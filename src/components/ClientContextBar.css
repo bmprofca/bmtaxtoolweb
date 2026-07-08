@@ -1,0 +1,97 @@
+.client-context-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.client-context-selectors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.55rem 0.75rem;
+}
+
+.client-context-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.client-context-field select {
+  min-width: 9.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.42rem 0.55rem;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #0f172a;
+  background: #fff;
+}
+
+.client-context-field--fy select {
+  min-width: 11rem;
+}
+
+.client-context-field--business select {
+  min-width: 12rem;
+}
+
+.client-context-tools-btn {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+}
+
+.client-context-tools-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.client-context-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  min-width: 8rem;
+}
+
+.client-context-summary-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.client-context-summary strong {
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+@media (max-width: 768px) {
+  .client-context-summary {
+    align-items: flex-start;
+    width: 100%;
+  }
+}

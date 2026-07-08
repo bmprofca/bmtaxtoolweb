@@ -1,26 +1,34 @@
 import { useEffect, useMemo, useState } from 'react'
+import { saveLoans } from '../api/fs'
 import type { LoanFormInput, LoanRecord } from '../types/loan'
 import {
   calculateEmi,
+  clampLoanMonthToFinancialYear,
   computeLoanForFinancialYear,
   createEmptyLoanForm,
+  getFinancialYearMonthBounds,
   loanToFormInput,
   summarizeCashFlowByYear,
+  toLoanMonthStartIso,
 } from '../utils/loanCalculator'
 import { formatAmount } from '../utils/fsCalculator'
-import { confirmSave } from '../utils/sweetAlert'
+import { confirmSave, showAddedAlert, showUpdatedAlert } from '../utils/sweetAlert'
 import LoanCashFlowTable from './LoanCashFlowTable'
 import './LoanModal.css'
 
 interface LoanModalProps {
   title: string
+  clientId: string
+  fyId: string
+  businessId: string
   fyLabel: string
   fyStartYear: number
   fyEndYear: number
+  existingLoans: LoanRecord[]
   loan?: LoanRecord | null
   openingBalanceReadOnly?: boolean
   onClose: () => void
-  onSave: (loan: LoanRecord) => void
+  onSaved: (loans: LoanRecord[]) => void
 }
 
 function dateToMonthInput(value: string) {
@@ -38,26 +46,42 @@ function monthToIsoDate(value: string) {
   if (!value) {
     return ''
   }
-  return `${value}-01`
+  return toLoanMonthStartIso(`${value}-01`)
 }
 
 function LoanModal({
   title,
+  clientId,
+  fyId,
+  businessId,
   fyLabel,
   fyStartYear,
   fyEndYear,
+  existingLoans,
   loan,
   openingBalanceReadOnly = false,
   onClose,
-  onSave,
+  onSaved,
 }: LoanModalProps) {
   const [form, setForm] = useState<LoanFormInput>(() =>
-    loan ? loanToFormInput(loan) : createEmptyLoanForm(),
+    loan ? loanToFormInput(loan) : createEmptyLoanForm(fyStartYear),
+  )
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+
+  const fyMonthBounds = useMemo(
+    () => getFinancialYearMonthBounds(fyStartYear, fyEndYear),
+    [fyStartYear, fyEndYear],
   )
 
   useEffect(() => {
-    setForm(loan ? loanToFormInput(loan) : createEmptyLoanForm())
-  }, [loan])
+    setForm(
+      loan
+        ? loanToFormInput(loan)
+        : createEmptyLoanForm(fyStartYear),
+    )
+    setSaveError('')
+  }, [loan, fyStartYear])
 
   const preview = useMemo(
     () => computeLoanForFinancialYear({ ...form, id: loan?.id }, fyStartYear, fyEndYear),
@@ -65,19 +89,55 @@ function LoanModal({
   )
 
   const updateField = (field: keyof LoanFormInput, value: string) => {
-    setForm((current) => ({
-      ...current,
-      [field]:
-        field === 'lender' || field.endsWith('Date')
-          ? value
-          : field === 'loanType'
-            ? (value as LoanFormInput['loanType'])
-            : Number(value) || 0,
-    }))
+    setForm((current) => {
+      const next: LoanFormInput = {
+        ...current,
+        [field]:
+          field === 'lender' || field.endsWith('Date')
+            ? value
+            : field === 'loanType'
+              ? (value as LoanFormInput['loanType'])
+              : Number(value) || 0,
+      }
+
+      if (field === 'disbursementDate' && value) {
+        const normalizedDisbursement = clampLoanMonthToFinancialYear(
+          monthToIsoDate(value),
+          fyStartYear,
+          fyEndYear,
+        )
+        next.disbursementDate = normalizedDisbursement
+
+        if (
+          !current.emiStartDate ||
+          current.emiStartDate === current.disbursementDate
+        ) {
+          next.emiStartDate = normalizedDisbursement
+        }
+      }
+
+      if (field === 'emiStartDate' && value) {
+        next.emiStartDate = clampLoanMonthToFinancialYear(
+          monthToIsoDate(value),
+          fyStartYear,
+          fyEndYear,
+        )
+      }
+
+      if (field === 'prepaymentDate' && value) {
+        next.prepaymentDate = clampLoanMonthToFinancialYear(
+          monthToIsoDate(value),
+          fyStartYear,
+          fyEndYear,
+        )
+      }
+
+      return next
+    })
   }
 
   const handleSave = async () => {
-    if (!form.lender.trim()) {
+    if (!form.lender.trim() || saving) {
       return
     }
 
@@ -95,20 +155,47 @@ function LoanModal({
       fyEndYear,
     )
 
-    onSave({
-      id: computed.id,
-      lender: computed.lender,
-      loanType: computed.loanType,
-      openingBalance: computed.openingBalance,
-      disbursement: computed.disbursement,
-      disbursementDate: computed.disbursementDate,
-      interestRate: computed.interestRate,
-      tenureMonths: computed.tenureMonths,
-      emiStartDate: computed.emiStartDate,
-      prepaymentAmount: computed.prepaymentAmount,
-      prepaymentDate: computed.prepaymentDate,
-    })
-    onClose()
+    const existing = existingLoans.find((item) => item.id === computed.id)
+    const nextLoan: LoanRecord =
+      existing && openingBalanceReadOnly
+        ? { ...computed, openingBalance: existing.openingBalance }
+        : {
+            id: computed.id,
+            lender: computed.lender,
+            loanType: computed.loanType,
+            openingBalance: computed.openingBalance,
+            disbursement: computed.disbursement,
+            disbursementDate: computed.disbursementDate,
+            interestRate: computed.interestRate,
+            tenureMonths: computed.tenureMonths,
+            emiStartDate: computed.emiStartDate,
+            prepaymentAmount: computed.prepaymentAmount,
+            prepaymentDate: computed.prepaymentDate,
+          }
+
+    const exists = existingLoans.some((item) => item.id === nextLoan.id)
+    const loans = exists
+      ? existingLoans.map((item) => (item.id === nextLoan.id ? nextLoan : item))
+      : [...existingLoans, nextLoan]
+
+    setSaving(true)
+    setSaveError('')
+
+    try {
+      const { loans: savedLoans } = await saveLoans(clientId, fyId, businessId, loans)
+      onSaved(savedLoans)
+      onClose()
+
+      if (exists) {
+        await showUpdatedAlert(nextLoan.lender)
+      } else {
+        await showAddedAlert(nextLoan.lender)
+      }
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save loan')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const basePrincipal = form.openingBalance + form.disbursement
@@ -119,8 +206,11 @@ function LoanModal({
       <div className="loan-modal" onClick={(event) => event.stopPropagation()}>
         <h2>{title}</h2>
         <p className="loan-modal-subtitle">
-          FY {fyLabel} — EMI schedule is generated from the details below
+          FY {fyLabel} (Apr {fyStartYear} – Mar {fyEndYear}) — loan is saved immediately. First EMI
+          is generated from the start installment month within this financial year.
         </p>
+
+        {saveError && <div className="alert loan-modal-error">{saveError}</div>}
 
         <div className="loan-form-grid">
           <label className="loan-field loan-field--wide">
@@ -130,6 +220,7 @@ function LoanModal({
               onChange={(e) => updateField('lender', e.target.value)}
               placeholder="Lender name"
               autoFocus
+              disabled={saving}
             />
           </label>
 
@@ -138,6 +229,7 @@ function LoanModal({
             <select
               value={form.loanType}
               onChange={(e) => updateField('loanType', e.target.value)}
+              disabled={saving}
             >
               <option value="long-term">Long-term (Secured Loans)</option>
               <option value="short-term">Short-term (Unsecured Loans)</option>
@@ -167,16 +259,20 @@ function LoanModal({
               value={form.disbursement || ''}
               onChange={(e) => updateField('disbursement', e.target.value)}
               placeholder="0"
+              disabled={saving}
             />
           </label>
 
           <label className="loan-field">
-            Disbursement Period
+            Disbursement Period (FY month)
             <input
               type="month"
               className="loan-period-input"
+              min={fyMonthBounds.min}
+              max={fyMonthBounds.max}
               value={dateToMonthInput(form.disbursementDate)}
-              onChange={(e) => updateField('disbursementDate', monthToIsoDate(e.target.value))}
+              onChange={(e) => updateField('disbursementDate', e.target.value)}
+              disabled={saving}
             />
           </label>
 
@@ -188,6 +284,7 @@ function LoanModal({
               value={form.interestRate || ''}
               onChange={(e) => updateField('interestRate', e.target.value)}
               placeholder="0"
+              disabled={saving}
             />
           </label>
 
@@ -198,17 +295,24 @@ function LoanModal({
               value={form.tenureMonths || ''}
               onChange={(e) => updateField('tenureMonths', e.target.value)}
               placeholder="12"
+              disabled={saving}
             />
           </label>
 
           <label className="loan-field">
-            Loan Commencement Period
+            Start Installment Period (FY month)
             <input
               type="month"
               className="loan-period-input"
+              min={fyMonthBounds.min}
+              max={fyMonthBounds.max}
               value={dateToMonthInput(form.emiStartDate)}
-              onChange={(e) => updateField('emiStartDate', monthToIsoDate(e.target.value))}
+              onChange={(e) => updateField('emiStartDate', e.target.value)}
+              disabled={saving}
             />
+            <span className="loan-field-hint">
+              First EMI falls in this month (defaults to disbursement month)
+            </span>
           </label>
 
           <label className="loan-field">
@@ -218,16 +322,20 @@ function LoanModal({
               value={form.prepaymentAmount || ''}
               onChange={(e) => updateField('prepaymentAmount', e.target.value)}
               placeholder="0"
+              disabled={saving}
             />
           </label>
 
           <label className="loan-field">
-            Prepayment Period (optional)
+            Prepayment Period (optional, FY month)
             <input
               type="month"
               className="loan-period-input"
+              min={fyMonthBounds.min}
+              max={fyMonthBounds.max}
               value={dateToMonthInput(form.prepaymentDate)}
-              onChange={(e) => updateField('prepaymentDate', monthToIsoDate(e.target.value))}
+              onChange={(e) => updateField('prepaymentDate', e.target.value)}
+              disabled={saving}
             />
           </label>
         </div>
@@ -282,16 +390,16 @@ function LoanModal({
         )}
 
         <div className="loan-modal-actions">
-          <button type="button" className="secondary-btn" onClick={onClose}>
+          <button type="button" className="secondary-btn" onClick={onClose} disabled={saving}>
             Cancel
           </button>
           <button
             type="button"
             className="primary-btn"
-            onClick={handleSave}
-            disabled={!form.lender.trim()}
+            onClick={() => void handleSave()}
+            disabled={!form.lender.trim() || saving}
           >
-            {loan ? 'Update Loan' : 'Add Loan'}
+            {saving ? 'Saving…' : loan ? 'Update Loan' : 'Add Loan'}
           </button>
         </div>
       </div>

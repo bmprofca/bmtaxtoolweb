@@ -991,3 +991,85 @@
     grid-column: span 1;
   }
 }
+
+.business-matrix--tools .business-tools-col {
+  min-width: 14rem;
+}
+
+.business-tools-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.business-tool-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.1rem;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.business-tool-chip--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.business-tool-chip--all {
+  background: #fff;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.business-tool-chip--all:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.business-tool-chip--emerald:not(.business-tool-chip--disabled) {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.business-tool-chip--emerald:not(.business-tool-chip--disabled):hover {
+  background: #047857;
+  color: #fff;
+}
+
+.business-tool-chip--sky:not(.business-tool-chip--disabled) {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.business-tool-chip--violet:not(.business-tool-chip--disabled) {
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.business-tool-chip--amber:not(.business-tool-chip--disabled) {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.business-tool-chip--rose:not(.business-tool-chip--disabled) {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.business-tool-chip--slate:not(.business-tool-chip--disabled) {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.business-tools-fy-hint {
+  margin: 0;
+}

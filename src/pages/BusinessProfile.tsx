@@ -28,6 +28,9 @@ import {
   showUpdatedAlert,
 } from '../utils/sweetAlert'
 import PageRefreshButton from '../components/PageRefreshButton'
+import { TOOLS } from '../config/tools'
+import { getDefaultFyForBusiness } from '../utils/financialYear'
+import { buildToolPickerRoute, buildToolWorkspaceRoute } from '../utils/toolRoutes'
 import '../styles/shared.css'
 import './BusinessProfile.css'
 
@@ -456,7 +459,7 @@ function BusinessProfile() {
                 Edit Business
               </button>
               <Link to={`/clients/${clientId}/business`} className="secondary-btn bp-link-btn">
-                Back to Matrix
+                Back to Workspace
               </Link>
             </div>
           </div>
@@ -465,9 +468,42 @@ function BusinessProfile() {
         {activeTab === 'financial-years' && (
           <div className="bp-tab-content">
             <p className="bp-tab-hint">
-              All financial years for <strong>{business.name}</strong>. Open FS to prepare or
-              review statements.
+              All financial years for <strong>{business.name}</strong>. Open tools from the workspace
+              or use the shortcuts below.
             </p>
+
+            {clientId ? (
+              <div className="bp-tools-row">
+                {TOOLS.map((tool) => {
+                  const defaultFy = getDefaultFyForBusiness(business, financialYears)
+                  const disabled = !tool.available || !defaultFy
+
+                  if (disabled) {
+                    return (
+                      <span
+                        key={tool.id}
+                        className={`bp-tool-chip bp-tool-chip--disabled bp-tool-chip--${tool.accent}`}
+                      >
+                        {tool.shortName}
+                      </span>
+                    )
+                  }
+
+                  return (
+                    <Link
+                      key={tool.id}
+                      to={buildToolWorkspaceRoute(clientId, tool.id, defaultFy.id, business.id)}
+                      className={`bp-tool-chip bp-tool-chip--${tool.accent}`}
+                    >
+                      {tool.shortName}
+                    </Link>
+                  )
+                })}
+                <Link to={buildToolPickerRoute(clientId, business.id)} className="bp-tool-chip bp-tool-chip--all">
+                  All Tools
+                </Link>
+              </div>
+            ) : null}
 
             {financialYears.length === 0 ? (
               <p className="empty-state">
@@ -482,7 +518,6 @@ function BusinessProfile() {
                       <th>Financial Year</th>
                       <th>Period</th>
                       <th>Status</th>
-                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -506,18 +541,6 @@ function BusinessProfile() {
                             <span className={`bp-status bp-status--${cellState}`}>
                               {getFyCellStatusLabel(cellState)}
                             </span>
-                          </td>
-                          <td>
-                            {cellState === 'active' ? (
-                              <Link
-                                to={`/clients/${clientId}/fs/${fy.id}/business/${business.id}`}
-                                className="bp-fs-link"
-                              >
-                                Open FS
-                              </Link>
-                            ) : (
-                              <span className="bp-fs-muted">—</span>
-                            )}
                           </td>
                         </tr>
                       )

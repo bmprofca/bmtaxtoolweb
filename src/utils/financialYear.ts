@@ -35,6 +35,15 @@ export function getBusinessFyCellState(
   return 'active'
 }
 
+export function getDefaultFyForBusiness<
+  T extends { id: string; startingYear: number; status?: string },
+  F extends { id: string; endYear: number; closedBusinessIds?: string[]; startYear: number },
+>(business: T, financialYears: F[]): F | null {
+  const sorted = sortFinancialYears(financialYears)
+  const activeYears = sorted.filter((fy) => getBusinessFyCellState(business, fy) === 'active')
+  return activeYears[activeYears.length - 1] ?? null
+}
+
 export function getEligibleBusinesses<T extends { startingYear: number }>(
   businesses: T[],
   endYear: number,
@@ -118,6 +127,26 @@ export function normalizeStatementType(value?: string): FinancialStatementType {
   return 'Actual'
 }
 
+export type FinancialYearStatus = 'active' | 'inactive'
+
+export function normalizeFinancialYearStatus(value?: string | null): FinancialYearStatus {
+  return value === 'inactive' ? 'inactive' : 'active'
+}
+
+export function isActiveFinancialYear(fy: { status?: string | null }): boolean {
+  return normalizeFinancialYearStatus(fy.status) === 'active'
+}
+
+export function getActiveFinancialYears<T extends { status?: string | null }>(
+  financialYears: T[],
+): T[] {
+  return financialYears.filter((fy) => isActiveFinancialYear(fy))
+}
+
+export function getFinancialYearStatusLabel(status?: string | null): string {
+  return normalizeFinancialYearStatus(status) === 'inactive' ? 'Inactive' : 'Active'
+}
+
 export function formatFyDisplay(fy: { label: string; statementType?: string }) {
   const type = normalizeStatementType(fy.statementType)
   return type === 'Actual' ? fy.label : `${fy.label} (${type})`
@@ -196,6 +225,37 @@ export function formatNotesTabLabel(statementType?: string): string {
 export function formatBalanceSheetReportTitle(statementType?: string): string {
   const qualifier = getStatementTypeQualifier(statementType)
   return qualifier ? `${qualifier} Balance Sheet` : 'Balance Sheet'
+}
+
+export function formatFyEndDateShort(endYear: number): string {
+  return `31.03.${endYear}`
+}
+
+export function formatFyEndDateLong(endYear: number): string {
+  return `31st March ${endYear}`
+}
+
+export function formatBalanceSheetPrintColumnLabel(endYear: number): string {
+  return `As at ${formatFyEndDateLong(endYear)}`
+}
+
+export function formatPrintReportPeriod(
+  reportKind: 'balance-sheet' | 'profit-loss' | 'notes' | 'other',
+  fy: Pick<FinancialYear, 'endYear'>,
+): string {
+  const endLabel = formatFyEndDateLong(fy.endYear)
+  if (reportKind === 'balance-sheet') {
+    return `As at ${endLabel}`
+  }
+  return `For the year ended ${endLabel}`
+}
+
+export function formatPrintDate(value: Date = new Date()): string {
+  return value.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
 }
 
 export function formatProfitLossReportTitle(statementType?: string): string {

@@ -119,7 +119,6 @@ export function buildBalanceSheetLines(input: BalanceSheetBuildInput): Statement
   return [
     line('I. SOURCES OF FUNDS', 0, 0, { isHeader: true }),
     line('1. Owners Fund', 0, 0, { isSubHeader: true, indent: 0 }),
-    line('', 0, 0, { isSpacer: true }),
     line('(a) Capital A/c', ownersFund.current, ownersFund.previous, {
       indent: 1,
       noteNo: '1',

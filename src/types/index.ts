@@ -15,6 +15,13 @@ export interface AppUser extends User {
   userToken?: never
 }
 
+export interface UpdateUserPayload {
+  name: string
+  mobile: string
+  userType?: UserType
+  password?: string
+}
+
 export interface CreateUserPayload {
   username: string
   mobile: string
@@ -56,9 +63,12 @@ export interface FinancialYear {
   startYear: number
   endYear: number
   statementType: string
+  status?: FinancialYearStatus
   closedBusinessIds: string[]
   createdAt: string
 }
+
+export type FinancialYearStatus = 'active' | 'inactive'
 
 export type ClientStatus = 'active' | 'inactive'
 export type ClientStatusFilter = ClientStatus | 'all'

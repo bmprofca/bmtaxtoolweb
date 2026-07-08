@@ -5,6 +5,62 @@
   align-items: start;
 }
 
+.settings-back-link {
+  margin-bottom: 0.85rem;
+}
+
+.settings-modules-table td {
+  vertical-align: middle;
+}
+
+.settings-module-name {
+  display: flex;
+  align-items: center;
+}
+
+.settings-module-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.settings-module-badge--sky {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.settings-module-badge--violet {
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.settings-module-desc {
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  max-width: 34rem;
+}
+
+.settings-module-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.settings-module-manage-btn {
+  font-size: 0.82rem;
+  padding: 0.42rem 0.85rem;
+}
+
 .settings-nav h2 {
   margin: 0 0 0.75rem;
   font-size: 0.95rem;
@@ -193,6 +249,44 @@
 
 .settings-fy-type-col {
   min-width: 9rem;
+}
+
+.settings-fy-status-col {
+  min-width: 7.5rem;
+}
+
+.settings-fy-status-select {
+  width: 100%;
+  min-width: 6.5rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.settings-fy-status-select--active {
+  border: 1px solid #86efac;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.settings-fy-status-select--inactive {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.settings-fy-status-select:focus {
+  outline: 2px solid #93c5fd;
+  border-color: #60a5fa;
+}
+
+.settings-fy-status-select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .settings-fy-type-select {
@@ -467,4 +561,93 @@
     width: 100%;
     justify-content: flex-start;
   }
+}
+
+.settings-users-table td {
+  vertical-align: middle;
+}
+
+.settings-users-actions {
+  flex-wrap: wrap;
+}
+
+.settings-users-token-btn {
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+.settings-users-token-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.settings-user-type {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.settings-user-type--admin {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.settings-user-type--staff {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.settings-users-modal {
+  width: min(100%, 480px);
+  padding: 1.25rem 1.35rem;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+}
+
+.settings-users-modal h2 {
+  margin: 0 0 0.35rem;
+}
+
+.settings-users-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.settings-users-form input:disabled {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.settings-users-token-panel p {
+  margin: 0 0 0.75rem;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.settings-users-token-value {
+  display: block;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  word-break: break-all;
+  font-size: 0.82rem;
+  color: #0f172a;
+}
+
+.settings-users-token-hint {
+  margin-top: 0.75rem !important;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.settings-users-token-hint code {
+  font-size: 0.8rem;
 }

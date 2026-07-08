@@ -1,7 +1,7 @@
-export { default as Users } from './Users'
 export { default as Clients } from './Clients'
 export { default as Business } from './Business'
 export { default as BusinessProfile } from './BusinessProfile'
+export { default as ClientToolPicker } from './ClientToolPicker'
 export { default as Settings } from './Settings'
 export { default as CA } from './CA'
 export { default as Ledger } from './Ledger'

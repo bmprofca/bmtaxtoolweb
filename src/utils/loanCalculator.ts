@@ -1,6 +1,7 @@
 import type { Loan, LoanFormInput, LoanMonthRow, LoanRecord, LoanSummary, LoanYearCashFlow } from '../types/loan'
 
 const MONTHS = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar']
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 function n(value: number | undefined) {
   return Number.isFinite(value) ? Number(value) : 0
@@ -8,6 +9,105 @@ function n(value: number | undefined) {
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+}
+
+export function parseLoanYearMonth(value: string) {
+  if (!value) {
+    return null
+  }
+
+  const parts = value.split('-')
+  if (parts.length < 2) {
+    return null
+  }
+
+  const year = Number(parts[0])
+  const month = Number(parts[1])
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    return null
+  }
+
+  return { year, month }
+}
+
+function yearMonthKey(year: number, month: number) {
+  return year * 12 + month
+}
+
+function isBeforeYearMonth(
+  left: { year: number; month: number },
+  right: { year: number; month: number },
+) {
+  return yearMonthKey(left.year, left.month) < yearMonthKey(right.year, right.month)
+}
+
+function isAfterYearMonth(
+  left: { year: number; month: number },
+  right: { year: number; month: number },
+) {
+  return yearMonthKey(left.year, left.month) > yearMonthKey(right.year, right.month)
+}
+
+export function toLoanMonthStartIso(value: string) {
+  const parsed = parseLoanYearMonth(value)
+  if (!parsed) {
+    return ''
+  }
+
+  return `${parsed.year}-${String(parsed.month).padStart(2, '0')}-01`
+}
+
+export function resolveEmiStartDate(
+  input: { emiStartDate?: string; disbursementDate?: string },
+  fyStartYear: number,
+) {
+  if (input.emiStartDate) {
+    return toLoanMonthStartIso(input.emiStartDate)
+  }
+
+  if (input.disbursementDate) {
+    return toLoanMonthStartIso(input.disbursementDate)
+  }
+
+  return `${fyStartYear}-04-01`
+}
+
+export function formatLoanInstallmentPeriod(value: string) {
+  const parsed = parseLoanYearMonth(value)
+  if (!parsed) {
+    return '—'
+  }
+
+  return `${MONTH_LABELS[parsed.month - 1]} ${parsed.year}`
+}
+
+export function getFinancialYearMonthBounds(fyStartYear: number, fyEndYear: number) {
+  return {
+    min: `${fyStartYear}-04`,
+    max: `${fyEndYear}-03`,
+  }
+}
+
+export function clampLoanMonthToFinancialYear(value: string, fyStartYear: number, fyEndYear: number) {
+  const parsed = parseLoanYearMonth(value)
+  if (!parsed) {
+    return `${fyStartYear}-04-01`
+  }
+
+  const bounds = getFinancialYearMonthBounds(fyStartYear, fyEndYear)
+  const min = parseLoanYearMonth(bounds.min)!
+  const max = parseLoanYearMonth(bounds.max)!
+
+  if (isBeforeYearMonth(parsed, min)) {
+    return toLoanMonthStartIso(bounds.min)
+  }
+
+  if (isAfterYearMonth(parsed, max)) {
+    return toLoanMonthStartIso(bounds.max)
+  }
+
+  return toLoanMonthStartIso(value)
 }
 
 export function calculateEmi(principal: number, annualRate: number, tenureMonths: number) {
@@ -34,8 +134,17 @@ function isInFinancialYear(date: Date, fyStartYear: number, fyEndYear: number) {
   return date >= fyStart && date <= fyEnd
 }
 
-function sameMonth(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
+function sameMonth(dateValue: string | Date, monthDate: Date) {
+  const parsed =
+    typeof dateValue === 'string'
+      ? parseLoanYearMonth(dateValue)
+      : { year: dateValue.getFullYear(), month: dateValue.getMonth() + 1 }
+
+  if (!parsed) {
+    return false
+  }
+
+  return parsed.year === monthDate.getFullYear() && parsed.month === monthDate.getMonth() + 1
 }
 
 export function computeLoanForFinancialYear(
@@ -44,7 +153,9 @@ export function computeLoanForFinancialYear(
   fyEndYear: number,
 ): Loan {
   const fyStart = new Date(fyStartYear, 3, 1)
-  const emiStart = input.emiStartDate ? new Date(input.emiStartDate) : fyStart
+  const resolvedEmiStartDate = resolveEmiStartDate(input, fyStartYear)
+  const emiStartYm = parseLoanYearMonth(resolvedEmiStartDate)!
+  const fyEndYm = { year: fyEndYear, month: 3 }
   const monthlyRate = n(input.interestRate) / 12 / 100
 
   let balance = n(input.openingBalance)
@@ -67,8 +178,9 @@ export function computeLoanForFinancialYear(
 
   for (let index = 0; index < 12; index += 1) {
     const monthDate = new Date(fyStartYear, 3 + index, 1)
+    const monthYm = { year: monthDate.getFullYear(), month: monthDate.getMonth() + 1 }
 
-    if (monthDate < emiStart || monthDate > new Date(fyEndYear, 2, 31)) {
+    if (isBeforeYearMonth(monthYm, emiStartYm) || isAfterYearMonth(monthYm, fyEndYm)) {
       continue
     }
 
@@ -77,7 +189,7 @@ export function computeLoanForFinancialYear(
     }
 
     if (n(input.prepaymentAmount) > 0 && input.prepaymentDate) {
-      const prepDate = new Date(input.prepaymentDate)
+      const prepDate = input.prepaymentDate
       if (sameMonth(prepDate, monthDate)) {
         const prepay = Math.min(balance, n(input.prepaymentAmount))
         balance -= prepay
@@ -130,7 +242,7 @@ export function computeLoanForFinancialYear(
     disbursementDate: input.disbursementDate || '',
     interestRate: n(input.interestRate),
     tenureMonths: n(input.tenureMonths),
-    emiStartDate: input.emiStartDate || '',
+    emiStartDate: resolvedEmiStartDate,
     prepaymentAmount: n(input.prepaymentAmount),
     prepaymentDate: input.prepaymentDate || '',
     emiAmount,
@@ -204,16 +316,17 @@ export function mergeCashFlowByYear(loans: Loan[]): LoanYearCashFlow[] {
     }))
 }
 
-export function createEmptyLoanForm(): LoanFormInput {
+export function createEmptyLoanForm(fyStartYear?: number): LoanFormInput {
+  const defaultMonth = fyStartYear ? `${fyStartYear}-04-01` : ''
   return {
     lender: '',
     loanType: 'long-term',
     openingBalance: 0,
     disbursement: 0,
-    disbursementDate: '',
+    disbursementDate: defaultMonth,
     interestRate: 0,
     tenureMonths: 12,
-    emiStartDate: '',
+    emiStartDate: defaultMonth,
     prepaymentAmount: 0,
     prepaymentDate: '',
   }

@@ -137,6 +137,47 @@ export async function showCaStatusAlert(options: {
   })
 }
 
+export async function confirmFinancialYearStatusChange(options: {
+  itemLabel: string
+  nextStatus: 'active' | 'inactive'
+}): Promise<boolean> {
+  const isActive = options.nextStatus === 'active'
+  const result = await SwalApp.fire({
+    icon: 'question',
+    title: isActive ? 'Activate Financial Year?' : 'Deactivate Financial Year?',
+    html: `<p>Set <strong>${escapeHtml(options.itemLabel)}</strong> as <strong>${
+      isActive ? 'Active' : 'Inactive'
+    }</strong>?</p>${
+      isActive
+        ? '<p style="margin-top:0.5rem;color:#6b7280;font-size:0.92rem">Active years appear in financial statement reports and year selectors.</p>'
+        : '<p style="margin-top:0.5rem;color:#6b7280;font-size:0.92rem">Inactive years are hidden from financial statement reports and year selectors.</p>'
+    }`,
+    showCancelButton: true,
+    confirmButtonText: isActive ? 'Yes, activate' : 'Yes, deactivate',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: isActive ? '#16a34a' : SWAL_DANGER_COLOR,
+    cancelButtonColor: '#6b7280',
+  })
+
+  return result.isConfirmed
+}
+
+export async function showFinancialYearStatusAlert(options: {
+  itemLabel: string
+  status: 'active' | 'inactive'
+}) {
+  const isActive = options.status === 'active'
+  await SwalApp.fire({
+    icon: 'success',
+    title: isActive ? 'Financial Year Activated' : 'Financial Year Deactivated',
+    html: `<p><strong>${escapeHtml(options.itemLabel)}</strong> is now <strong style="color:${
+      isActive ? '#166534' : '#64748b'
+    }">${isActive ? 'Active' : 'Inactive'}</strong>.</p>`,
+    confirmButtonText: 'OK',
+    confirmButtonColor: isActive ? '#16a34a' : SWAL_CONFIRM_COLOR,
+  })
+}
+
 export async function promptPassword(options: {
   title: string
   itemLabel?: string

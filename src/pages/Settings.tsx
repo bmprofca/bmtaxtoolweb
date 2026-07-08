@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   fetchDeletedGlobalFinancialYears,
   fetchGlobalFinancialYears,
@@ -7,6 +7,7 @@ import {
   restoreGlobalFinancialYear,
   saveGlobalFinancialYears,
   updateGlobalFinancialYearStatementType,
+  updateGlobalFinancialYearStatus,
 } from '../api/fySettings'
 import {
   canDeleteFinancialYear,
@@ -14,6 +15,7 @@ import {
   getAutoFillYearsPreview,
   getAvailableFinancialYearOptions,
   mergeFinancialYearRange,
+  normalizeFinancialYearStatus,
   normalizeStatementType,
   validateSequentialFinancialYears,
 } from '../utils/financialYear'
@@ -24,22 +26,55 @@ import {
 } from '../utils/globalFinancialYear'
 import {
   confirmDelete,
+  confirmFinancialYearStatusChange,
   confirmRestore,
   confirmSave,
   showAddedAlert,
   showDeletedAlert,
+  showFinancialYearStatusAlert,
   showRestoredAlert,
   showUpdatedAlert,
 } from '../utils/sweetAlert'
 import PageRefreshButton from '../components/PageRefreshButton'
+import SettingsUsersSection from '../components/SettingsUsersSection'
+import { fetchUsers } from '../api/users'
 import '../styles/shared.css'
 import './Settings.css'
 
-type SettingsSection = 'financial-year'
+type SettingsSection = 'financial-year' | 'users'
 type ModalMode = 'add' | 'edit'
 
+const SETTING_MODULES: Array<{
+  id: SettingsSection
+  name: string
+  description: string
+  accent: 'sky' | 'violet'
+}> = [
+  {
+    id: 'financial-year',
+    name: 'Financial Year',
+    description: 'Application-wide financial years used across all clients and tools.',
+    accent: 'sky',
+  },
+  {
+    id: 'users',
+    name: 'Users',
+    description: 'App users, roles, passwords, and API access tokens.',
+    accent: 'violet',
+  },
+]
+
 function Settings() {
-  const [activeSection] = useState<SettingsSection>('financial-year')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const sectionParam = searchParams.get('section')
+  const activeSection: SettingsSection | null =
+    sectionParam === 'users'
+      ? 'users'
+      : sectionParam === 'financial-year'
+        ? 'financial-year'
+        : null
+  const [usersRefreshKey, setUsersRefreshKey] = useState(0)
+  const [userCount, setUserCount] = useState<number | null>(null)
   const [financialYears, setFinancialYears] = useState<GlobalFinancialYear[]>([])
   const [deletedFinancialYears, setDeletedFinancialYears] = useState<GlobalFinancialYear[]>([])
   const [loading, setLoading] = useState(true)
@@ -54,6 +89,7 @@ function Settings() {
   const [selectedStartYear, setSelectedStartYear] = useState(String(new Date().getFullYear()))
   const [selectedStatementType, setSelectedStatementType] = useState('Actual')
   const [savingStatementTypeFyId, setSavingStatementTypeFyId] = useState<string | null>(null)
+  const [savingStatusFyId, setSavingStatusFyId] = useState<string | null>(null)
   const [modalError, setModalError] = useState('')
 
   const sortedYears = useMemo(
@@ -105,8 +141,21 @@ function Settings() {
     }
   }
 
+  const loadUserCount = async () => {
+    try {
+      const data = await fetchUsers()
+      setUserCount(data.users.length)
+    } catch {
+      setUserCount(null)
+    }
+  }
+
+  const loadSettingsOverview = async () => {
+    await Promise.all([loadFinancialYears(), loadUserCount()])
+  }
+
   useEffect(() => {
-    loadFinancialYears()
+    loadSettingsOverview()
   }, [])
 
   const closeModal = () => {
@@ -230,6 +279,38 @@ function Settings() {
     }
   }
 
+  const handleStatusChange = async (
+    fy: GlobalFinancialYear,
+    nextStatus: 'active' | 'inactive',
+  ) => {
+    const normalized = normalizeFinancialYearStatus(nextStatus)
+    if (normalizeFinancialYearStatus(fy.status) === normalized) {
+      return
+    }
+
+    const confirmed = await confirmFinancialYearStatusChange({
+      itemLabel: fy.label,
+      nextStatus: normalized,
+    })
+    if (!confirmed) {
+      return
+    }
+
+    setSavingStatusFyId(fy.id)
+    setError('')
+    try {
+      const result = await updateGlobalFinancialYearStatus(fy.id, normalized)
+      setFinancialYears((current) =>
+        current.map((item) => (item.id === fy.id ? result.financialYear : item)),
+      )
+      await showFinancialYearStatusAlert({ itemLabel: fy.label, status: normalized })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update financial year status')
+    } finally {
+      setSavingStatusFyId(null)
+    }
+  }
+
   const handleDeleteFy = async (fy: GlobalFinancialYear) => {
     if (!canDeleteFinancialYear(sortedYears, fy.id)) {
       setError('Delete the latest financial year first to keep years in sequence.')
@@ -301,28 +382,151 @@ function Settings() {
     })
   }
 
+  const openSection = (section: SettingsSection) => {
+    setSearchParams({ section })
+  }
+
+  const backToSettingsList = () => {
+    setSearchParams({})
+  }
+
+  const handleRefresh = async () => {
+    if (!activeSection) {
+      await loadSettingsOverview()
+      return
+    }
+
+    if (activeSection === 'users') {
+      setUsersRefreshKey((current) => current + 1)
+      await loadUserCount()
+      return
+    }
+
+    await loadFinancialYears()
+  }
+
+  const getModuleStatus = (moduleId: SettingsSection) => {
+    if (moduleId === 'financial-year') {
+      if (loading && userCount === null) {
+        return 'Loading...'
+      }
+      if (sortedYears.length === 0) {
+        return 'Not configured'
+      }
+      const activeCount = sortedYears.filter(
+        (fy) => normalizeFinancialYearStatus(fy.status) === 'active',
+      ).length
+      return `${activeCount} active / ${sortedYears.length} ${sortedYears.length === 1 ? 'year' : 'years'}`
+    }
+
+    if (userCount === null) {
+      return 'Loading...'
+    }
+    return `${userCount} ${userCount === 1 ? 'user' : 'users'}`
+  }
+
   return (
     <div className="settings-page">
       <header className="page-header page-header-row">
         <div>
           <h1>Settings</h1>
-          <p>Configure application-wide master data</p>
+          <p>
+            {activeSection
+              ? activeSection === 'financial-year'
+                ? 'Manage financial years for all clients'
+                : 'Settings'
+              : 'Configure application-wide master data'}
+          </p>
         </div>
-        <PageRefreshButton onRefresh={loadFinancialYears} disabled={loading} />
+        <PageRefreshButton
+          onRefresh={handleRefresh}
+          disabled={loading && (!activeSection || activeSection === 'financial-year')}
+        />
       </header>
 
       {error && <div className="alert">{error}</div>}
       {saveMessage && <p className="success-text">{saveMessage}</p>}
 
-      <div className="settings-layout">
-        <aside className="settings-nav panel">
-          <h2>Sections</h2>
-          <button type="button" className="settings-nav-item active">
-            Financial Year
-          </button>
-        </aside>
+      {!activeSection ? (
+        <section className="panel settings-section">
+          <div className="settings-section-header">
+            <div>
+              <h2>Settings</h2>
+              <p className="hint">
+                Choose a setting to manage. Financial years and users are maintained here for the
+                whole application.
+              </p>
+            </div>
+          </div>
 
-        {activeSection === 'financial-year' && (
+          <div className="settings-fy-table-card">
+            <div className="settings-fy-table-meta">
+              <span className="settings-fy-count">
+                {SETTING_MODULES.length} {SETTING_MODULES.length === 1 ? 'module' : 'modules'}
+              </span>
+            </div>
+
+            <div className="settings-table-wrap">
+              <table className="settings-fy-table settings-modules-table">
+                <thead>
+                  <tr>
+                    <th className="settings-fy-sno-col">#</th>
+                    <th>Setting</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th className="settings-fy-actions-col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {SETTING_MODULES.map((module, index) => (
+                    <tr key={module.id}>
+                      <td className="settings-fy-sno-col">
+                        <span className="settings-fy-sno">{index + 1}</span>
+                      </td>
+                      <td>
+                        <div className="settings-module-name">
+                          <span className={`settings-module-badge settings-module-badge--${module.accent}`}>
+                            {module.name}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="settings-module-desc">{module.description}</td>
+                      <td>
+                        <span className="settings-module-status">{getModuleStatus(module.id)}</span>
+                      </td>
+                      <td className="settings-fy-actions-col">
+                        <button
+                          type="button"
+                          className="primary-btn settings-module-manage-btn"
+                          onClick={() => openSection(module.id)}
+                        >
+                          Manage
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <>
+          {activeSection === 'financial-year' && (
+            <button type="button" className="back-link settings-back-link" onClick={backToSettingsList}>
+              ← Back to Settings
+            </button>
+          )}
+
+          {activeSection === 'users' && (
+            <SettingsUsersSection
+              key={usersRefreshKey}
+              onBack={backToSettingsList}
+              onCountChange={setUserCount}
+            />
+          )}
+
+          {activeSection === 'financial-year' && (
           <section className="panel settings-section">
             <div className="settings-section-header">
               <div>
@@ -367,6 +571,7 @@ function Settings() {
                         <th className="settings-fy-year-col">Financial Year</th>
                         <th className="settings-fy-period-col">Period</th>
                         <th className="settings-fy-type-col">Statement Type</th>
+                        <th className="settings-fy-status-col">Status</th>
                         <th className="settings-fy-actions-col">Actions</th>
                       </tr>
                     </thead>
@@ -409,6 +614,23 @@ function Settings() {
                                     {type}
                                   </option>
                                 ))}
+                              </select>
+                            </td>
+                            <td className="settings-fy-status-col">
+                              <select
+                                className={`settings-fy-status-select settings-fy-status-select--${normalizeFinancialYearStatus(fy.status)}`}
+                                value={normalizeFinancialYearStatus(fy.status)}
+                                onChange={(event) =>
+                                  void handleStatusChange(
+                                    fy,
+                                    event.target.value as 'active' | 'inactive',
+                                  )
+                                }
+                                disabled={saving || savingStatusFyId === fy.id}
+                                aria-label={`Status for ${fy.label}`}
+                              >
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
                               </select>
                             </td>
                             <td className="settings-fy-actions-col">
@@ -492,10 +714,11 @@ function Settings() {
               </div>
             )}
           </section>
-        )}
-      </div>
+          )}
+        </>
+      )}
 
-      {showModal && (
+      {showModal && activeSection === 'financial-year' && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="settings-fy-modal" onClick={(event) => event.stopPropagation()}>
             <h2>{modalMode === 'edit' ? 'Edit Financial Year' : 'Add Financial Year'}</h2>

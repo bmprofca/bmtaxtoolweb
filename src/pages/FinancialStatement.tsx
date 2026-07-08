@@ -12,7 +12,7 @@ import { fetchCaSettings, normalizeCaSettings } from '../api/caSettings'
 import type { CaProfile } from '../types/caProfile'
 import { EMPTY_CA_PROFILE, isActiveCaProfile } from '../types/caProfile'
 import { fetchClient } from '../api/client'
-import { fetchDepreciationHistory, fetchFsData, saveFsData } from '../api/fs'
+import { fetchDepreciationHistory, fetchFsData, saveBankAccounts, saveFsData, saveLoans } from '../api/fs'
 import { fetchLedgers } from '../api/ledger'
 import type { Client } from '../types'
 import type {
@@ -64,6 +64,7 @@ import {
   updateDepreciationRowLedger,
 } from '../utils/depreciationLedgerSync'
 import {
+  formatLoanInstallmentPeriod,
   mergeCashFlowByYear,
   normalizeLoans,
   recomputeLoansForFy,
@@ -118,7 +119,6 @@ import { normalizeGstReco } from '../utils/gstDefaults'
 import { getGstTaxableSalesTotal, isGstLinkedRevenueSub } from '../utils/gstCalculator'
 import { applyGstSalesLinkToRevenue } from '../utils/gstRevenueLink'
 import {
-  createBankAccountFromForm,
   getBankAccountTypeLabel,
   getCreditClosingAmount,
   getDebitClosingAmount,
@@ -146,6 +146,8 @@ import {
   formatBalanceSheetReportTitle,
   formatFinancialStatementPageTitle,
   formatFyDisplay,
+  formatFyEndDateShort,
+  formatBalanceSheetPrintColumnLabel,
   formatNotesReportTitle,
   formatProfitLossReportTitle,
   formatProfitLossTabLabel,
@@ -174,7 +176,6 @@ import {
   confirmSave,
   promptUnlockConfirmationCode,
   showActionAlert,
-  showAddedAlert,
   showDeletedAlert,
   showUpdatedAlert,
 } from '../utils/sweetAlert'
@@ -258,17 +259,6 @@ function formatDateTime(value: string) {
   })
 }
 
-function formatLoanCommencementDate(value: string) {
-  if (!value) {
-    return '—'
-  }
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) {
-    return value
-  }
-  return parsed.toLocaleDateString('en-IN')
-}
-
 function fsDataFingerprint(data: FinancialStatementData): string {
   const { updatedAt, savedAt, clientId, fyId, businessId, ...payload } = data
   return JSON.stringify(payload)
@@ -286,6 +276,8 @@ function StatementTable({
   lines,
   currentLabel,
   previousLabel,
+  printCurrentLabel,
+  printPreviousLabel,
   showNoteColumn = false,
   useStatementAmountFormat = false,
   onNoteNavigate,
@@ -296,6 +288,8 @@ function StatementTable({
   lines: StatementLine[]
   currentLabel: string
   previousLabel: string
+  printCurrentLabel?: string
+  printPreviousLabel?: string
   showNoteColumn?: boolean
   useStatementAmountFormat?: boolean
   onNoteNavigate?: (noteKey: keyof FsNotes, noteSubId?: string) => void
@@ -305,9 +299,14 @@ function StatementTable({
   const formatValue = useStatementAmountFormat ? formatStatementAmount : formatAmount
 
   const renderAmount = (value: number, variant: 'prev' | 'curr', blank?: boolean) => (
-    <div className={`statement-amount-value statement-amount-${variant}`}>
-      {blank ? '—' : formatValue(value)}
-    </div>
+    <>
+      <div className={`statement-amount-value statement-amount-${variant} fs-screen-only`}>
+        {blank ? '—' : formatValue(value)}
+      </div>
+      <span className={`statement-amount-print statement-amount-${variant} fs-print-only`}>
+        {blank ? '—' : formatValue(value)}
+      </span>
+    </>
   )
 
   const renderVariance = (change: number, pct: number | null, blank?: boolean) => (
@@ -335,12 +334,13 @@ function StatementTable({
         <td className="statement-note-col">
           <button
             type="button"
-            className="statement-note-link"
+            className="statement-note-link fs-screen-only"
             onClick={() => onNoteNavigate(row.noteKey!, row.noteSubId)}
             title="Open in Notes"
           >
             {row.noteNo}
           </button>
+          <span className="statement-note-print-value fs-print-only">{row.noteNo}</span>
         </td>
       )
     }
@@ -349,29 +349,44 @@ function StatementTable({
   }
 
   const colSpan = showNoteColumn ? 6 : 5
+  const isBalanceSheetTable = wrapperClassName?.includes('balance-sheet') ?? false
 
   return (
     <div className={`statement-table-wrap${wrapperClassName ? ` ${wrapperClassName}` : ''}`}>
       <h3>{title}</h3>
       <div className="table-wrap statement-table-container">
         <table className={`statement-table${showNoteColumn ? ' has-note-col' : ''}`}>
+          {isBalanceSheetTable && (
+            <colgroup>
+              <col className="bs-col-particular" />
+              <col className="bs-col-note" />
+              <col className="bs-col-prev" />
+              <col className="bs-col-curr" />
+              <col className="bs-col-change" />
+              <col className="bs-col-pct" />
+            </colgroup>
+          )}
           <thead>
             <tr className="statement-head-row">
               <th className="statement-particular-col">Particulars</th>
               {showNoteColumn && <th className="statement-note-col">Note</th>}
               <th className="statement-amount-col statement-prev-col">
-                <span className="statement-fy-label">{previousLabel}</span>
+                <span className="fs-screen-only statement-fy-label">{previousLabel}</span>
+                <span className="fs-print-only statement-fy-label statement-fy-label--print">
+                  {printPreviousLabel || previousLabel}
+                </span>
               </th>
               <th className="statement-amount-col statement-curr-col">
-                <span className="statement-fy-label">{currentLabel}</span>
+                <span className="fs-screen-only statement-fy-label">{currentLabel}</span>
+                <span className="fs-print-only statement-fy-label statement-fy-label--print">
+                  {printCurrentLabel || currentLabel}
+                </span>
               </th>
               <th className="statement-variance-col statement-change-col">
                 <span className="statement-fy-label">Change</span>
-                <span className="statement-fy-hint">vs last year</span>
               </th>
               <th className="statement-variance-col statement-pct-col">
                 <span className="statement-fy-label">% Change</span>
-                <span className="statement-fy-hint">vs last year</span>
               </th>
             </tr>
           </thead>
@@ -413,6 +428,7 @@ function StatementTable({
               const isGrandTotal = row.isGrandTotal ?? false
               const isSubLine = row.isSubLine ?? row.label.startsWith('Less:')
               const indent = row.indent ?? (isSubLine ? 1 : 0)
+              const isBlankLabel = row.label.trim().length === 0
 
               return (
                 <tr
@@ -427,6 +443,7 @@ function StatementTable({
                           : isSubLine
                             ? 'statement-sub-row'
                             : undefined,
+                      isBlankLabel ? 'statement-blank-label-row' : undefined,
                       row.rowId && highlightedRowId === row.rowId ? 'notes-row-highlight' : '',
                     ]
                       .filter(Boolean)
@@ -694,6 +711,13 @@ function FinancialStatement() {
         }
       }
       const fyMeta = clientData.financialYears?.find((item) => item.id === fyId)
+
+      if (!fyMeta) {
+        setClient(normalizedClient)
+        setFsData(null)
+        setError('This financial year is inactive or not available for financial statements.')
+        return
+      }
 
       if (isConsolidatedView) {
         if (!fyMeta || !isConsolidatedApplicableForFy(clientData.businesses, fyMeta)) {
@@ -1163,6 +1187,10 @@ function FinancialStatement() {
     ? buildShortFyLabel(fy.startYear - 1, fy.endYear - 1)
     : 'Previous'
   const currentFyLabel = fy ? buildShortFyLabel(fy.startYear, fy.endYear) : 'Current'
+  const printPreviousFyLabel = fy ? formatFyEndDateShort(fy.endYear - 1) : 'Previous'
+  const printCurrentFyLabel = fy ? formatFyEndDateShort(fy.endYear) : 'Current'
+  const printBalanceSheetPreviousLabel = fy ? formatBalanceSheetPrintColumnLabel(fy.endYear - 1) : 'Previous'
+  const printBalanceSheetCurrentLabel = fy ? formatBalanceSheetPrintColumnLabel(fy.endYear) : 'Current'
 
   const computedLoans = useMemo(() => {
     if (!fsData || !fy) {
@@ -2593,36 +2621,16 @@ function FinancialStatement() {
     setSaveMessage('')
   }
 
-  const saveLoan = async (loan: LoanRecord) => {
-    if (!fsData) {
-      return
-    }
-
-    const existing = fsData.loans.find((item) => item.id === loan.id)
-    const nextLoan =
-      existing && openingBalanceLocks?.loanIds.has(loan.id)
-        ? { ...loan, openingBalance: existing.openingBalance }
-        : loan
-
-    const exists = fsData.loans.some((item) => item.id === loan.id)
-    const loans = exists
-      ? fsData.loans.map((item) => (item.id === nextLoan.id ? nextLoan : item))
-      : [...fsData.loans, nextLoan]
-
-    setFsData({ ...fsData, loans })
+  const handleLoansSaved = (loans: LoanRecord[]) => {
+    setFsData((current) => (current ? { ...current, loans } : current))
     setSaveMessage('')
+    setError('')
     setLoanModalOpen(false)
     setEditingLoan(null)
-
-    if (exists) {
-      await showUpdatedAlert(nextLoan.lender)
-    } else {
-      await showAddedAlert(nextLoan.lender)
-    }
   }
 
   const deleteLoan = async (loanId: string) => {
-    if (!fsData) {
+    if (!fsData || !clientId || !fyId || !businessId || isConsolidatedView) {
       return
     }
 
@@ -2634,15 +2642,20 @@ function FinancialStatement() {
       return
     }
 
-    setFsData({
-      ...fsData,
-      loans: fsData.loans.filter((item) => item.id !== loanId),
-    })
-    setSaveMessage('')
-    if (expandedLoanId === loanId) {
-      setExpandedLoanId(null)
+    const loans = fsData.loans.filter((item) => item.id !== loanId)
+
+    try {
+      const { loans: savedLoans } = await saveLoans(clientId, fyId, businessId, loans)
+      setFsData((current) => (current ? { ...current, loans: savedLoans } : current))
+      setSaveMessage('')
+      setError('')
+      if (expandedLoanId === loanId) {
+        setExpandedLoanId(null)
+      }
+      await showDeletedAlert(loan?.lender || 'Loan')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete loan')
     }
-    await showDeletedAlert(loan?.lender || 'Loan')
   }
 
   const openAddLoan = () => {
@@ -2665,31 +2678,16 @@ function FinancialStatement() {
     setBankModalOpen(true)
   }
 
-  const saveBank = async (form: { bankName: string; accountNumber: string; accountType: BankAccountRecord['accountType'] }) => {
-    if (!fsData) {
-      return
-    }
-
-    const account = createBankAccountFromForm(form, editingBank)
-    const exists = fsData.bankAccounts.some((item) => item.id === account.id)
-    const bankAccounts = exists
-      ? fsData.bankAccounts.map((item) => (item.id === account.id ? account : item))
-      : [...fsData.bankAccounts, account]
-
-    setFsData({ ...fsData, bankAccounts })
+  const handleBankAccountsSaved = (bankAccounts: BankAccountRecord[]) => {
+    setFsData((current) => (current ? { ...current, bankAccounts } : current))
     setSaveMessage('')
+    setError('')
     setBankModalOpen(false)
     setEditingBank(null)
-
-    if (exists) {
-      await showUpdatedAlert(account.bankName)
-    } else {
-      await showAddedAlert(account.bankName)
-    }
   }
 
   const deleteBank = async (accountId: string) => {
-    if (!fsData) {
+    if (!fsData || !clientId || !fyId || !businessId || isConsolidatedView) {
       return
     }
 
@@ -2701,12 +2699,24 @@ function FinancialStatement() {
       return
     }
 
-    setFsData({
-      ...fsData,
-      bankAccounts: fsData.bankAccounts.filter((item) => item.id !== accountId),
-    })
-    setSaveMessage('')
-    await showDeletedAlert(account?.bankName || 'Bank account')
+    const bankAccounts = fsData.bankAccounts.filter((item) => item.id !== accountId)
+
+    try {
+      const { bankAccounts: savedBankAccounts } = await saveBankAccounts(
+        clientId,
+        fyId,
+        businessId,
+        bankAccounts,
+      )
+      setFsData((current) =>
+        current ? { ...current, bankAccounts: savedBankAccounts } : current,
+      )
+      setSaveMessage('')
+      setError('')
+      await showDeletedAlert(account?.bankName || 'Bank account')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete bank account')
+    }
   }
 
   const updateBankAmount = (
@@ -3061,6 +3071,15 @@ function FinancialStatement() {
 
   const printTitleForTab = (tab: FsTab) =>
     visibleTabs.find(([t]) => t === tab)?.[1] ?? FS_TAB_PRINT_TITLES[tab]
+
+  const printReportKind: 'balance-sheet' | 'profit-loss' | 'notes' | 'other' =
+    resolvedActiveTab === 'balance-sheet'
+      ? 'balance-sheet'
+      : resolvedActiveTab === 'profit-loss'
+        ? 'profit-loss'
+        : resolvedActiveTab === 'notes'
+          ? 'notes'
+          : 'other'
 
   const tabPanelClass = (tab: FsTab) =>
     `panel fs-tab-panel${resolvedActiveTab === tab ? ' is-active' : ''}`
@@ -3490,6 +3509,7 @@ function FinancialStatement() {
         udinNumber={udinDetails.udinNumber || effectivePrintCaProfile.udin}
         udinDate={printUdinDate}
         activeTabLabel={printTitleForTab(resolvedActiveTab)}
+        reportKind={printReportKind}
         printAll={printAll}
       />
 
@@ -3650,7 +3670,7 @@ function FinancialStatement() {
         ))}
       </div>
 
-      <div className="fs-print-body">
+      <div className="fs-print-body fs-print-statement-format">
       {printableTabSet.has('notes') && (
         <section
           className={tabPanelClass('notes')}
@@ -3686,36 +3706,36 @@ function FinancialStatement() {
                   </th>
                 </tr>
               </thead>
-              <tbody>
-                {noteGroups.map((group) => (
-                  <Fragment key={group}>
+              {noteGroups.map((group) => (
+                <Fragment key={group}>
+                  <tbody className="fs-print-note-group">
                     <tr className="notes-section-row">
                       <td colSpan={6}>{group}</td>
                     </tr>
-                    {NOTE_FIELDS.filter((field) => field.group === group).map((field) => (
-                      <Fragment key={field.key}>
-                        <tr
-                          id={`note-row-${field.key}`}
-                          className={`notes-main-row notes-main-row-header${field.key === 'longTermBorrowings' ? ' notes-main-row-lt' : ''}${field.key === 'otherAdministrativeExpenses' ? ' notes-main-row-admin' : ''}${field.key === 'shortTermBorrowings' ? ' notes-main-row-st' : ''}${field.key === 'financeCost' ? ' notes-main-row-finance' : ''}${field.key === 'capitalAccount' ? ' notes-main-row-capital' : ''}${field.key === 'revenueFromOperations' ? ' notes-main-row-revenue' : ''}${isManualNoteLineKey(field.key) ? ' notes-main-row-manual' : ''}${
-                            highlightedNote?.noteKey === field.key && !highlightedNote.noteSubId
-                              ? ' notes-row-highlight'
-                              : ''
-                          }`}
-                        >
-                          <td className="notes-sno-col">
-                            {renderNoteNumberLink(field.key, field.noteNo)}
-                          </td>
-                          <td className="notes-particular-col notes-main-label">
-                            {renderMainNoteLabel(field)}
-                          </td>
-                          {renderEmptyNoteHeadCells()}
-                        </tr>
-                        {renderNoteSubRows(field.key)}
-                      </Fragment>
-                    ))}
-                  </Fragment>
-                ))}
-              </tbody>
+                  </tbody>
+                  {NOTE_FIELDS.filter((field) => field.group === group).map((field) => (
+                    <tbody key={field.key} className="fs-print-note-block">
+                      <tr
+                        id={`note-row-${field.key}`}
+                        className={`notes-main-row notes-main-row-header${field.key === 'longTermBorrowings' ? ' notes-main-row-lt' : ''}${field.key === 'otherAdministrativeExpenses' ? ' notes-main-row-admin' : ''}${field.key === 'shortTermBorrowings' ? ' notes-main-row-st' : ''}${field.key === 'financeCost' ? ' notes-main-row-finance' : ''}${field.key === 'capitalAccount' ? ' notes-main-row-capital' : ''}${field.key === 'revenueFromOperations' ? ' notes-main-row-revenue' : ''}${isManualNoteLineKey(field.key) ? ' notes-main-row-manual' : ''}${
+                          highlightedNote?.noteKey === field.key && !highlightedNote.noteSubId
+                            ? ' notes-row-highlight'
+                            : ''
+                        }`}
+                      >
+                        <td className="notes-sno-col">
+                          {renderNoteNumberLink(field.key, field.noteNo)}
+                        </td>
+                        <td className="notes-particular-col notes-main-label">
+                          {renderMainNoteLabel(field)}
+                        </td>
+                        {renderEmptyNoteHeadCells()}
+                      </tr>
+                      {renderNoteSubRows(field.key)}
+                    </tbody>
+                  ))}
+                </Fragment>
+              ))}
             </table>
           </div>
 
@@ -3768,12 +3788,15 @@ function FinancialStatement() {
             Layout per balance sheet format. Click any <strong>Note</strong> number to open the matching note for
             entry.
           </p>
+          <div className="fs-balance-sheet-print-body">
           <StatementTable
             title={`${balanceSheetLabel} — Sources of Funds — ${formatBalanceSheetAsAtLabel(fy.endYear)}`}
             lines={sourcesOfFundsLines}
             wrapperClassName="statement-table-wrap--balance-sheet statement-table-wrap--balance-sheet-sources"
             currentLabel={formatBalanceSheetAsAtLabel(fy.endYear)}
             previousLabel={formatBalanceSheetAsAtLabel(fy.endYear - 1)}
+            printCurrentLabel={printBalanceSheetCurrentLabel}
+            printPreviousLabel={printBalanceSheetPreviousLabel}
             showNoteColumn
             useStatementAmountFormat
             onNoteNavigate={navigateToNote}
@@ -3785,11 +3808,14 @@ function FinancialStatement() {
             wrapperClassName="statement-table-wrap--balance-sheet statement-table-wrap--balance-sheet-application"
             currentLabel={formatBalanceSheetAsAtLabel(fy.endYear)}
             previousLabel={formatBalanceSheetAsAtLabel(fy.endYear - 1)}
+            printCurrentLabel={printBalanceSheetCurrentLabel}
+            printPreviousLabel={printBalanceSheetPreviousLabel}
             showNoteColumn
             useStatementAmountFormat
             onNoteNavigate={navigateToNote}
             highlightedRowId={highlightedBsRow}
           />
+          </div>
         </section>
       )}
 
@@ -3807,13 +3833,15 @@ function FinancialStatement() {
             lines={computed.profitAndLoss}
             currentLabel={`Year ended 31ST MARCH ${fy.endYear}`}
             previousLabel={`Year ended 31ST MARCH ${fy.endYear - 1}`}
+            printCurrentLabel={printCurrentFyLabel}
+            printPreviousLabel={printPreviousFyLabel}
             showNoteColumn
             useStatementAmountFormat
             onNoteNavigate={navigateToNote}
             highlightedRowId={highlightedPlRow}
           />
 
-          <div className="pl-appropriation-panel">
+          <div className="pl-appropriation-panel fs-print-section-block">
             <div className="pl-appropriation-header">
               <div>
                 <h3>P&L Appropriation — detail lines</h3>
@@ -3990,7 +4018,7 @@ function FinancialStatement() {
               in the Ledger page to build this schedule.
             </p>
           ) : (
-            <div className="table-wrap dep-schedule-wrap">
+            <div className="table-wrap dep-schedule-wrap fs-print-section-block">
               <table className="data-table schedule-table dep-schedule-table">
                 <thead>
                   <tr>
@@ -4307,8 +4335,9 @@ function FinancialStatement() {
           </div>
           <p className="hint">
             Add multiple long-term or short-term loans. EMI schedule is auto-generated from principal,
-            rate, tenure and start date. Optional prepayment reduces balance. Interest is charged in
-            the relevant financial year and closing balances flow to Notes (long-term / short-term borrowings).
+            rate, tenure and start installment month (Apr–Mar within the financial year). Optional
+            prepayment reduces balance. Interest is charged in the relevant financial year and closing
+            balances flow to Notes (long-term / short-term borrowings).
           </p>
 
           {fsData.loans.length === 0 ? (
@@ -4318,7 +4347,7 @@ function FinancialStatement() {
               {computedLoans.map((loan) => {
                 const record = fsData.loans.find((item) => item.id === loan.id)!
                 const expanded = expandedLoanId === loan.id
-                const loanCommencementDate = record.emiStartDate || record.disbursementDate || ''
+                const startInstallmentDate = record.emiStartDate || record.disbursementDate || ''
                 return (
                   <div key={loan.id} className="loan-card">
                     <div className="loan-card-header">
@@ -4327,12 +4356,10 @@ function FinancialStatement() {
                         <span className={`loan-type-badge ${loan.loanType}`}>
                           {loan.loanType === 'long-term' ? 'Long-term' : 'Short-term'}
                         </span>
-                        {loan.loanType === 'long-term' && (
-                          <div className="loan-start-period">
-                            Loan commencement date:{' '}
-                            <strong>{formatLoanCommencementDate(loanCommencementDate)}</strong>
-                          </div>
-                        )}
+                        <div className="loan-start-period">
+                          Start installment from:{' '}
+                          <strong>{formatLoanInstallmentPeriod(startInstallmentDate)}</strong>
+                        </div>
                       </div>
                       <div className="loan-card-actions">
                         <button
@@ -4991,13 +5018,17 @@ function FinancialStatement() {
       )}
       </div>
 
-      {loanModalOpen && fy && (
+      {loanModalOpen && clientId && fyId && businessId && fsData && fy && !isConsolidatedView && (
         <div className="fs-no-print">
         <LoanModal
           title={editingLoan ? 'Edit Loan' : 'Add Loan'}
+          clientId={clientId}
+          fyId={fyId}
+          businessId={businessId}
           fyLabel={formatFyDisplay(fy)}
           fyStartYear={fy.startYear}
           fyEndYear={fy.endYear}
+          existingLoans={fsData.loans}
           loan={editingLoan}
           openingBalanceReadOnly={
             editingLoan ? Boolean(openingBalanceLocks?.loanIds.has(editingLoan.id)) : false
@@ -5006,21 +5037,25 @@ function FinancialStatement() {
             setLoanModalOpen(false)
             setEditingLoan(null)
           }}
-          onSave={saveLoan}
+          onSaved={handleLoansSaved}
         />
         </div>
       )}
 
-      {bankModalOpen && (
+      {bankModalOpen && clientId && fyId && businessId && fsData && !isConsolidatedView && (
         <div className="fs-no-print">
         <BankAccountModal
           title={editingBank ? 'Edit Bank Account' : 'Add Bank Account'}
+          clientId={clientId}
+          fyId={fyId}
+          businessId={businessId}
+          existingAccounts={fsData.bankAccounts}
           account={editingBank}
           onClose={() => {
             setBankModalOpen(false)
             setEditingBank(null)
           }}
-          onSave={saveBank}
+          onSaved={handleBankAccountsSaved}
         />
         </div>
       )}

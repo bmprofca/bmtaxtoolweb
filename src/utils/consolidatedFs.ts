@@ -54,6 +54,14 @@ export function getConsolidatedFyCellState(
   return 'not-started'
 }
 
+export function getDefaultFyForConsolidated<
+  F extends { id: string; endYear: number; closedBusinessIds?: string[]; startYear: number },
+>(businesses: Business[], financialYears: F[]): F | null {
+  const sorted = [...financialYears].sort((a, b) => a.startYear - b.startYear)
+  const activeYears = sorted.filter((fy) => getConsolidatedFyCellState(businesses, fy) === 'active')
+  return activeYears[activeYears.length - 1] ?? null
+}
+
 function sumNoteValue(left: NoteValue, right: NoteValue): NoteValue {
   return {
     current: (left.current || 0) + (right.current || 0),

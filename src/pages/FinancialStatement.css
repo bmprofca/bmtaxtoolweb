@@ -2362,8 +2362,8 @@ input.fs-readonly-input {
 }
 
 .statement-table-wrap--balance-sheet-sources .statement-section-row td {
-  padding-top: 1rem;
-  padding-bottom: 0.35rem;
+  padding-top: 0.35rem;
+  padding-bottom: 0.2rem;
 }
 
 .statement-table-wrap--balance-sheet-sources .statement-subheader-row td {
@@ -2374,6 +2374,177 @@ input.fs-readonly-input {
 .statement-table-wrap--balance-sheet-sources .statement-spacer-row td {
   height: 2rem;
   padding: 0.85rem 0 !important;
+}
+
+.fs-balance-sheet-print-body {
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  background: #fff;
+  box-shadow: none;
+  box-sizing: border-box;
+  font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif;
+  font-size: 0.88rem;
+}
+
+.fs-balance-sheet-print-body .statement-table {
+  table-layout: fixed;
+  width: 100%;
+  font-family: inherit;
+  font-size: inherit;
+  border-collapse: collapse;
+}
+
+.fs-balance-sheet-print-body .statement-table th,
+.fs-balance-sheet-print-body .statement-table td {
+  border: 1px solid #e2e8f0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.35;
+  padding: 0.4rem 0.55rem;
+}
+
+.fs-balance-sheet-print-body .statement-table tbody td {
+  height: auto;
+  min-height: 0;
+  vertical-align: middle;
+}
+
+.fs-balance-sheet-print-body .statement-table-wrap--balance-sheet {
+  margin: 0;
+}
+
+.fs-balance-sheet-print-body .statement-table-container {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.fs-balance-sheet-print-body .statement-table-wrap--balance-sheet-application .statement-table-container {
+  border-top: none;
+}
+
+.fs-balance-sheet-print-body .statement-particular-col {
+  width: 52%;
+}
+
+.fs-balance-sheet-print-body .statement-note-col {
+  width: 8%;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.fs-balance-sheet-print-body .statement-particular-col,
+.fs-balance-sheet-print-body .statement-amount-col {
+  vertical-align: middle;
+}
+
+.fs-balance-sheet-print-body .statement-prev-col {
+  width: 20%;
+}
+
+.fs-balance-sheet-print-body .statement-curr-col {
+  width: 20%;
+}
+
+.fs-balance-sheet-print-body col.bs-col-particular {
+  width: 52%;
+}
+
+.fs-balance-sheet-print-body col.bs-col-note {
+  width: 8%;
+}
+
+.fs-balance-sheet-print-body col.bs-col-prev,
+.fs-balance-sheet-print-body col.bs-col-curr {
+  width: 20%;
+}
+
+.fs-balance-sheet-print-body col.bs-col-change,
+.fs-balance-sheet-print-body col.bs-col-pct {
+  width: 0;
+}
+
+.fs-balance-sheet-print-body .statement-amount-col,
+.fs-balance-sheet-print-body .statement-amount-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.fs-balance-sheet-print-body .statement-note-print-value,
+.fs-balance-sheet-print-body .statement-amount-print {
+  display: none;
+}
+
+.fs-balance-sheet-print-body .statement-head-row th {
+  vertical-align: top;
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+}
+
+.fs-balance-sheet-print-body .statement-head-row th.statement-note-col {
+  text-align: center;
+}
+
+.fs-balance-sheet-print-body .statement-head-row th.statement-amount-col {
+  text-align: right;
+}
+
+.fs-balance-sheet-print-body .statement-table tbody td {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+  vertical-align: middle;
+}
+
+.fs-balance-sheet-print-body .statement-amount-value {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 1.85rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.fs-balance-sheet-print-body .statement-note-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.85rem;
+  line-height: 1.35;
+  vertical-align: middle;
+}
+
+.fs-balance-sheet-print-body .statement-section-row td {
+  padding-top: 0.55rem;
+  padding-bottom: 0.35rem;
+}
+
+.fs-balance-sheet-print-body .statement-subheader-row td {
+  padding-top: 0.35rem;
+  padding-bottom: 0.25rem;
+}
+
+.fs-balance-sheet-print-body .statement-blank-label-row td {
+  padding-top: 0.05rem !important;
+  padding-bottom: 0.05rem !important;
+  line-height: 1 !important;
+}
+
+.fs-balance-sheet-print-body .statement-blank-label-row .statement-particular-col {
+  padding: 0 !important;
+  line-height: 1 !important;
+}
+
+.fs-balance-sheet-print-body .statement-spacer-row {
+  display: none;
+}
+
+.fs-balance-sheet-print-body .statement-grand-total-row td {
+  background: #eef2f7;
+}
+
+.fs-balance-sheet-print-body .statement-grand-total-row .statement-amount-value,
+.fs-balance-sheet-print-body .statement-grand-total-row .statement-amount-print {
+  font-weight: 700;
 }
 
 .notes-row-highlight td {

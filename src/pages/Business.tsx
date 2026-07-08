@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { createBusiness, fetchClient, fetchDeletedBusinesses, removeBusiness, restoreBusiness, updateBusiness } from '../api/client'
-import type { Business as BusinessRecord, BusinessStatus, Client, FinancialYear } from '../types'
+import type { Business as BusinessRecord, BusinessStatus, Client } from '../types'
 import {
   BUSINESS_TYPES,
   formatBusinessDate,
@@ -11,13 +11,7 @@ import {
   normalizeClientBusinesses,
 } from '../utils/businessUtils'
 import { formatPanInput, getPanValidationMessage } from '../utils/clientValidation'
-import {
-  buildShortFyLabel,
-  DEFAULT_VISIBLE_FY_COUNT,
-  getBusinessFyCellState,
-  getVisibleFinancialYears,
-  sortFinancialYears,
-} from '../utils/financialYear'
+import { getDefaultFyForBusiness, buildShortFyLabel, sortFinancialYears } from '../utils/financialYear'
 import {
   confirmDelete,
   confirmRestore,
@@ -30,9 +24,12 @@ import {
 import {
   CONSOLIDATED_BUSINESS_ID,
   CONSOLIDATED_BUSINESS_LABEL,
-  getConsolidatedFyCellState,
+  getDefaultFyForConsolidated,
 } from '../utils/consolidatedFs'
 import PageRefreshButton from '../components/PageRefreshButton'
+import { APP_NAME } from '../config/app'
+import { TOOLS } from '../config/tools'
+import { buildBusinessProfileRoute, buildToolPickerRoute, buildToolWorkspaceRoute } from '../utils/toolRoutes'
 import '../styles/shared.css'
 import './Business.css'
 
@@ -58,7 +55,6 @@ function Business() {
     top: number
     left: number
   } | null>(null)
-  const [earlierFyVisibleCount, setEarlierFyVisibleCount] = useState(0)
 
   const [businessName, setBusinessName] = useState('')
   const [businessType, setBusinessType] = useState('')
@@ -565,85 +561,66 @@ function Business() {
       return
     }
     closeActionsMenu()
-    navigate(`/clients/${clientId}/business/${business.id}/profile`)
+    navigate(buildBusinessProfileRoute(clientId, business.id))
   }
 
-  const renderConsolidatedFyCell = (fy: FinancialYear) => {
-    if (!client) {
-      return null
-    }
+  const renderBusinessTools = (
+    targetBusinessId: string,
+    defaultFy: { id: string } | null,
+    isConsolidated = false,
+  ) => (
+    <div className="business-tools-row">
+      {TOOLS.map((tool) => {
+        const consolidatedBlocked = isConsolidated && !tool.supportsConsolidated
+        const disabled = !tool.available || consolidatedBlocked || !defaultFy
 
-    const cellState = getConsolidatedFyCellState(client.businesses, fy)
-
-    if (cellState === 'active') {
-      return (
-        <Link
-          to={`/clients/${clientId}/fs/${fy.id}/business/${CONSOLIDATED_BUSINESS_ID}`}
-          className="business-matrix-fs-link business-matrix-fs-link--consolidated"
-          title={`Open consolidated ${fy.label} for ${client.name}`}
-        >
-          <span className="business-matrix-fs-icon" aria-hidden="true">
-            +
-          </span>
-          <span className="business-matrix-fs-text">CFS</span>
-        </Link>
-      )
-    }
-
-    return (
-      <span
-        className="business-matrix-cell-muted"
-        title={
-          cellState === 'closed'
-            ? `All businesses closed in ${fy.label}`
-            : 'Consolidated statement requires at least 2 active businesses for this year'
+        if (disabled) {
+          return (
+            <span
+              key={tool.id}
+              className={`business-tool-chip business-tool-chip--disabled business-tool-chip--${tool.accent}`}
+              title={
+                !defaultFy
+                  ? 'No active financial year'
+                  : consolidatedBlocked
+                    ? 'Not available for consolidated'
+                    : 'Coming soon'
+              }
+            >
+              {tool.shortName}
+            </span>
+          )
         }
+
+        return (
+          <Link
+            key={tool.id}
+            to={buildToolWorkspaceRoute(clientId!, tool.id, defaultFy.id, targetBusinessId)}
+            className={`business-tool-chip business-tool-chip--${tool.accent}`}
+            title={tool.name}
+          >
+            {tool.shortName}
+          </Link>
+        )
+      })}
+      <Link
+        to={buildToolPickerRoute(clientId!, targetBusinessId)}
+        className="business-tool-chip business-tool-chip--all"
+        title="View all tools"
       >
-        —
-      </span>
-    )
-  }
-
-  const renderFyCell = (business: BusinessRecord, fy: FinancialYear) => {
-    const cellState = getBusinessFyCellState(business, fy)
-
-    if (cellState === 'active') {
-      return (
-        <Link
-          to={`/clients/${clientId}/fs/${fy.id}/business/${business.id}`}
-          className="business-matrix-fs-link"
-          title={`Open ${fy.label} for ${business.name}`}
-        >
-          <span className="business-matrix-fs-icon" aria-hidden="true">
-            +
-          </span>
-          <span className="business-matrix-fs-text">FS</span>
-        </Link>
-      )
-    }
-
-    return (
-      <span
-        className="business-matrix-cell-muted"
-        title={
-          cellState === 'closed'
-            ? `Closed in ${fy.label}`
-            : `Not active before ${business.startingFy}`
-        }
-      >
-        —
-      </span>
-    )
-  }
+        All
+      </Link>
+    </div>
+  )
 
   const financialYears = useMemo(
     () => sortFinancialYears(client?.financialYears || []),
     [client?.financialYears],
   )
 
-  const visibleFinancialYears = useMemo(
-    () => getVisibleFinancialYears(financialYears, earlierFyVisibleCount),
-    [financialYears, earlierFyVisibleCount],
+  const consolidatedDefaultFy = useMemo(
+    () => (client ? getDefaultFyForConsolidated(client.businesses, financialYears) : null),
+    [client, financialYears],
   )
 
   if (loading) {
@@ -661,20 +638,6 @@ function Business() {
     )
   }
 
-  const hiddenEarlierCount = Math.max(0, financialYears.length - DEFAULT_VISIBLE_FY_COUNT)
-  const visibleEarlierCount = Math.min(earlierFyVisibleCount, hiddenEarlierCount)
-  const remainingEarlierCount = hiddenEarlierCount - visibleEarlierCount
-
-  const showEarlierYears = () => {
-    setEarlierFyVisibleCount((current) =>
-      Math.min(current + DEFAULT_VISIBLE_FY_COUNT, hiddenEarlierCount),
-    )
-  }
-
-  const collapseEarlierYears = () => {
-    setEarlierFyVisibleCount(0)
-  }
-
   return (
     <div className="business-page">
       <button type="button" className="back-link" onClick={() => navigate('/clients')}>
@@ -683,9 +646,9 @@ function Business() {
 
       <header className="page-header page-header-row">
         <div>
-          <h1>Business</h1>
+          <h1>Client Workspace</h1>
           <p>
-            Client:{' '}
+            {APP_NAME} · Client:{' '}
             <Link to={`/clients/${client.id}/business`} className="client-link">
               {client.name}
             </Link>
@@ -705,11 +668,11 @@ function Business() {
       <section className="panel">
         <div className="panel-header-row">
           <div>
-            <h2>Businesses &amp; Financial Statements</h2>
+            <h2>Client Workspace</h2>
             <p className="hint business-matrix-hint">
-              Click a cell where a business row meets a financial year column to open or create the
-              statement. When multiple businesses exist, use the consolidated row to view a combined
-              report (requires at least 2 active businesses per year). Years are managed in{' '}
+              Open a tool for each business. Financial year is selected inside each tool or from the
+              tool picker. Client and business stay shared across Financial Statement, Cash Flow,
+              Project Report, CMA, DPR, and future tools. Years are managed in{' '}
               <Link to="/settings">Settings</Link>.
             </p>
           </div>
@@ -725,75 +688,24 @@ function Business() {
 
         {client.businesses.length === 0 ? (
           <p className="empty-state">No businesses yet. Click &quot;Add Business&quot; to get started.</p>
-        ) : financialYears.length === 0 ? (
-          <p className="empty-state">
-            No financial years yet. Add them in <Link to="/settings">Settings</Link> to prepare
-            statements.
-          </p>
         ) : (
           <div className="business-matrix-section">
-            {financialYears.length > DEFAULT_VISIBLE_FY_COUNT && (
-              <div className="business-matrix-fy-toolbar">
-                <div className="business-matrix-fy-toolbar-copy">
-                  <span className="business-matrix-fy-toolbar-label">Showing</span>
-                  <strong>
-                    {visibleFinancialYears[0]?.label} →{' '}
-                    {visibleFinancialYears[visibleFinancialYears.length - 1]?.label}
-                  </strong>
-                  <span className="business-matrix-fy-toolbar-count">
-                    ({visibleFinancialYears.length} of {financialYears.length} years)
-                  </span>
-                </div>
-                <div className="business-matrix-fy-toolbar-actions">
-                  {remainingEarlierCount > 0 ? (
-                    <button
-                      type="button"
-                      className="secondary-btn business-matrix-fy-expand-btn"
-                      onClick={showEarlierYears}
-                    >
-                      Show {Math.min(remainingEarlierCount, DEFAULT_VISIBLE_FY_COUNT)} earlier
-                      {remainingEarlierCount === 1 ? ' year' : ' years'}
-                    </button>
-                  ) : visibleEarlierCount > 0 ? (
-                    <button
-                      type="button"
-                      className="secondary-btn business-matrix-fy-expand-btn"
-                      onClick={collapseEarlierYears}
-                    >
-                      Show latest {DEFAULT_VISIBLE_FY_COUNT} only
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            )}
-
             <div className="business-matrix-wrap">
-              <table className="business-matrix">
+              <table className="business-matrix business-matrix--tools">
                 <thead>
                   <tr>
-                    <th className="sno-col" rowSpan={2}>
-                      S.No
-                    </th>
-                    <th rowSpan={2}>Business Name</th>
-                    <th rowSpan={2}>Type</th>
-                    <th rowSpan={2}>PAN</th>
-                    <th rowSpan={2}>Status</th>
-                    <th rowSpan={2}>Starting FY</th>
-                    <th className="business-matrix-fy-header" colSpan={visibleFinancialYears.length}>
-                      Financial Years
-                    </th>
-                    <th className="business-matrix-actions-col" rowSpan={2} aria-label="Actions">
+                    <th className="sno-col">S.No</th>
+                    <th>Business Name</th>
+                    <th>Type</th>
+                    <th>PAN</th>
+                    <th>Status</th>
+                    <th>Starting FY</th>
+                    <th className="business-tools-col">Tools</th>
+                    <th className="business-matrix-actions-col" aria-label="Actions">
                       <span className="business-matrix-actions-head" title="Actions" aria-hidden="true">
                         ⋮
                       </span>
                     </th>
-                  </tr>
-                  <tr>
-                    {visibleFinancialYears.map((fy) => (
-                      <th key={fy.id} className="business-matrix-fy-col" title={fy.label}>
-                        <span className="business-matrix-fy-label">{fy.label}</span>
-                      </th>
-                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -813,18 +725,9 @@ function Business() {
                       <td>—</td>
                       <td>—</td>
                       <td>All Businesses</td>
-                      {visibleFinancialYears.map((fy) => {
-                        const cellState = getConsolidatedFyCellState(client.businesses, fy)
-
-                        return (
-                          <td
-                            key={fy.id}
-                            className={`business-matrix-cell business-matrix-cell-${cellState} business-matrix-cell-consolidated`}
-                          >
-                            {renderConsolidatedFyCell(fy)}
-                          </td>
-                        )
-                      })}
+                      <td className="business-tools-col">
+                        {renderBusinessTools(CONSOLIDATED_BUSINESS_ID, consolidatedDefaultFy, true)}
+                      </td>
                       <td className="business-matrix-actions-col">
                         <span className="business-matrix-consolidated-hint" title="Combined view">
                           —
@@ -832,66 +735,67 @@ function Business() {
                       </td>
                     </tr>
                   )}
-                  {client.businesses.map((business, index) => (
-                    <tr key={business.id}>
-                      <td className="sno-col">{index + 1}</td>
-                      <td className="business-matrix-name">
-                        <Link
-                          to={`/clients/${clientId}/business/${business.id}/profile`}
-                          className="business-matrix-name-link"
-                        >
-                          {business.name}
-                        </Link>
-                      </td>
-                      <td>{business.type}</td>
-                      <td>{business.pan || '—'}</td>
-                      <td>
-                        <span
-                          className={`business-status-badge business-status-badge--${business.status || 'active'}`}
-                        >
-                          {getBusinessStatusLabel(business.status)}
-                        </span>
-                      </td>
-                      <td>{business.startingFy}</td>
-                      {visibleFinancialYears.map((fy) => {
-                        const cellState = getBusinessFyCellState(business, fy)
+                  {client.businesses.map((business, index) => {
+                    const defaultFy = getDefaultFyForBusiness(business, financialYears)
 
-                        return (
-                          <td
-                            key={fy.id}
-                            className={`business-matrix-cell business-matrix-cell-${cellState}`}
+                    return (
+                      <tr key={business.id}>
+                        <td className="sno-col">{index + 1}</td>
+                        <td className="business-matrix-name">
+                          <Link
+                            to={buildBusinessProfileRoute(clientId!, business.id)}
+                            className="business-matrix-name-link"
                           >
-                            {renderFyCell(business, fy)}
-                          </td>
-                        )
-                      })}
-                      <td className="business-matrix-actions-col">
-                        <div className="business-actions-menu">
-                          <button
-                            type="button"
-                            className={`business-actions-trigger${
-                              openActionsMenuId === business.id ? ' is-open' : ''
-                            }`}
-                            onMouseDown={(event) => event.stopPropagation()}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              openActionsMenu(business.id, event.currentTarget)
-                            }}
-                            aria-label={`Actions for ${business.name}`}
-                            aria-haspopup="menu"
-                            aria-expanded={openActionsMenuId === business.id}
+                            {business.name}
+                          </Link>
+                        </td>
+                        <td>{business.type}</td>
+                        <td>{business.pan || '—'}</td>
+                        <td>
+                          <span
+                            className={`business-status-badge business-status-badge--${business.status || 'active'}`}
                           >
-                            <span className="business-actions-dots" aria-hidden="true">
-                              ⋮
-                            </span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            {getBusinessStatusLabel(business.status)}
+                          </span>
+                        </td>
+                        <td>{business.startingFy}</td>
+                        <td className="business-tools-col">
+                          {renderBusinessTools(business.id, defaultFy)}
+                        </td>
+                        <td className="business-matrix-actions-col">
+                          <div className="business-actions-menu">
+                            <button
+                              type="button"
+                              className={`business-actions-trigger${
+                                openActionsMenuId === business.id ? ' is-open' : ''
+                              }`}
+                              onMouseDown={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                openActionsMenu(business.id, event.currentTarget)
+                              }}
+                              aria-label={`Actions for ${business.name}`}
+                              aria-haspopup="menu"
+                              aria-expanded={openActionsMenuId === business.id}
+                            >
+                              <span className="business-actions-dots" aria-hidden="true">
+                                ⋮
+                              </span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
+            {financialYears.length === 0 ? (
+              <p className="hint business-tools-fy-hint">
+                No financial years yet. Add them in <Link to="/settings">Settings</Link> to open
+                tools.
+              </p>
+            ) : null}
           </div>
         )}
       </section>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { APP_NAME } from '../config/app'
 import { getUserTypeLabel, hasPermission, type Permission } from '../utils/userPermissions'
 import './DashboardLayout.css'
 
@@ -8,10 +9,9 @@ const SIDEBAR_COLLAPSED_KEY = 'dashboardSidebarCollapsed'
 
 const navItems: { to: string; label: string; abbr: string; permission?: Permission }[] = [
   { to: '/clients', label: 'Clients', abbr: 'CL', permission: 'manageClients' },
-  { to: '/users', label: 'Users', abbr: 'US', permission: 'manageUsers' },
-  { to: '/settings', label: 'Settings', abbr: 'ST', permission: 'manageSettings' },
   { to: '/ca', label: 'CA', abbr: 'CA', permission: 'manageCa' },
   { to: '/ledger', label: 'Ledger', abbr: 'LG', permission: 'manageLedger' },
+  { to: '/settings', label: 'Settings', abbr: 'ST', permission: 'manageSettings' },
 ]
 
 function readCollapsedPreference() {
@@ -47,8 +47,8 @@ function DashboardLayout() {
       <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
         <div className="sidebar-brand">
           <div className="sidebar-brand-text">
-            <h2>Balance Sheet</h2>
-            <p>Dashboard</p>
+            <h2>{APP_NAME}</h2>
+            <p>Client workspace</p>
           </div>
           <button
             type="button"

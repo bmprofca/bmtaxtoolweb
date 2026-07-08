@@ -19,7 +19,15 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   })
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }))
+    const contentType = response.headers.get('content-type') || ''
+    const error = contentType.includes('application/json')
+      ? await response.json().catch(() => ({ error: 'Request failed' }))
+      : {
+          error:
+            response.status === 404
+              ? 'API route not found. Restart the server with the latest code and try again.'
+              : `Request failed (${response.status}). Make sure the API server is running.`,
+        }
     throw new Error(error.error || 'Request failed')
   }
 
@@ -68,5 +76,15 @@ export function restoreGlobalFinancialYear(
 ): Promise<{ financialYear: GlobalFinancialYear }> {
   return request(`${API_BASE}/settings/financial-years/${fyId}/restore`, {
     method: 'POST',
+  })
+}
+
+export function updateGlobalFinancialYearStatus(
+  fyId: string,
+  status: 'active' | 'inactive',
+): Promise<{ financialYear: GlobalFinancialYear }> {
+  return request(`${API_BASE}/settings/financial-years/${fyId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
   })
 }

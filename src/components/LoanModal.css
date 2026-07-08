@@ -148,6 +148,10 @@
   cursor: not-allowed;
 }
 
+.loan-modal-error {
+  margin: 0 0 0.75rem;
+}
+
 .loan-modal .secondary-btn {
   border: 1px solid #d1d5db;
   border-radius: 8px;

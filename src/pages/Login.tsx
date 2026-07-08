@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { APP_NAME } from '../config/app'
 import './Login.css'
 
 function Login() {
@@ -27,8 +28,8 @@ function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-header">
-          <h1>Balance Sheet</h1>
-          <p>Sign in to continue</p>
+          <h1>{APP_NAME}</h1>
+          <p>Sign in to your client workspace</p>
         </div>
 
         {error && <div className="login-error">{error}</div>}

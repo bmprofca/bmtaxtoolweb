@@ -7,6 +7,7 @@ export interface GlobalFinancialYear {
   startYear: number
   endYear: number
   statementType: string
+  status?: 'active' | 'inactive'
   createdAt: string
   isDeleted?: boolean
   deletedAt?: string | null
@@ -30,6 +31,7 @@ export function normalizeGlobalFinancialYear(raw: GlobalFinancialYear): GlobalFi
     startYear,
     endYear,
     statementType: raw.statementType?.trim() || 'Actual',
+    status: raw.status === 'inactive' ? 'inactive' : 'active',
     createdAt: raw.createdAt || new Date().toISOString(),
     isDeleted: raw.isDeleted,
     deletedAt: raw.deletedAt ?? null,
