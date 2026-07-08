@@ -1,0 +1,102 @@
+.page-header {
+  margin-bottom: 1.5rem;
+}
+
+.page-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+.page-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.page-refresh-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+}
+
+.page-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.page-refresh-btn.is-refreshing svg {
+  animation: page-refresh-spin 0.8s linear infinite;
+}
+
+@keyframes page-refresh-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.page-header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #16213e;
+}
+
+.page-header p {
+  margin-top: 0.35rem;
+  color: #6b7280;
+}
+
+.alert {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.panel {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 1.25rem;
+}
+
+.panel h2 {
+  font-size: 1.1rem;
+  color: #0f3460;
+  margin-bottom: 1rem;
+}
+
+.empty-state {
+  color: #6b7280;
+  padding: 1rem 0;
+}
+
+.empty-state.small {
+  padding: 0.5rem 0 1rem;
+  font-size: 0.9rem;
+}

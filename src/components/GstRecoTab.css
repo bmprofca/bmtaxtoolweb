@@ -1,0 +1,293 @@
+.gst-reco-panel .table-wrap {
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  overflow: auto;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+  margin-bottom: 0.5rem;
+}
+
+.gst-simple-table {
+  font-size: 0.85rem;
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.gst-simple-table th:nth-child(1) {
+  width: 28%;
+}
+
+.gst-simple-table th:nth-child(n + 2) {
+  width: 18%;
+}
+
+.gst-simple-table th,
+.gst-simple-table td {
+  padding: 0.55rem 0.65rem;
+  vertical-align: middle;
+  border: 1px solid #e2e8f0;
+}
+
+.gst-simple-table thead th {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  border-bottom: 2px solid #cbd5e1;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #475569;
+  font-weight: 600;
+}
+
+.gst-simple-table th:not(:first-child),
+.gst-simple-table td:not(:first-child):not(.particulars-col):not(.gst-na-cell):not(.gst-inline-option) {
+  text-align: right;
+}
+
+.gst-simple-table .particulars-col {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.gst-reco-panel h2 {
+  margin-bottom: 0.35rem;
+}
+
+.gst-header-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.gst-header-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.gst-header-fields input {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+}
+
+.gst-books-hint {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #1e40af;
+}
+
+.gst-books-hint--linked {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+.gst-books-diff {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.gst-note-link-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  color: #047857;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.gst-sales-link-toggle {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0.2rem;
+  cursor: pointer;
+}
+
+.gst-sales-link-toggle input {
+  width: 0.95rem;
+  height: 0.95rem;
+  margin: 0;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+.gst-reco-section {
+  margin-bottom: 1.75rem;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.gst-reco-section h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: #16213e;
+}
+
+.gst-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.gst-section-header h3 {
+  margin: 0;
+}
+
+.gst-section-note,
+.gst-calc-hint {
+  margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.gst-simple-table .schedule-total-row td {
+  font-weight: 700;
+  background: #f1f5f9;
+  border-top: 2px solid #cbd5e1;
+}
+
+.gst-simple-table .schedule-total-row.has-balance td {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.gst-amount-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+  text-align: right;
+}
+
+.gst-amount-input:focus {
+  outline: 2px solid #93c5fd;
+  border-color: #60a5fa;
+}
+
+.gst-readonly-cell {
+  display: block;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.gst-input-cell {
+  background: #fafafa;
+}
+
+.gst-na-cell {
+  background: #f1f5f9;
+  color: #94a3b8;
+  text-align: center;
+  font-size: 0.82rem;
+}
+
+.gst-sno-cell {
+  text-align: center;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.gst-itc-particular.is-input {
+  font-weight: 500;
+}
+
+.gst-itc-particular.is-total {
+  font-weight: 700;
+}
+
+.gst-subtotal-row td {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+.gst-linked-row td {
+  background: #fffbeb;
+}
+
+.gst-link-note {
+  font-size: 0.78rem;
+  color: #b45309;
+  font-weight: 500;
+}
+
+.gst-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.gst-reco-subtitle {
+  margin: 1rem 0 0.65rem;
+  font-size: 0.92rem;
+  color: #0f3460;
+}
+
+.gst-reco-particular {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.gst-reco-particular.is-less {
+  color: #b45309;
+}
+
+.gst-reco-particular.is-equals {
+  font-weight: 700;
+  color: #0f3460;
+}
+
+.gst-formula-row td,
+.gst-closing-row td,
+.gst-diff-row td {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+.gst-diff-row td:last-child {
+  color: #1d4ed8;
+}
+
+.gst-sl-hint {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.gst-payment-matrix th,
+.gst-payment-matrix td {
+  font-size: 0.8rem;
+}
+
+.gst-itc-table .gst-itc-particular {
+  text-align: left;
+}
+
+.gst-simple-reco .gst-reco-particular {
+  min-width: 14rem;
+}

@@ -1,0 +1,741 @@
+.fs-print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 24mm 8mm 20mm 8mm;
+  }
+
+  html,
+  body {
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #000 !important;
+    print-color-adjust: economy;
+    -webkit-print-color-adjust: economy;
+  }
+
+  .dashboard,
+  .dashboard-content,
+  .fs-page,
+  .fs-print-body {
+    width: 100% !important;
+    max-width: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .dashboard .sidebar,
+  .fs-no-print {
+    display: none !important;
+  }
+
+  .dashboard-content {
+    padding: 0 !important;
+  }
+
+  .fs-page {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .fs-print-only {
+    display: block !important;
+  }
+
+  /* —— Fixed header: business / client details —— */
+  .fs-print-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: #fff;
+    border-bottom: 1px solid #000;
+    padding: 0 8mm 2mm;
+    max-height: 24mm;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .fs-print-entity-block {
+    font-size: 6.5pt;
+    line-height: 1.25;
+    color: #000;
+    padding-bottom: 1.5mm;
+    border-bottom: 0.5px solid #666;
+  }
+
+  .fs-print-entity-label {
+    display: block;
+    font-size: 5.5pt;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #333;
+    margin-bottom: 0.5mm;
+  }
+
+  .fs-print-entity-name {
+    display: block;
+    font-size: 8pt;
+    font-weight: 700;
+    color: #000;
+    margin-bottom: 0.5mm;
+  }
+
+  .fs-print-entity-line {
+    display: block;
+    font-weight: 400;
+    color: #000;
+    word-break: break-word;
+  }
+
+  .fs-print-title-block {
+    text-align: center;
+    padding-top: 1.5mm;
+  }
+
+  .fs-print-doc-title {
+    margin: 0;
+    font-size: 9pt;
+    font-weight: 700;
+    color: #000;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.15;
+  }
+
+  .fs-print-doc-subtitle {
+    margin: 0.5mm 0 0;
+    font-size: 6.5pt;
+    font-weight: 400;
+    color: #000;
+    line-height: 1.2;
+  }
+
+  .fs-print-doc-subtitle strong {
+    font-weight: 600;
+  }
+
+  .fs-print-section-label {
+    margin: 0.5mm 0 0;
+    font-size: 6.5pt;
+    font-weight: 600;
+    color: #333;
+  }
+
+  /* —— Fixed footer on every page —— */
+  .fs-print-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: #fff;
+    border-top: 1px solid #000;
+    padding: 2mm 8mm 1mm;
+    max-height: 18mm;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .fs-print-footer-inner {
+    display: flex;
+    justify-content: space-between;
+    gap: 10mm;
+    align-items: flex-end;
+  }
+
+  .fs-print-footer-left,
+  .fs-print-footer-right {
+    flex: 1;
+    min-width: 0;
+    font-size: 6.5pt;
+    line-height: 1.3;
+    color: #000;
+  }
+
+  .fs-print-footer-left {
+    text-align: left;
+  }
+
+  .fs-print-footer-right {
+    text-align: right;
+  }
+
+  .fs-print-footer-left--empty {
+    visibility: hidden;
+  }
+
+  .fs-print-footer-heading {
+    margin: 0;
+    font-size: 5.5pt;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #333;
+  }
+
+  .fs-print-footer-strong {
+    margin: 0.5mm 0 0;
+    font-size: 7pt;
+    font-weight: 700;
+    color: #000;
+  }
+
+  .fs-print-footer-line {
+    margin: 0.3mm 0 0;
+    font-size: 6.5pt;
+    font-weight: 400;
+    color: #000;
+  }
+
+  .fs-print-sign-area {
+    height: 10mm;
+    margin-bottom: 1mm;
+    border-bottom: 0.5px solid #000;
+  }
+
+  .fs-print-footer-right .fs-print-sign-area {
+    margin-left: auto;
+    width: 42mm;
+  }
+
+  /* —— Body spacing for fixed header/footer —— */
+  .fs-print-body {
+    margin: 0;
+    padding: 26mm 0 19mm;
+  }
+
+  .fs-page.fs-print-all .fs-print-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='balance-sheet'] {
+    order: 1;
+  }
+
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='profit-loss'] {
+    order: 2;
+  }
+
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='notes'] {
+    order: 3;
+  }
+
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='depreciation'] {
+    order: 4;
+  }
+
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='repayment'] {
+    order: 5;
+  }
+
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='bank-account'] {
+    order: 6;
+  }
+
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='gst-reco'] {
+    order: 7;
+  }
+
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='udin-details'] {
+    order: 8;
+  }
+
+  .fs-tab-panel {
+    display: block !important;
+    break-inside: auto;
+    page-break-inside: auto;
+    page-break-before: always;
+    margin-bottom: 2mm;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .fs-tab-panel[data-fs-tab='balance-sheet'] {
+    margin-bottom: 0;
+  }
+
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='balance-sheet'] {
+    page-break-before: auto;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-tab-panel:not(.is-active) {
+    display: none !important;
+  }
+
+  .fs-tab-panel::before {
+    content: attr(data-print-title);
+    display: block;
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: #000;
+    margin: 0 0 2mm;
+    padding-bottom: 1mm;
+    border-bottom: 0.5px solid #666;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-tab-panel::before {
+    display: none;
+  }
+
+  .fs-tab-panel > h2,
+  .fs-tab-panel .panel-header-row .secondary-btn,
+  .fs-tab-panel .panel-header-row .danger-btn,
+  .fs-tab-panel .schedule-table .notes-add-round-btn,
+  .fs-tab-panel .schedule-table .danger-btn {
+    display: none;
+  }
+
+  .fs-tab-panel .panel-header-row h2 {
+    display: block;
+    font-size: 8.5pt;
+    font-weight: 700;
+    margin: 0 0 2mm;
+    color: #000;
+  }
+
+  .fs-tab-panel .hint,
+  .fs-tab-panel .auto-summary,
+  .fs-opening-balance-banner,
+  .fs-consolidated-banner {
+    display: none !important;
+  }
+
+  /* Hide change & % columns unless opted in */
+  .fs-page:not(.fs-print-with-comparison) .notes-change-col,
+  .fs-page:not(.fs-print-with-comparison) .notes-pct-col,
+  .fs-page:not(.fs-print-with-comparison) .statement-change-col,
+  .fs-page:not(.fs-print-with-comparison) .statement-pct-col,
+  .fs-page:not(.fs-print-with-comparison) .pl-appr-change-col,
+  .fs-page:not(.fs-print-with-comparison) .pl-appr-pct-col {
+    display: none !important;
+  }
+
+  /* —— Black & white content —— */
+  .fs-print-body,
+  .fs-print-body * {
+    color: #000 !important;
+    box-shadow: none !important;
+  }
+
+  .fs-print-body .variance-up,
+  .fs-print-body .variance-down,
+  .fs-print-body .variance-flat,
+  .fs-print-body .notes-change-col,
+  .fs-print-body .notes-pct-col,
+  .fs-print-body .notes-prev-col,
+  .fs-print-body .notes-curr-col,
+  .fs-print-body .statement-change-col,
+  .fs-print-body .statement-pct-col,
+  .fs-print-body .statement-prev-col,
+  .fs-print-body .statement-curr-col,
+  .fs-print-body .pl-appr-change-col,
+  .fs-print-body .pl-appr-pct-col,
+  .fs-print-body .notes-section-row td,
+  .fs-print-body .statement-section-row td,
+  .fs-print-body .statement-total-row td,
+  .fs-print-body .statement-grand-total-row td,
+  .fs-print-body th,
+  .fs-print-body td {
+    background: #fff !important;
+  }
+
+  .fs-print-body input,
+  .fs-print-body select,
+  .fs-print-body textarea {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    color: #000 !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    font-weight: 400 !important;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .fs-print-body button,
+  .fs-print-body .notes-add-round-btn,
+  .fs-print-body .notes-gst-link-bar,
+  .fs-print-body .danger-btn,
+  .fs-print-body .secondary-btn,
+  .fs-print-body .primary-btn,
+  .fs-print-body .notes-gst-open-btn,
+  .fs-print-body .loan-card-actions,
+  .fs-print-body .bank-row-actions,
+  .fs-print-body .bank-icon-btn,
+  .fs-print-body .notes-admin-remove-btn,
+  .fs-print-body .gst-sales-link-toggle,
+  .fs-print-body .gst-note-link-btn,
+  .fs-print-body .gst-section-header button {
+    display: none !important;
+  }
+
+  .fs-print-body .statement-note-link {
+    display: inline !important;
+    border: none !important;
+    background: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: #000 !important;
+    font: inherit !important;
+    font-size: 6.5pt !important;
+    font-weight: 400 !important;
+    cursor: default !important;
+    text-decoration: none !important;
+    pointer-events: none !important;
+  }
+
+  .fs-print-body .table-wrap,
+  .fs-print-body .statement-table-wrap,
+  .fs-print-body .statement-table-container,
+  .fs-print-body .notes-table-wrap,
+  .fs-print-body .bank-account-table-wrap,
+  .fs-print-body .dep-schedule-wrap,
+  .fs-print-body .pl-appropriation-table-wrap,
+  .fs-print-body .loan-emi-table-wrap,
+  .fs-print-body .gst-reco-panel .table-wrap {
+    border: 0.5px solid #000 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background: #fff !important;
+  }
+
+  .fs-print-body table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed;
+    font-size: 6.5pt !important;
+    font-weight: 400;
+    border-collapse: collapse;
+    color: #000 !important;
+  }
+
+  .fs-print-body thead {
+    display: table-header-group;
+  }
+
+  .fs-print-body thead th {
+    font-weight: 600 !important;
+    border-bottom: 0.5px solid #000 !important;
+  }
+
+  .fs-print-body tfoot {
+    display: table-footer-group;
+  }
+
+  .fs-print-body tr {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .fs-print-body .statement-section-row,
+  .fs-print-body .statement-grand-total-row,
+  .fs-print-body .statement-total-row,
+  .fs-print-body .notes-section-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .fs-print-body .statement-grand-total-row td,
+  .fs-print-body .statement-total-row td,
+  .fs-print-body .notes-note-total-row td {
+    font-weight: 600 !important;
+    border-top: 0.5px solid #000 !important;
+  }
+
+  .fs-print-body th,
+  .fs-print-body td {
+    padding: 1px 2px !important;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    vertical-align: top;
+    border-color: #ccc !important;
+  }
+
+  .fs-print-body .notes-particular-col,
+  .fs-print-body .statement-particular-col,
+  .fs-print-body .pl-appr-particular-col {
+    width: 38% !important;
+  }
+
+  .fs-print-body .notes-sno-col,
+  .fs-print-body .statement-note-col {
+    width: 6% !important;
+  }
+
+  .fs-print-body .notes-amount-col,
+  .fs-print-body .statement-amount-col,
+  .fs-print-body .pl-appr-amount-col {
+    width: 14% !important;
+    text-align: right !important;
+    font-weight: 500 !important;
+  }
+
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .notes-sno-col,
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .statement-note-col {
+    width: 8% !important;
+  }
+
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .notes-particular-col,
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .statement-particular-col,
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .pl-appr-particular-col {
+    width: 44% !important;
+  }
+
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .notes-amount-col,
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .statement-amount-col,
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .pl-appr-amount-col {
+    width: 24% !important;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body .notes-amount-col,
+  .fs-page.fs-print-with-comparison .fs-print-body .statement-amount-col,
+  .fs-page.fs-print-with-comparison .fs-print-body .pl-appr-amount-col {
+    width: 11% !important;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body .notes-variance-col,
+  .fs-page.fs-print-with-comparison .fs-print-body .statement-variance-col,
+  .fs-page.fs-print-with-comparison .fs-print-body .pl-appr-variance-col {
+    width: 9% !important;
+    text-align: right !important;
+    font-weight: 500 !important;
+  }
+
+  .fs-print-body .schedule-table th:last-child,
+  .fs-print-body .schedule-table td:last-child {
+    display: none !important;
+  }
+
+  .fs-print-body .notes-admin-category-select,
+  .fs-print-body .notes-admin-amount-input,
+  .fs-print-body .bank-amount-input,
+  .fs-print-body .statement-amount-value,
+  .fs-print-body .note-variance-value,
+  .fs-print-body .note-prev-ref {
+    text-align: right !important;
+    font-size: 6.5pt !important;
+    font-weight: 400 !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .fs-print-body .schedule-table th,
+  .fs-print-body .schedule-table td {
+    font-size: 6pt !important;
+    padding: 0.5px 1.5px !important;
+  }
+
+  .fs-print-body .bank-account-table {
+    font-size: 6pt !important;
+  }
+
+  .fs-print-body .bank-account-table th,
+  .fs-print-body .bank-account-table td {
+    padding: 0.5px 1.5px !important;
+  }
+
+  .fs-print-body .bank-name-text {
+    font-size: 6pt !important;
+    line-height: 1.2;
+  }
+
+  .fs-print-body .bank-type-badge {
+    font-size: 5.5pt !important;
+    padding: 0 2px !important;
+    border: 0.5px solid #000 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .fs-print-body .loan-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 0.5px solid #000;
+    margin-bottom: 2mm;
+    padding: 2mm;
+    background: #fff !important;
+  }
+
+  .fs-print-body .loan-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2mm;
+    font-size: 6pt;
+  }
+
+  .fs-print-body .statement-table-wrap h3,
+  .fs-print-body .statement-table-container h3 {
+    font-size: 7.5pt;
+    font-weight: 600;
+    margin: 0 0 1mm;
+    padding: 0;
+    text-align: center;
+    line-height: 1.2;
+    color: #000 !important;
+  }
+
+  .fs-print-body .statement-table-wrap--balance-sheet {
+    break-inside: auto;
+    page-break-inside: auto;
+    margin-bottom: 1mm;
+  }
+
+  .fs-print-body .statement-table-wrap--balance-sheet table {
+    font-size: 6pt !important;
+  }
+
+  .fs-print-body .statement-table-wrap--balance-sheet th,
+  .fs-print-body .statement-table-wrap--balance-sheet td {
+    padding: 0.5px 1.5px !important;
+    line-height: 1.1;
+  }
+
+  .fs-print-body .statement-table-wrap--balance-sheet-sources .statement-section-row td {
+    padding-top: 2mm !important;
+    padding-bottom: 0.5mm !important;
+    font-weight: 600 !important;
+  }
+
+  .fs-print-body .statement-spacer-row td {
+    height: 2mm !important;
+    padding: 0.5mm 0 !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .fs-print-body .statement-table-wrap--balance-sheet-sources .statement-spacer-row td {
+    height: 2.5mm !important;
+    padding: 0.5mm 0 !important;
+  }
+
+  .fs-print-body .statement-table-wrap--balance-sheet .statement-amount-value,
+  .fs-print-body .statement-table-wrap--balance-sheet .statement-variance-value {
+    font-size: 6pt !important;
+    font-weight: 500 !important;
+  }
+
+  .fs-print-body .statement-table-wrap--balance-sheet-application {
+    page-break-before: always;
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Single-tab Balance Sheet print: keep Sources + Application together. */
+  .fs-page:not(.fs-print-all) .fs-tab-panel[data-fs-tab='balance-sheet'] {
+    page-break-before: auto;
+    margin-bottom: 0;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-tab-panel[data-fs-tab='balance-sheet']::before {
+    margin-bottom: 1mm;
+    padding-bottom: 0.5mm;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-table-wrap--balance-sheet {
+    margin-bottom: 0.5mm;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-table-wrap--balance-sheet h3 {
+    font-size: 7pt;
+    margin: 0 0 0.5mm;
+    line-height: 1.1;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-table-wrap--balance-sheet-application h3 {
+    display: none;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-table-wrap--balance-sheet thead {
+    display: none !important;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-table-wrap--balance-sheet table {
+    font-size: 5.5pt !important;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-table-wrap--balance-sheet th,
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-table-wrap--balance-sheet td {
+    padding: 0.25px 1px !important;
+    line-height: 1.05;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-table-wrap--balance-sheet-sources .statement-section-row td {
+    padding-top: 0.5mm !important;
+    padding-bottom: 0.25mm !important;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-spacer-row td,
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-table-wrap--balance-sheet-sources .statement-spacer-row td {
+    height: 0.8mm !important;
+    padding: 0 !important;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-table-wrap--balance-sheet-application {
+    page-break-before: auto;
+    break-before: auto;
+    margin-top: 0;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-table-wrap--balance-sheet .statement-note-col {
+    width: 4.5% !important;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-table-wrap--balance-sheet .statement-particular-col {
+    width: 47% !important;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-body .statement-table-wrap--balance-sheet .statement-amount-col {
+    width: 21% !important;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-section-label {
+    display: none;
+  }
+
+  .fs-print-body .pl-appropriation-panel {
+    margin-top: 2mm;
+    break-inside: auto;
+    page-break-inside: auto;
+    border: 0.5px solid #000 !important;
+    background: #fff !important;
+  }
+
+  .fs-print-body .bank-closing-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3mm;
+    margin-top: 2mm;
+    font-size: 6.5pt;
+  }
+
+  .fs-print-body .gst-reco-panel h2 {
+    font-size: 8.5pt;
+    font-weight: 700;
+    margin: 0 0 2mm;
+    color: #000 !important;
+  }
+
+  .fs-print-body .gst-reco-section {
+    break-inside: auto;
+    page-break-inside: auto;
+    margin-bottom: 2mm;
+  }
+}

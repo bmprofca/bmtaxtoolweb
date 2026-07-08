@@ -1,0 +1,144 @@
+.fs-context-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 0.85rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.7rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+}
+
+.fs-context-selectors {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: min(100%, 16rem);
+}
+
+.fs-context-summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding-left: 0.65rem;
+  border-left: 1px solid #cbd5e1;
+}
+
+.fs-context-summary-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+
+.fs-context-summary strong {
+  font-size: 0.85rem;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
+.fs-inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.fs-inline-field > span {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.fs-inline-field select {
+  height: 1.85rem;
+  min-width: 0;
+  padding: 0 0.45rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #1e293b;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.fs-inline-field--fy select {
+  min-width: 8.5rem;
+}
+
+.fs-inline-field--type select {
+  min-width: 7.25rem;
+}
+
+.fs-inline-field--business select {
+  max-width: 9.5rem;
+}
+
+.fs-inline-field select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.fs-inline-field select:focus {
+  outline: 2px solid #93c5fd;
+  border-color: #60a5fa;
+}
+
+.fs-quick-entry-btn {
+  height: 1.85rem;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0 0.65rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fs-quick-entry-btn:hover {
+  background: #1d4ed8;
+}
+
+@media (max-width: 768px) {
+  .fs-context-bar {
+    gap: 0.5rem;
+  }
+
+  .fs-context-selectors {
+    width: 100%;
+    order: 1;
+  }
+
+  .fs-context-summary {
+    width: 100%;
+    order: 2;
+    border-left: none;
+    padding-left: 0;
+  }
+
+  .fs-inline-field--fy,
+  .fs-inline-field--type,
+  .fs-inline-field--business {
+    flex: 1;
+  }
+
+  .fs-inline-field--fy select,
+  .fs-inline-field--type select,
+  .fs-inline-field--business select {
+    width: 100%;
+    max-width: none;
+  }
+}

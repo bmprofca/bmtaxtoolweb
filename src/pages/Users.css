@@ -1,0 +1,106 @@
+.users-page .hint {
+  margin-top: 0.35rem;
+  color: #64748b;
+}
+
+.users-table-wrap {
+  margin-top: 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  overflow: auto;
+  background: #fff;
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.users-table th,
+.users-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.users-table thead th {
+  background: #f8fafc;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.users-empty {
+  text-align: center;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.users-token-btn {
+  font-size: 0.82rem;
+  padding: 0.45rem 0.7rem;
+}
+
+.users-type-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.users-type-admin {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.users-type-staff {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.users-modal label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.users-modal input {
+  font: inherit;
+  font-weight: 500;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+}
+
+.users-token-panel p {
+  margin: 0 0 0.75rem;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.users-token-value {
+  display: block;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  word-break: break-all;
+  font-size: 0.82rem;
+  color: #0f172a;
+}
+
+.users-token-hint {
+  margin-top: 0.75rem !important;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.users-token-hint code {
+  font-size: 0.8rem;
+}
