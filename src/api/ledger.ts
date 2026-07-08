@@ -1,6 +1,5 @@
 import type { LedgerRecord } from '../types/ledger'
-
-const API_BASE = '/api'
+import { API_BASE } from '../config/api'
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('authToken')

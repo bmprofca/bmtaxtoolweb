@@ -2,8 +2,7 @@ import type { AssetDepreciationHistoryRow, DepreciationRow, FinancialStatementDa
 import type { BankAccountHistoryRow, BankAccountRecord } from '../types/bankAccount'
 import type { GstRecoHistoryRow, GstRecoStatement } from '../types/gst'
 import type { LoanFySummary, LoanHistoryRow, LoanRecord } from '../types/loan'
-
-const API_BASE = '/api'
+import { API_BASE } from '../config/api'
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('authToken')

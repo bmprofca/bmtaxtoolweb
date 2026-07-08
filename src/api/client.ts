@@ -12,8 +12,8 @@ import type {
   UpdateFinancialYearPayload,
   User,
 } from '../types'
+import { API_BASE } from '../config/api'
 
-const API_BASE = '/api'
 let authToken: string | null = localStorage.getItem('authToken')
 
 export function setAuthToken(token: string | null) {

@@ -4,8 +4,7 @@ import {
   EMPTY_CA_SETTINGS,
   normalizeCaStatus,
 } from '../types/caProfile'
-
-const API_BASE = '/api'
+import { API_BASE } from '../config/api'
 
 function getAuthHeaders() {
   const headers = new Headers({ 'Content-Type': 'application/json' })
