@@ -491,8 +491,13 @@
     text-align: right !important;
   }
 
+  .fs-print-body .pl-appropriation-panel--empty,
+  .fs-print-body .pl-appropriation-panel--empty .pl-appr-print-title {
+    display: none !important;
+  }
+
   .fs-print-body .pl-appropriation-table-wrap--empty {
-    display: block !important;
+    display: none !important;
   }
 
   .fs-print-seal-image {
@@ -670,23 +675,30 @@
 
   /* P&L print: highlight table header and first body row */
   .fs-print-body .fs-tab-panel[data-fs-tab='profit-loss'] .statement-table .statement-head-row th {
-    background: #eef2f7 !important;
+    background: #dce4ee !important;
     font-weight: 700 !important;
-    border-bottom: 0.5px solid #000 !important;
+    color: #0f172a !important;
+    border: 0.5px solid #000 !important;
+    border-top: 1px solid #000 !important;
+    border-bottom: 1px solid #000 !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
 
   .fs-print-body .fs-tab-panel[data-fs-tab='profit-loss'] .statement-table tbody > tr:first-child td {
-    background: #f1f5f9 !important;
+    background: #f8fafc !important;
     font-weight: 600 !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
 
   .fs-print-body .fs-tab-panel[data-fs-tab='profit-loss'] .pl-appropriation-table .pl-appr-head-row th {
-    background: #eef2f7 !important;
+    background: #dce4ee !important;
     font-weight: 700 !important;
+    color: #0f172a !important;
+    border: 0.5px solid #000 !important;
+    border-top: 1px solid #000 !important;
+    border-bottom: 1px solid #000 !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
@@ -758,18 +770,7 @@
   }
 
   .fs-print-body .statement-note-link {
-    display: inline !important;
-    border: none !important;
-    background: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    color: #000 !important;
-    font: inherit !important;
-    font-size: inherit !important;
-    font-weight: 400 !important;
-    cursor: default !important;
-    text-decoration: none !important;
-    pointer-events: none !important;
+    display: none !important;
   }
 
   .fs-print-body .notes-repayment-link-btn {
@@ -1063,7 +1064,24 @@
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-table-wrap--balance-sheet-sources .statement-head-row th {
-    border-top: 0.5px solid #000 !important;
+    border: 0.5px solid #000 !important;
+    border-top: 1px solid #000 !important;
+  }
+
+  .fs-print-body .fs-balance-sheet-print-body .statement-head-row th {
+    font-weight: 700 !important;
+    text-align: center !important;
+    background: #dce4ee !important;
+    color: #0f172a !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    border: 0.5px solid #000 !important;
+    border-top: 1px solid #000 !important;
+    border-bottom: 1px solid #000 !important;
+    padding: 2pt 4pt !important;
+    vertical-align: middle !important;
+    height: auto !important;
+    min-height: 15pt !important;
   }
 
   .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-change-col,
@@ -1210,16 +1228,6 @@
     min-height: 15pt !important;
   }
 
-  .fs-print-body .fs-balance-sheet-print-body .statement-head-row th {
-    font-weight: 700 !important;
-    text-align: center !important;
-    border-bottom: 0.5px solid #000 !important;
-    padding: 2pt 4pt !important;
-    vertical-align: middle !important;
-    height: auto !important;
-    min-height: 15pt !important;
-  }
-
   .fs-print-body .fs-balance-sheet-print-body .statement-head-row th.statement-particular-col {
     text-align: left !important;
   }
@@ -1237,10 +1245,11 @@
     display: block;
     font-family: inherit !important;
     font-size: 12pt !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
     white-space: normal !important;
     line-height: 12pt !important;
     text-align: right !important;
+    color: #0f172a !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-particular-col {
@@ -1309,29 +1318,309 @@
     line-height: 1 !important;
   }
 
-  .fs-print-body .fs-balance-sheet-print-body .statement-grand-total-row td,
   .fs-print-body .fs-balance-sheet-print-body .statement-total-row td {
     font-weight: 700 !important;
     font-size: 12pt !important;
-    border-top: 0.5px solid #000 !important;
+    background: #f1f5f9 !important;
+    border-top: 1px solid #000 !important;
     border-bottom: 0.5px solid #000 !important;
     height: 15pt !important;
     min-height: 15pt !important;
     padding: 1.5pt 4pt !important;
-  }
-
-  .fs-print-body .fs-balance-sheet-print-body .statement-grand-total-row td {
-    background: #eef2f7 !important;
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
   }
 
+  .fs-print-body .fs-balance-sheet-print-body .statement-grand-total-row td {
+    font-weight: 800 !important;
+    font-size: 12pt !important;
+    background: #c9d4e3 !important;
+    border-top: 1px solid #000 !important;
+    border-bottom: 1px solid #000 !important;
+    height: 15pt !important;
+    min-height: 15pt !important;
+    padding: 1.5pt 4pt !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .fs-print-body .fs-balance-sheet-print-body .statement-total-row .statement-particular-col,
+  .fs-print-body .fs-balance-sheet-print-body .statement-grand-total-row .statement-particular-col {
+    font-weight: inherit !important;
+    color: #0f172a !important;
+  }
+
+  .fs-print-body .fs-balance-sheet-print-body .statement-total-row .statement-amount-print,
   .fs-print-body .fs-balance-sheet-print-body .statement-grand-total-row .statement-amount-print {
     font-weight: 700 !important;
+    color: #0f172a !important;
+  }
+
+  .fs-print-body .fs-balance-sheet-print-body .statement-grand-total-row .statement-amount-print {
+    font-weight: 800 !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-sub-row .statement-particular-col {
     padding-left: 2mm !important;
+  }
+
+  /* P&L print: aligned tables with bordered header and appropriation grid */
+  .fs-print-body .fs-profit-loss-print-body {
+    border: none !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif !important;
+    font-size: 12pt !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-table-wrap,
+  .fs-print-body .fs-profit-loss-print-body .pl-appropriation-panel,
+  .fs-print-body .fs-profit-loss-print-body .pl-appropriation-table-wrap,
+  .fs-print-body .fs-profit-loss-print-body .statement-table-container,
+  .fs-print-body .fs-profit-loss-print-body .table-wrap {
+    border: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .pl-appropriation-panel {
+    margin-top: 2mm !important;
+    padding-top: 0 !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body table {
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    font-family: inherit !important;
+    font-size: 12pt !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-table.has-note-col,
+  .fs-print-body .fs-profit-loss-print-body .pl-appropriation-table {
+    min-width: 0 !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body th,
+  .fs-print-body .fs-profit-loss-print-body td {
+    border: 0.5px solid #000 !important;
+    vertical-align: middle !important;
+    padding: 1.5pt 4pt !important;
+    line-height: 12pt !important;
+    font-family: inherit !important;
+    font-size: 12pt !important;
+    box-sizing: border-box !important;
+    color: #000 !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body tbody td {
+    height: 15pt !important;
+    min-height: 15pt !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-head-row th,
+  .fs-print-body .fs-profit-loss-print-body .pl-appr-head-row th {
+    font-weight: 700 !important;
+    background: #dce4ee !important;
+    color: #0f172a !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    border: 0.5px solid #000 !important;
+    border-top: 1px solid #000 !important;
+    border-bottom: 1px solid #000 !important;
+    padding: 2pt 4pt !important;
+    vertical-align: middle !important;
+    height: auto !important;
+    min-height: 15pt !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-head-row th.statement-particular-col,
+  .fs-print-body .fs-profit-loss-print-body .pl-appr-head-row th.pl-appr-particular-col {
+    text-align: left !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-head-row th.statement-note-col {
+    text-align: center !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-head-row th.statement-amount-col,
+  .fs-print-body .fs-profit-loss-print-body .pl-appr-head-row th.pl-appr-amount-col {
+    text-align: right !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-head-row th .statement-fy-label--print,
+  .fs-print-body .fs-profit-loss-print-body .statement-head-row th .statement-fy-label--unified,
+  .fs-print-body .fs-profit-loss-print-body .pl-appr-head-row th .statement-fy-label--print {
+    display: block !important;
+    font-family: inherit !important;
+    font-size: 12pt !important;
+    font-weight: 700 !important;
+    line-height: 12pt !important;
+    text-align: right !important;
+    color: #0f172a !important;
+  }
+
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body col.pl-col-particular {
+    width: 60% !important;
+  }
+
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body col.pl-col-prev,
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body col.pl-col-curr {
+    width: 20% !important;
+  }
+
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .statement-particular-col {
+    width: 52% !important;
+    text-align: left !important;
+  }
+
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .statement-note-col {
+    width: 8% !important;
+    text-align: center !important;
+  }
+
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .pl-appr-particular-col {
+    width: 60% !important;
+    text-align: left !important;
+  }
+
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .statement-prev-col,
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .statement-curr-col,
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .pl-appr-prev-col,
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .pl-appr-curr-col {
+    width: 20% !important;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .statement-curr-col,
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .pl-appr-curr-col {
+    border-right: 0.5px solid #000 !important;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body col.pl-col-particular {
+    width: 45% !important;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body col.pl-col-prev,
+  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body col.pl-col-curr {
+    width: 15% !important;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body col.pl-col-change,
+  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body col.pl-col-pct {
+    width: 12.5% !important;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body .pl-appr-curr-col {
+    border-right: none !important;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body .pl-appr-pct-col {
+    border-right: 0.5px solid #000 !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-note-print-value {
+    display: block !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    width: 100% !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-family: inherit !important;
+    font-size: 12pt !important;
+    font-weight: 400 !important;
+    line-height: 12pt !important;
+    color: #000 !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-amount-print,
+  .fs-print-body .fs-profit-loss-print-body .pl-appr-particular-print,
+  .fs-print-body .fs-profit-loss-print-body .note-prev-ref {
+    display: block !important;
+    width: 100% !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-family: inherit !important;
+    font-size: 12pt !important;
+    line-height: 12pt !important;
+    color: #000 !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-amount-print,
+  .fs-print-body .fs-profit-loss-print-body .note-prev-ref,
+  .fs-print-body .fs-profit-loss-print-body .pl-appr-total-value {
+    text-align: right !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .pl-appr-particular-print {
+    text-align: left !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-amount-value,
+  .fs-print-body .fs-profit-loss-print-body .note-variance-value,
+  .fs-print-body .fs-profit-loss-print-body .pl-appr-field,
+  .fs-print-body .fs-profit-loss-print-body .note-amount-input {
+    display: none !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-total-row td,
+  .fs-print-body .fs-profit-loss-print-body .statement-grand-total-row td {
+    font-weight: 700 !important;
+    background: #f1f5f9 !important;
+    border-top: 1px solid #000 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-grand-total-row td {
+    font-weight: 800 !important;
+    background: #c9d4e3 !important;
+    border-bottom: 1px solid #000 !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-grand-total-row .statement-amount-print,
+  .fs-print-body .fs-profit-loss-print-body .statement-total-row .statement-amount-print {
+    font-weight: inherit !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .pl-appropriation-total-row td {
+    font-weight: 700 !important;
+    background: #c9d4e3 !important;
+    border-top: 1px solid #000 !important;
+    border-bottom: 1px solid #000 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .pl-appropriation-total-row .pl-appr-total-value,
+  .fs-print-body .fs-profit-loss-print-body .pl-appropriation-total-row .pl-appr-particular-col {
+    font-weight: 700 !important;
+    color: #0f172a !important;
+  }
+
+  .fs-print-body .fs-profit-loss-print-body .statement-table tbody > tr:first-child td {
+    background: #f8fafc !important;
+    font-weight: 600 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
   }
 
   /* Unified print format for all financial statement components */
@@ -1485,6 +1774,25 @@
     padding: 2pt 4pt !important;
   }
 
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-head-row th {
+    background: #dce4ee !important;
+    color: #0f172a !important;
+    border: 0.5px solid #000 !important;
+    border-top: 1px solid #000 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-profit-loss-print-body .statement-head-row th,
+  .fs-print-body.fs-print-statement-format .fs-profit-loss-print-body .pl-appr-head-row th {
+    background: #dce4ee !important;
+    color: #0f172a !important;
+    border: 0.5px solid #000 !important;
+    border-top: 1px solid #000 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
   .fs-print-body.fs-print-statement-format .notes-head-row th {
     font-weight: 700 !important;
     height: auto !important;
@@ -1499,12 +1807,25 @@
   }
 
   .fs-print-body.fs-print-statement-format .statement-grand-total-row td,
+  .fs-print-body.fs-print-statement-format .statement-total-row td,
   .fs-print-body.fs-print-statement-format .notes-note-total-row td,
   .fs-print-body.fs-print-statement-format .pl-appropriation-total-row td {
     font-weight: 700 !important;
     background: #eef2f7 !important;
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-total-row td {
+    background: #f1f5f9 !important;
+    border-top: 1px solid #000 !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-grand-total-row td {
+    font-weight: 800 !important;
+    background: #c9d4e3 !important;
+    border-top: 1px solid #000 !important;
+    border-bottom: 1px solid #000 !important;
   }
 
   /* Notes print: match P&L statement table formatting */

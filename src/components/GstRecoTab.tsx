@@ -167,7 +167,7 @@ function GstRecoTab({ gstReco, fyLabel, salesFromBooks, onOpenRevenueNote, onCha
         }
       >
         <td className="gst-sno-cell">{index + 1}</td>
-        <td className={`gst-itc-particular ${particularClass(row.type)}`}>{row.particular}</td>
+        <td className={`gst-itc-particular particulars-col ${particularClass(row.type)}`}>{row.particular}</td>
         {isClosing ? (
           gstReco.inputTax.linkClosingToNotes ? (
             <TaxCells values={gstReco.inputTax.closingFromNotes} onChange={updateClosingFromNotes} />
@@ -454,10 +454,17 @@ function GstRecoTab({ gstReco, fyLabel, salesFromBooks, onOpenRevenueNote, onCha
         </div>
         <div className="table-wrap">
           <table className="data-table gst-simple-table gst-itc-table">
+            <colgroup>
+              <col className="gst-itc-col-sno" />
+              <col className="gst-itc-col-particular" />
+              <col className="gst-itc-col-tax" />
+              <col className="gst-itc-col-tax" />
+              <col className="gst-itc-col-tax" />
+            </colgroup>
             <thead>
               <tr>
                 <th>S.No</th>
-                <th>Particulars</th>
+                <th className="particulars-col">Particulars</th>
                 <th>IGST</th>
                 <th>CGST</th>
                 <th>SGST</th>

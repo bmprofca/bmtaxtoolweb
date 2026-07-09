@@ -12,7 +12,6 @@ import type { Client, ClientFormPayload, ClientStatus, ClientStatusFilter } from
 import {
   formatPanInput,
   getPanValidationMessage,
-  PAN_FORMAT_HINT,
 } from '../utils/clientValidation'
 import {
   confirmDelete,
@@ -172,6 +171,18 @@ function Clients() {
       return
     }
 
+    if (field === 'mobile') {
+      const formatted = value.replace(/\D/g, '').slice(0, 10)
+      setFormData((current) => ({ ...current, mobile: formatted }))
+      return
+    }
+
+    if (field === 'pin') {
+      const formatted = value.replace(/\D/g, '').slice(0, 6)
+      setFormData((current) => ({ ...current, pin: formatted }))
+      return
+    }
+
     setFormData((current) => ({ ...current, [field]: value }))
   }
 
@@ -291,6 +302,139 @@ function Clients() {
   }
 
   const activeClient = clients.find((client) => client.id === activeClientId)
+
+  const renderClientFormFields = (mode: 'add' | 'edit') => (
+    <div className="business-form-layout">
+      <label className="modal-field business-form-field-full">
+        Client Name *
+        <input
+          type="text"
+          value={formData.name}
+          onChange={(event) => updateFormField('name', event.target.value)}
+          placeholder="e.g. Rajesh Kumar"
+          required
+          autoFocus={mode === 'add'}
+        />
+      </label>
+
+      <div className="business-form-row business-form-row-3">
+        <label className="modal-field modal-field-pan">
+          PAN Card *
+          <div className="client-pan-input-wrap">
+            <input
+              type="text"
+              value={formData.pan}
+              onChange={(event) => updateFormField('pan', event.target.value)}
+              onBlur={validatePanField}
+              placeholder="ABCDE1234F"
+              maxLength={10}
+              required
+              inputMode="text"
+              autoCapitalize="characters"
+              spellCheck={false}
+              aria-invalid={Boolean(panFieldError)}
+              className={`pan-input client-pan-input ${
+                panFieldError ? 'pan-input-invalid' : ''
+              } ${formData.pan.length === 10 && !panFieldError ? 'client-input-valid' : ''}`}
+            />
+            <span
+              className={`client-pan-status${
+                formData.pan.length === 10 && !panFieldError ? ' client-pan-status-valid' : ''
+              }`}
+              aria-hidden="true"
+            >
+              {formData.pan.length === 10 && !panFieldError ? '✓' : `${formData.pan.length}/10`}
+            </span>
+          </div>
+          {panFieldError ? <span className="pan-field-error">{panFieldError}</span> : null}
+        </label>
+
+        <label className="modal-field">
+          Mobile Number
+          <input
+            type="tel"
+            value={formData.mobile}
+            onChange={(event) => updateFormField('mobile', event.target.value)}
+            placeholder="10-digit mobile number"
+            inputMode="numeric"
+            maxLength={10}
+          />
+        </label>
+
+        {mode === 'add' ? (
+          <label className="modal-field">
+            Email ID
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(event) => updateFormField('email', event.target.value)}
+              placeholder="name@example.com"
+            />
+          </label>
+        ) : (
+          <label className="modal-field">
+            Status *
+            <select
+              value={formData.status || 'active'}
+              onChange={(event) => updateFormField('status', event.target.value as ClientStatus)}
+              required
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </label>
+        )}
+      </div>
+
+      <label className="modal-field business-form-field-full">
+        Address
+        <textarea
+          rows={2}
+          value={formData.address}
+          onChange={(event) => updateFormField('address', event.target.value)}
+          placeholder="Street, locality, city, state"
+        />
+      </label>
+
+      {mode === 'edit' ? (
+        <div className="business-form-row business-form-row-2">
+          <label className="modal-field">
+            Email ID
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(event) => updateFormField('email', event.target.value)}
+              placeholder="name@example.com"
+            />
+          </label>
+
+          <label className="modal-field">
+            PIN Code
+            <input
+              type="text"
+              value={formData.pin}
+              onChange={(event) => updateFormField('pin', event.target.value)}
+              placeholder="6-digit PIN"
+              inputMode="numeric"
+              maxLength={6}
+            />
+          </label>
+        </div>
+      ) : (
+        <label className="modal-field business-form-field-full">
+          PIN Code
+          <input
+            type="text"
+            value={formData.pin}
+            onChange={(event) => updateFormField('pin', event.target.value)}
+            placeholder="6-digit PIN"
+            inputMode="numeric"
+            maxLength={6}
+          />
+        </label>
+      )}
+    </div>
+  )
 
   return (
     <div className="clients-page">
@@ -525,10 +669,36 @@ function Clients() {
 
       {modalMode && (
         <div className="modal-overlay" onClick={closeModal}>
-          <div
-            className={`modal ${modalMode === 'add' || modalMode === 'edit' ? 'modal-wide' : ''}`}
-            onClick={(event) => event.stopPropagation()}
-          >
+          {modalMode === 'add' || modalMode === 'edit' ? (
+            <div className="modal modal-wide" onClick={(event) => event.stopPropagation()}>
+              <h2>{modalMode === 'add' ? 'Add Client' : 'Edit Client'}</h2>
+
+              {modalError && <div className="modal-error">{modalError}</div>}
+
+              <form className="modal-form" onSubmit={handleSaveClient}>
+                {renderClientFormFields(modalMode)}
+
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={closeModal}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="primary-btn" disabled={submitting}>
+                    {submitting
+                      ? 'Saving...'
+                      : modalMode === 'add'
+                        ? 'Add Client'
+                        : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+          <div className="modal modal-compact" onClick={(event) => event.stopPropagation()}>
             {modalMode === 'success' && successClient ? (
               <div className="success-panel">
                 <div className="success-icon" aria-hidden="true">
@@ -592,161 +762,9 @@ function Clients() {
                   </div>
                 </form>
               </>
-            ) : (
-              <>
-                <div className="modal-header">
-                  <h2>{modalMode === 'add' ? 'Add Client' : 'Edit Client'}</h2>
-                  <p className="modal-subtitle">
-                    Fields marked with <RequiredMark /> are required
-                  </p>
-                </div>
-
-                {modalError && <div className="modal-error">{modalError}</div>}
-
-                <form className="modal-form" onSubmit={handleSaveClient}>
-                  <div
-                    className={`modal-form-grid ${modalMode === 'edit' ? 'modal-form-grid-edit' : ''}`}
-                  >
-                    <label className="modal-field">
-                      Name <RequiredMark />
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(event) => updateFormField('name', event.target.value)}
-                        placeholder="Client name"
-                        required
-                        autoFocus={modalMode === 'add'}
-                      />
-                    </label>
-
-                    <label className="modal-field modal-field-pan">
-                      PAN Card <RequiredMark />
-                      <input
-                        type="text"
-                        value={formData.pan}
-                        onChange={(event) => updateFormField('pan', event.target.value)}
-                        onBlur={validatePanField}
-                        placeholder="ABCDE1234F"
-                        maxLength={10}
-                        required
-                        inputMode="text"
-                        autoCapitalize="characters"
-                        spellCheck={false}
-                        aria-invalid={Boolean(panFieldError)}
-                        className={`pan-input ${panFieldError ? 'pan-input-invalid' : ''} ${
-                          formData.pan.length === 10 && !panFieldError ? 'pan-input-valid' : ''
-                        }`}
-                      />
-                      <span className="pan-format-hint">{PAN_FORMAT_HINT}</span>
-                      {panFieldError ? (
-                        <span className="pan-field-error">{panFieldError}</span>
-                      ) : (
-                        <span className="pan-char-count">{formData.pan.length}/10</span>
-                      )}
-                    </label>
-
-                    {modalMode === 'edit' ? (
-                      <label className="modal-field">
-                        Status
-                        <select
-                          value={formData.status || 'active'}
-                          onChange={(event) =>
-                            updateFormField('status', event.target.value as ClientStatus)
-                          }
-                        >
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                        </select>
-                      </label>
-                    ) : (
-                      <label className="modal-field">
-                        Mobile Number
-                        <input
-                          type="tel"
-                          value={formData.mobile}
-                          onChange={(event) => updateFormField('mobile', event.target.value)}
-                          placeholder="Mobile number"
-                        />
-                      </label>
-                    )}
-
-                    {modalMode === 'edit' ? (
-                      <label className="modal-field">
-                        Mobile Number
-                        <input
-                          type="tel"
-                          value={formData.mobile}
-                          onChange={(event) => updateFormField('mobile', event.target.value)}
-                          placeholder="Mobile number"
-                        />
-                      </label>
-                    ) : (
-                      <label className="modal-field">
-                        Email ID
-                        <input
-                          type="email"
-                          value={formData.email}
-                          onChange={(event) => updateFormField('email', event.target.value)}
-                          placeholder="Email address"
-                        />
-                      </label>
-                    )}
-
-                    <label className="modal-field">
-                      {modalMode === 'edit' ? 'Email ID' : 'PIN'}
-                      {modalMode === 'edit' ? (
-                        <input
-                          type="email"
-                          value={formData.email}
-                          onChange={(event) => updateFormField('email', event.target.value)}
-                          placeholder="Email address"
-                        />
-                      ) : (
-                        <input
-                          type="text"
-                          value={formData.pin}
-                          onChange={(event) => updateFormField('pin', event.target.value)}
-                          placeholder="PIN code"
-                        />
-                      )}
-                    </label>
-
-                    {modalMode === 'edit' && (
-                      <label className="modal-field">
-                        PIN
-                        <input
-                          type="text"
-                          value={formData.pin}
-                          onChange={(event) => updateFormField('pin', event.target.value)}
-                          placeholder="PIN code"
-                        />
-                      </label>
-                    )}
-                  </div>
-
-                  <label className="modal-field modal-field-full">
-                    Address
-                    <textarea
-                      rows={3}
-                      value={formData.address}
-                      onChange={(event) => updateFormField('address', event.target.value)}
-                      placeholder="Full address"
-                      className="address-textarea"
-                    />
-                  </label>
-
-                  <div className="modal-actions">
-                    <button type="button" className="secondary-btn" onClick={closeModal}>
-                      Cancel
-                    </button>
-                    <button type="submit" className="primary-btn" disabled={submitting}>
-                      {submitting ? 'Saving...' : modalMode === 'add' ? 'Add Client' : 'Save Changes'}
-                    </button>
-                  </div>
-                </form>
-              </>
-            )}
+            ) : null}
           </div>
+          )}
         </div>
       )}
     </div>

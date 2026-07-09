@@ -405,8 +405,8 @@ function Business() {
   }
 
   const renderBusinessFormFields = (mode: 'add' | 'edit') => (
-    <>
-      <label className="modal-field">
+    <div className="business-form-layout">
+      <label className="modal-field business-form-field-full">
         Business Name *
         <input
           type="text"
@@ -418,53 +418,55 @@ function Business() {
         />
       </label>
 
-      <label className="modal-field">
-        Business Type *
-        <select
-          value={businessType}
-          onChange={(event) => handleBusinessTypeChange(event.target.value)}
-          required
-        >
-          <option value="">Select type</option>
-          {BUSINESS_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="business-form-row business-form-row-3">
+        <label className="modal-field">
+          Business Type *
+          <select
+            value={businessType}
+            onChange={(event) => handleBusinessTypeChange(event.target.value)}
+            required
+          >
+            <option value="">Select type</option>
+            {BUSINESS_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </label>
 
-      <label className="modal-field modal-field-pan">
-        PAN *
-        <input
-          type="text"
-          value={businessPan}
-          onChange={(event) => handleBusinessPanChange(event.target.value)}
-          placeholder={isProprietorshipType(businessType) ? 'Uses proprietor PAN if empty' : 'ABCDE1234F'}
-          maxLength={10}
-          inputMode="text"
-          autoCapitalize="characters"
-          spellCheck={false}
-          className={`pan-input ${businessPanError ? 'pan-input-invalid' : ''}`}
-        />
-        {businessPanError ? (
-          <span className="pan-field-error">{businessPanError}</span>
-        ) : null}
-      </label>
+        <label className="modal-field modal-field-pan">
+          PAN *
+          <input
+            type="text"
+            value={businessPan}
+            onChange={(event) => handleBusinessPanChange(event.target.value)}
+            placeholder={isProprietorshipType(businessType) ? 'Uses proprietor PAN if empty' : 'ABCDE1234F'}
+            maxLength={10}
+            inputMode="text"
+            autoCapitalize="characters"
+            spellCheck={false}
+            className={`pan-input ${businessPanError ? 'pan-input-invalid' : ''}`}
+          />
+          {businessPanError ? (
+            <span className="pan-field-error">{businessPanError}</span>
+          ) : null}
+        </label>
 
-      <label className="modal-field">
-        Status *
-        <select
-          value={businessStatus}
-          onChange={(event) => setBusinessStatus(event.target.value as BusinessStatus)}
-          required
-        >
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-      </label>
+        <label className="modal-field">
+          Status *
+          <select
+            value={businessStatus}
+            onChange={(event) => setBusinessStatus(event.target.value as BusinessStatus)}
+            required
+          >
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </label>
+      </div>
 
-      <label className="modal-field modal-field-span-2">
+      <label className="modal-field business-form-field-full">
         Address
         <textarea
           value={businessAddress}
@@ -474,33 +476,35 @@ function Business() {
         />
       </label>
 
-      <label className="modal-field">
-        GST Number
-        <input
-          type="text"
-          value={businessGstNumber}
-          onChange={(event) => setBusinessGstNumber(event.target.value.toUpperCase())}
-          placeholder="Optional"
-        />
-      </label>
+      <div className="business-form-row business-form-row-2">
+        <label className="modal-field">
+          GST Number
+          <input
+            type="text"
+            value={businessGstNumber}
+            onChange={(event) => setBusinessGstNumber(event.target.value.toUpperCase())}
+            placeholder="Optional"
+          />
+        </label>
 
-      <label className="modal-field">
-        Start Year *
-        <input
-          type="number"
-          value={businessStartYear}
-          onChange={(event) => handleBusinessStartYearChange(event.target.value)}
-          min={1900}
-          max={2100}
-          required
-        />
-      </label>
+        <label className="modal-field">
+          Start Year *
+          <input
+            type="number"
+            value={businessStartYear}
+            onChange={(event) => handleBusinessStartYearChange(event.target.value)}
+            min={1900}
+            max={2100}
+            required
+          />
+        </label>
+      </div>
 
-      <div className="fy-preview modal-field-span-2">
+      <div className="fy-preview business-form-field-full">
         <span>Starting FY</span>
         <strong>{businessStartingFy}</strong>
       </div>
-    </>
+    </div>
   )
 
   const handleDeleteBusiness = async (event: React.FormEvent) => {
@@ -930,9 +934,7 @@ function Business() {
             {businessModalError && <div className="modal-error">{businessModalError}</div>}
 
             <form className="modal-form" onSubmit={handleEditBusiness}>
-              <div className="modal-form-grid modal-form-grid-edit">
-                {renderBusinessFormFields('edit')}
-              </div>
+              {renderBusinessFormFields('edit')}
 
               <label className="modal-field">
                 Password
@@ -966,7 +968,7 @@ function Business() {
             {businessModalError && <div className="modal-error">{businessModalError}</div>}
 
             <form className="modal-form" onSubmit={handleAddBusiness}>
-              <div className="modal-form-grid">{renderBusinessFormFields('add')}</div>
+              {renderBusinessFormFields('add')}
 
               <div className="modal-actions">
                 <button type="button" className="secondary-btn" onClick={closeBusinessModal}>

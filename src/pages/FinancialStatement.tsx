@@ -13,7 +13,14 @@ import { fetchCaSettings, normalizeCaSettings } from '../api/caSettings'
 import type { CaProfile } from '../types/caProfile'
 import { EMPTY_CA_PROFILE, isActiveCaProfile } from '../types/caProfile'
 import { fetchClient } from '../api/client'
-import { fetchDepreciationHistory, fetchFsData, saveBankAccounts, saveFsData, saveLoans } from '../api/fs'
+import {
+  fetchDepreciationHistory,
+  fetchFsData,
+  saveBankAccounts,
+  saveDepreciationSchedule,
+  saveFsData,
+  saveLoans,
+} from '../api/fs'
 import { fetchLedgers } from '../api/ledger'
 import type { Client } from '../types'
 import type {
@@ -48,16 +55,18 @@ import {
   NOTE_FIELDS,
   NOTE_GROUP_ORDER,
   createEmptyUdinDetails,
-  createDepreciationRow,
   migrateNoteBreakdowns,
   migrateNotes,
   notesWithPreviousFromPriorFy,
   normalizePreviousYearDepreciation,
 } from '../utils/fsDefaults'
-import { normalizeDepreciationSchedule, recalcDepreciationRow, sumDepreciationSchedule } from '../utils/depreciation'
+import { normalizeDepreciationSchedule, recalcDepreciationRow, sumDepreciationSchedule, filterActiveDepreciationSchedule } from '../utils/depreciation'
 import {
   autoPopulateDepreciationFromLedgers,
+  collectBusinessAssetLedgerIds,
+  createDepreciationRowFromLedger,
   expandPriorScheduleWithHistory,
+  filterScheduleToBusinessAssets,
   getAvailableFixedAssetLedgers,
   getLedgersForAssetSelect,
   mergeDepreciationScheduleLedgerNames,
@@ -178,8 +187,10 @@ import {
   confirmDelete,
   confirmProceed,
   confirmSave,
+  promptDepreciationAssetSelect,
   promptUnlockConfirmationCode,
   showActionAlert,
+  showAddedAlert,
   showDeletedAlert,
   showUpdatedAlert,
 } from '../utils/sweetAlert'
@@ -1119,12 +1130,28 @@ function FinancialStatement() {
 
       if (!isConsolidatedView) {
         const priorClosingsForLedgers = priorFsPrepared
-          ? buildPriorDepClosingsByLedgerId(priorFsPrepared.depreciationSchedule || [])
+          ? buildPriorDepClosingsByLedgerId(
+              expandPriorScheduleWithHistory(
+                priorFsPrepared.depreciationSchedule || [],
+                loadedDepreciationHistory,
+                priorFy?.id ?? '',
+              ),
+            )
           : new Map<string, number>()
         carriedDepreciationSchedule = autoPopulateDepreciationFromLedgers(
           carriedDepreciationSchedule,
           loadedLedgers,
           priorClosingsForLedgers,
+          loadedDepreciationHistory,
+        )
+        const businessAssetLedgerIds = collectBusinessAssetLedgerIds(
+          carriedDepreciationSchedule,
+          loadedDepreciationHistory,
+          priorClosingsForLedgers,
+        )
+        carriedDepreciationSchedule = filterScheduleToBusinessAssets(
+          carriedDepreciationSchedule,
+          businessAssetLedgerIds,
         )
       }
 
@@ -2584,8 +2611,45 @@ function FinancialStatement() {
     setSaveMessage('')
   }
 
-  const addDepreciationRow = () => {
-    if (!fsData || isConsolidatedView || isFsFinalLocked) {
+  const persistDepreciationSchedule = async (
+    schedule: DepreciationRow[],
+    options?: { successAlert?: () => Promise<void> },
+  ) => {
+    if (!fsData || !clientId || !fyId || !businessId || isConsolidatedView) {
+      return false
+    }
+
+    const businessAssetLedgerIds = collectBusinessAssetLedgerIds(
+      schedule,
+      depreciationHistory,
+      priorDepClosingsByLedgerId,
+    )
+    const prunedSchedule = filterScheduleToBusinessAssets(schedule, businessAssetLedgerIds)
+
+    const saved = await saveDepreciationSchedule(clientId, fyId, businessId, {
+      depreciationSchedule: prunedSchedule,
+      previousYearDepreciation: fsData.previousYearDepreciation,
+    })
+
+    const nextFsData = {
+      ...fsData,
+      depreciationSchedule: saved.depreciationSchedule,
+      previousYearDepreciation: saved.previousYearDepreciation,
+    }
+    setFsData(nextFsData)
+    setSavedFingerprint(fsDataFingerprint(nextFsData))
+    setSaveMessage('')
+    setError('')
+
+    if (options?.successAlert) {
+      await options.successAlert()
+    }
+
+    return true
+  }
+
+  const addDepreciationRow = async () => {
+    if (!fsData || !clientId || !fyId || !businessId || isConsolidatedView || isFsFinalLocked) {
       return
     }
 
@@ -2594,7 +2658,8 @@ function FinancialStatement() {
       return
     }
 
-    if (getAvailableFixedAssetLedgers(fsData.depreciationSchedule, ledgers).length === 0) {
+    const availableLedgers = getAvailableFixedAssetLedgers(fsData.depreciationSchedule, ledgers)
+    if (availableLedgers.length === 0) {
       return
     }
 
@@ -2602,15 +2667,46 @@ function FinancialStatement() {
       return
     }
 
-    setFsData({
-      ...fsData,
-      depreciationSchedule: [...fsData.depreciationSchedule, createDepreciationRow()],
+    const selectedLedgerId = await promptDepreciationAssetSelect(availableLedgers)
+    if (!selectedLedgerId) {
+      return
+    }
+
+    const ledger = availableLedgers.find((item) => item.id === selectedLedgerId)
+    if (!ledger) {
+      return
+    }
+
+    const confirmed = await confirmSave({
+      action: 'add',
+      itemLabel: ledger.name,
     })
-    setSaveMessage('')
+    if (!confirmed) {
+      return
+    }
+
+    let newRow = createDepreciationRowFromLedger(ledger)
+    newRow = applyPriorDepClosingToRow(newRow, priorDepClosingsByLedgerId)
+    const nextSchedule = [...fsData.depreciationSchedule, newRow]
+    const previousSchedule = fsData.depreciationSchedule
+
+    // Show the new row immediately while persisting.
+    setFsData({ ...fsData, depreciationSchedule: nextSchedule })
+
+    try {
+      await persistDepreciationSchedule(nextSchedule, {
+        successAlert: () => showAddedAlert(ledger.name),
+      })
+    } catch (err) {
+      setFsData((current) =>
+        current ? { ...current, depreciationSchedule: previousSchedule } : current,
+      )
+      setError(err instanceof Error ? err.message : 'Failed to add asset')
+    }
   }
 
   const removeDepreciationAsset = async (index: number) => {
-    if (!fsData || isConsolidatedView || isFsFinalLocked) {
+    if (!fsData || !clientId || !fyId || !businessId || isConsolidatedView || isFsFinalLocked) {
       return
     }
 
@@ -2622,11 +2718,15 @@ function FinancialStatement() {
       return
     }
 
-    setFsData({
-      ...fsData,
-      depreciationSchedule: fsData.depreciationSchedule.filter((_, rowIndex) => rowIndex !== index),
-    })
-    setSaveMessage('')
+    const nextSchedule = fsData.depreciationSchedule.filter((_, rowIndex) => rowIndex !== index)
+
+    try {
+      await persistDepreciationSchedule(nextSchedule, {
+        successAlert: () => showDeletedAlert(row.assetName || 'Asset'),
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove asset')
+    }
   }
 
   const changeDepreciationAsset = (index: number, ledgerId: string) => {
@@ -2647,7 +2747,14 @@ function FinancialStatement() {
   }
 
   const handleLoansSaved = (loans: LoanRecord[]) => {
-    setFsData((current) => (current ? { ...current, loans } : current))
+    setFsData((current) => {
+      if (!current) {
+        return current
+      }
+      const next = { ...current, loans }
+      setSavedFingerprint(fsDataFingerprint(next))
+      return next
+    })
     setSaveMessage('')
     setError('')
     setLoanModalOpen(false)
@@ -2671,7 +2778,14 @@ function FinancialStatement() {
 
     try {
       const { loans: savedLoans } = await saveLoans(clientId, fyId, businessId, loans)
-      setFsData((current) => (current ? { ...current, loans: savedLoans } : current))
+      setFsData((current) => {
+        if (!current) {
+          return current
+        }
+        const next = { ...current, loans: savedLoans }
+        setSavedFingerprint(fsDataFingerprint(next))
+        return next
+      })
       setSaveMessage('')
       setError('')
       if (expandedLoanId === loanId) {
@@ -2833,7 +2947,7 @@ function FinancialStatement() {
       return
     }
 
-    if (field === 'openingWdv' && openingBalanceLocks?.previousYearDepOpening) {
+    if (openingBalanceLocks?.previousYearDepOpening) {
       return
     }
 
@@ -2916,9 +3030,19 @@ function FinancialStatement() {
         ? notesWithPreviousFromPriorFy(options.dataOverride.notes, previousYearNotes)
         : notesWithPreviousFromPriorFy(effectiveNotes, previousYearNotes)
 
+      const businessAssetLedgerIds = collectBusinessAssetLedgerIds(
+        workingData.depreciationSchedule,
+        depreciationHistory,
+        priorDepClosingsByLedgerId,
+      )
+      const prunedDepreciationSchedule = isConsolidatedView
+        ? filterActiveDepreciationSchedule(workingData.depreciationSchedule)
+        : filterScheduleToBusinessAssets(workingData.depreciationSchedule, businessAssetLedgerIds)
+
       const payload: FinancialStatementData = {
         ...workingData,
         notes: notesForSave,
+        depreciationSchedule: prunedDepreciationSchedule,
         statementSnapshot,
         finalizationInfo: nextFinalization,
         ...(unlockCode ? { unlockConfirmationCode: unlockCode } : {}),
@@ -3176,6 +3300,9 @@ function FinancialStatement() {
     availableFixedAssetLedgers.length > 0 &&
     !hasBlankDepRow
   const isPreviousYearDepLinked = Boolean(openingBalanceLocks?.previousYearDepLinked)
+  const isPreviousYearDepValuesLocked = Boolean(
+    openingBalanceLocks?.previousYearDepLinked || openingBalanceLocks?.previousYearDepOpening,
+  )
   const isDepOpeningLinked = (row: DepreciationRow) =>
     Boolean(
       (row.ledgerId && priorDepClosingsByLedgerId.has(row.ledgerId)) ||
@@ -3962,6 +4089,7 @@ function FinancialStatement() {
           <p className="hint">
             Click any <strong>Note</strong> number to open the matching note for entry.
           </p>
+          <div className="fs-profit-loss-print-body">
           <StatementTable
             title={`${profitLossLabel} — ${profitLossCurrentLabel}`}
             lines={computed.profitAndLoss}
@@ -3973,7 +4101,11 @@ function FinancialStatement() {
             highlightedRowId={highlightedPlRow}
           />
 
-          <div className="pl-appropriation-panel fs-print-pl-appropriation-block">
+          <div
+            className={`pl-appropriation-panel fs-print-pl-appropriation-block${
+              (fsData.plAppropriationLines?.length ?? 0) === 0 ? ' pl-appropriation-panel--empty' : ''
+            }`}
+          >
             <h3 className="pl-appr-print-title fs-print-only">Profit &amp; Loss Appropriation</h3>
             <div className="pl-appropriation-header">
               <div>
@@ -4007,6 +4139,13 @@ function FinancialStatement() {
               }`}
             >
               <table className="data-table pl-appropriation-table">
+                <colgroup>
+                  <col className="pl-col-particular" />
+                  <col className="pl-col-prev" />
+                  <col className="pl-col-curr" />
+                  <col className="pl-col-change" />
+                  <col className="pl-col-pct" />
+                </colgroup>
                 <thead>
                   <tr className="pl-appr-head-row">
                     <th className="pl-appr-particular-col">Particular</th>
@@ -4140,6 +4279,7 @@ function FinancialStatement() {
               </table>
             </div>
           </div>
+          </div>
         </section>
       )}
 
@@ -4155,10 +4295,10 @@ function FinancialStatement() {
           <p className="hint">
             As per Section 32: additions on or after 3rd October get 50% depreciation (used less
             than 180 days). Asset deletion reduces the block before depreciation is calculated.
-            Choose assets from <strong>Ledger → Note 9: Fixed Assets</strong>. Existing assets from
-            the prior year (or fixed asset ledgers for a new schedule) are added automatically;
-            use <strong>+</strong> only for new purchases in this year. Year-wise depreciation is
-            stored when you save.
+            Choose assets from <strong>Ledger → Note 9: Fixed Assets</strong>. Only assets added to
+            this business profile are shown. Assets carried from the prior year appear automatically
+            until closing WDV reaches zero; use <strong>+</strong> for new purchases in this year.
+            Adding or removing assets saves immediately to the database.
           </p>
           {fixedAssetLedgers.length === 0 ? (
             <p className="empty-state">
@@ -4366,13 +4506,13 @@ function FinancialStatement() {
                         <td>
                           <input
                             type="number"
-                            className={`prev-dep-input${openingBalanceLocks?.previousYearDepOpening ? ' fs-readonly-input' : ''}`}
+                            className={`prev-dep-input${isPreviousYearDepValuesLocked ? ' fs-readonly-input' : ''}`}
                             value={fsData.previousYearDepreciation.openingWdv || ''}
                             onChange={(e) => updatePreviousYearDep('openingWdv', e.target.value)}
-                            readOnly={isFsReadOnly || Boolean(openingBalanceLocks?.previousYearDepOpening)}
+                            readOnly={isFsReadOnly || isPreviousYearDepValuesLocked}
                             title={
-                              openingBalanceLocks?.previousYearDepOpening
-                                ? 'Opening WDV from previous year closing'
+                              isPreviousYearDepValuesLocked
+                                ? 'Values linked from prior year depreciation schedule'
                                 : undefined
                             }
                           />
@@ -4380,46 +4520,71 @@ function FinancialStatement() {
                         <td>
                           <input
                             type="number"
-                            className="prev-dep-input"
+                            className={`prev-dep-input${isPreviousYearDepValuesLocked ? ' fs-readonly-input' : ''}`}
                             value={fsData.previousYearDepreciation.additionBeforeOct3 || ''}
                             onChange={(e) => updatePreviousYearDep('additionBeforeOct3', e.target.value)}
-                            readOnly={isFsReadOnly}
+                            readOnly={isFsReadOnly || isPreviousYearDepValuesLocked}
+                            title={
+                              isPreviousYearDepValuesLocked
+                                ? 'Values linked from prior year depreciation schedule'
+                                : undefined
+                            }
                           />
                         </td>
                         <td>
                           <input
                             type="number"
-                            className="prev-dep-input"
+                            className={`prev-dep-input${isPreviousYearDepValuesLocked ? ' fs-readonly-input' : ''}`}
                             value={fsData.previousYearDepreciation.additionOnAfterOct3 || ''}
                             onChange={(e) => updatePreviousYearDep('additionOnAfterOct3', e.target.value)}
-                            readOnly={isFsReadOnly}
+                            readOnly={isFsReadOnly || isPreviousYearDepValuesLocked}
+                            title={
+                              isPreviousYearDepValuesLocked
+                                ? 'Values linked from prior year depreciation schedule'
+                                : undefined
+                            }
                           />
                         </td>
                         <td>
                           <input
                             type="number"
-                            className="prev-dep-input"
+                            className={`prev-dep-input${isPreviousYearDepValuesLocked ? ' fs-readonly-input' : ''}`}
                             value={fsData.previousYearDepreciation.assetDeletion || ''}
                             onChange={(e) => updatePreviousYearDep('assetDeletion', e.target.value)}
-                            readOnly={isFsReadOnly}
+                            readOnly={isFsReadOnly || isPreviousYearDepValuesLocked}
+                            title={
+                              isPreviousYearDepValuesLocked
+                                ? 'Values linked from prior year depreciation schedule'
+                                : undefined
+                            }
                           />
                         </td>
                         <td>
                           <input
                             type="number"
-                            className="prev-dep-input"
+                            className={`prev-dep-input${isPreviousYearDepValuesLocked ? ' fs-readonly-input' : ''}`}
                             value={fsData.previousYearDepreciation.depreciation || ''}
                             onChange={(e) => updatePreviousYearDep('depreciation', e.target.value)}
-                            readOnly={isFsReadOnly}
+                            readOnly={isFsReadOnly || isPreviousYearDepValuesLocked}
+                            title={
+                              isPreviousYearDepValuesLocked
+                                ? 'Values linked from prior year depreciation schedule'
+                                : undefined
+                            }
                           />
                         </td>
                         <td>
                           <input
                             type="number"
-                            className="prev-dep-input"
+                            className={`prev-dep-input${isPreviousYearDepValuesLocked ? ' fs-readonly-input' : ''}`}
                             value={fsData.previousYearDepreciation.closingWdv || ''}
                             onChange={(e) => updatePreviousYearDep('closingWdv', e.target.value)}
-                            readOnly={isFsReadOnly}
+                            readOnly={isFsReadOnly || isPreviousYearDepValuesLocked}
+                            title={
+                              isPreviousYearDepValuesLocked
+                                ? 'Values linked from prior year depreciation schedule'
+                                : undefined
+                            }
                           />
                         </td>
                       </>
@@ -4482,10 +4647,10 @@ function FinancialStatement() {
             </button>
           </div>
           <p className="hint">
-            Add multiple long-term or short-term loans. EMI schedule is auto-generated from principal,
-            rate, tenure and start installment month (Apr–Mar within the financial year). Optional
-            prepayment reduces balance. Interest is charged in the relevant financial year and closing
-            balances flow to Notes (long-term / short-term borrowings).
+            Add multiple long-term or short-term loans. Each loan is saved immediately to the database
+            after confirmation. The EMI schedule projects every installment until the loan is fully
+            repaid or closed. Interest for the current financial year and closing balances flow to
+            Notes (long-term / short-term borrowings).
           </p>
 
           {fsData.loans.length === 0 ? (
@@ -4515,7 +4680,7 @@ function FinancialStatement() {
                           className="secondary-btn loan-card-toggle-btn"
                           onClick={() => setExpandedLoanId(expanded ? null : loan.id)}
                         >
-                          {expanded ? 'Hide EMI Schedule' : `View EMI Schedule (${loan.monthlySchedule.length})`}
+                          {expanded ? 'Hide EMI Schedule' : `View Full EMI Schedule (${loan.monthlySchedule.length})`}
                         </button>
                         <button type="button" className="secondary-btn" onClick={() => openEditLoan(record)}>
                           Edit
@@ -4556,7 +4721,7 @@ function FinancialStatement() {
                       </div>
                     </div>
                     <LoanCashFlowTable
-                      title="Cash flow by year (for cash flow statement)"
+                      title="Cash flow by year (current and projected until loan closure)"
                       rows={summarizeCashFlowByYear(loan.monthlySchedule)}
                       compact
                     />
@@ -4585,7 +4750,7 @@ function FinancialStatement() {
                                     <td>{row.serialNo}</td>
                                     <td>
                                       {row.monthLabel}
-                                      {row.isPrepayment ? ' (Prepay)' : ''}
+                                      {row.isPreClosure || row.isPrepayment ? ' (Pre-closure)' : ''}
                                     </td>
                                     <td>{row.year}</td>
                                     <td className="calc-cell">{formatAmount(row.emi)}</td>
@@ -4612,8 +4777,8 @@ function FinancialStatement() {
             <div className="loan-cashflow-panel">
               <h3>Cash Flow Statement — Loan Repayments (All Loans)</h3>
               <p>
-                Year-wise interest and principal paid across all loans in this financial year.
-                Use these figures in the cash flow statement under financing activities.
+                Year-wise interest and principal paid across all loans — including projected future
+                years until each loan is fully repaid or closed.
               </p>
               <LoanCashFlowTable rows={consolidatedCashFlow} />
             </div>

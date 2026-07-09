@@ -24,6 +24,7 @@ export interface LoanMonthRow {
   interest: number
   balance: number
   isPrepayment?: boolean
+  isPreClosure?: boolean
 }
 
 export interface Loan {

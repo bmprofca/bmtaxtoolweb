@@ -7,6 +7,7 @@ import {
   generateLedgerId,
   getLedgerGroupOptions,
   getNoteFieldLabel,
+  filterLedgers,
   normalizeLedgerSign,
   normalizeLedgers,
 } from '../utils/ledgerUtils'
@@ -41,8 +42,17 @@ function Ledger() {
   const [formGroup, setFormGroup] = useState<keyof FsNotes>('otherAdministrativeExpenses')
   const [formSign, setFormSign] = useState<'add' | 'less'>('add')
   const [modalError, setModalError] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [groupFilter, setGroupFilter] = useState<keyof FsNotes | ''>('')
 
   const groupOptions = useMemo(() => getLedgerGroupOptions(), [])
+
+  const filteredLedgers = useMemo(
+    () => filterLedgers(ledgers, searchQuery, groupFilter, groupOptions),
+    [ledgers, searchQuery, groupFilter, groupOptions],
+  )
+
+  const hasActiveFilters = Boolean(searchQuery.trim() || groupFilter)
 
   const selectedGroupOption = groupOptions.find((item) => item.group === formGroup)
 
@@ -282,12 +292,53 @@ function Ledger() {
       {saveMessage && <p className="success-text">{saveMessage}</p>}
 
       <section className="panel ledger-table-panel">
-        <h2>Ledger List</h2>
+        <div className="ledger-list-toolbar">
+          <div className="ledger-list-toolbar-top">
+            <h2>Ledger List</h2>
+            {!loading && ledgers.length > 0 && (
+              <span className="ledger-count-badge">
+                {filteredLedgers.length} of {ledgers.length} shown
+              </span>
+            )}
+          </div>
+
+          {!loading && ledgers.length > 0 && (
+            <div className="ledger-list-filters">
+              <label className="ledger-list-search">
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search by ledger name, group, note..."
+                  className="ledger-list-search-input"
+                  aria-label="Search ledgers"
+                />
+              </label>
+
+              <label className="ledger-list-group-filter">
+                <span className="ledger-list-filter-label">Group</span>
+                <LedgerGroupSearch
+                  value={groupFilter}
+                  onChange={setGroupFilter}
+                  allowAll
+                  compact
+                  allLabel="All Groups"
+                />
+              </label>
+            </div>
+          )}
+        </div>
 
         {loading ? (
           <p className="empty-state">Loading ledgers...</p>
         ) : ledgers.length === 0 ? (
           <p className="empty-state">No ledgers yet. Click + Add Ledger to create one.</p>
+        ) : filteredLedgers.length === 0 ? (
+          <p className="empty-state">
+            {hasActiveFilters
+              ? 'No ledgers match your search. Try a different name or group filter.'
+              : 'No ledgers found.'}
+          </p>
         ) : (
           <div className="ledger-table-wrap">
             <table className="ledger-table">
@@ -304,7 +355,7 @@ function Ledger() {
                 </tr>
               </thead>
               <tbody>
-                {ledgers.map((ledger, index) => (
+                {filteredLedgers.map((ledger, index) => (
                   <tr key={ledger.id}>
                     <td className="ledger-col-sno">{index + 1}</td>
                     <td className="ledger-col-name">{ledger.name}</td>
@@ -421,7 +472,11 @@ function Ledger() {
                   </span>
                   <LedgerGroupSearch
                     value={formGroup}
-                    onChange={setFormGroup}
+                    onChange={(group) => {
+                      if (group) {
+                        setFormGroup(group)
+                      }
+                    }}
                     disabled={saving}
                   />
                 </label>

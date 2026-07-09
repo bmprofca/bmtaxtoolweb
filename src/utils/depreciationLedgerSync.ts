@@ -1,7 +1,11 @@
 import type { DepreciationRow, AssetDepreciationHistoryRow, PreviousYearDepreciationSummary } from '../types/fs'
 import type { LedgerRecord } from '../types/ledger'
 import { createDepreciationRow } from './fsDefaults'
-import { recalcDepreciationRow, isPlaceholderDepreciationRow } from './depreciation'
+import {
+  recalcDepreciationRow,
+  isPlaceholderDepreciationRow,
+  isActiveDepreciationRow,
+} from './depreciation'
 import {
   getLedgerById,
   getLedgersForGroup,
@@ -65,28 +69,88 @@ export function isScheduleEffectivelyEmpty(schedule: DepreciationRow[]): boolean
   return schedule.filter((row) => !isPlaceholderDepreciationRow(row)).length === 0
 }
 
+export function collectBusinessAssetLedgerIds(
+  schedule: DepreciationRow[],
+  depreciationHistory: AssetDepreciationHistoryRow[],
+  priorClosingsByLedgerId: Map<string, number> = new Map(),
+): Set<string> {
+  const ledgerIds = new Set<string>()
+
+  for (const row of schedule) {
+    if (row.ledgerId) {
+      ledgerIds.add(row.ledgerId)
+    }
+  }
+
+  for (const entry of depreciationHistory) {
+    if (entry.ledgerId) {
+      ledgerIds.add(entry.ledgerId)
+    }
+  }
+
+  for (const [ledgerId, closing] of priorClosingsByLedgerId) {
+    if (closing > 0) {
+      ledgerIds.add(ledgerId)
+    }
+  }
+
+  return ledgerIds
+}
+
+export function filterScheduleToBusinessAssets(
+  schedule: DepreciationRow[],
+  businessLedgerIds: Set<string>,
+): DepreciationRow[] {
+  return schedule.filter((row) => {
+    if (isPlaceholderDepreciationRow(row)) {
+      return false
+    }
+
+    if (!row.ledgerId) {
+      return row.assetName.trim() !== '' || isActiveDepreciationRow(row)
+    }
+
+    if (!businessLedgerIds.has(row.ledgerId)) {
+      return false
+    }
+
+    return isActiveDepreciationRow(row)
+  })
+}
+
 /** Add a row for each fixed asset ledger when the schedule has no real assets yet. */
 export function autoPopulateDepreciationFromLedgers(
   schedule: DepreciationRow[],
   ledgers: LedgerRecord[],
   priorClosingsByLedgerId: Map<string, number> = new Map(),
+  depreciationHistory: AssetDepreciationHistoryRow[] = [],
 ): DepreciationRow[] {
-  if (!isScheduleEffectivelyEmpty(schedule)) {
-    return schedule
+  const businessLedgerIds = collectBusinessAssetLedgerIds(
+    schedule,
+    depreciationHistory,
+    priorClosingsByLedgerId,
+  )
+  const meaningfulCurrent = filterScheduleToBusinessAssets(schedule, businessLedgerIds)
+
+  if (meaningfulCurrent.length > 0) {
+    return meaningfulCurrent
   }
 
-  const fixedAssetLedgers = getFixedAssetLedgers(ledgers)
-  if (fixedAssetLedgers.length === 0) {
-    return schedule
-  }
-
-  return fixedAssetLedgers.map((ledger) => {
+  const ledgersToAdd = getFixedAssetLedgers(ledgers).filter((ledger) => {
     const priorClosing = priorClosingsByLedgerId.get(ledger.id) ?? 0
-    return recalcDepreciationRow({
-      ...createDepreciationRowFromLedger(ledger),
-      openingWdv: priorClosing > 0 ? priorClosing : 0,
-    })
+    return priorClosing > 0 && businessLedgerIds.has(ledger.id)
   })
+
+  if (ledgersToAdd.length === 0) {
+    return []
+  }
+
+  return ledgersToAdd.map((ledger) =>
+    recalcDepreciationRow({
+      ...createDepreciationRowFromLedger(ledger),
+      openingWdv: priorClosingsByLedgerId.get(ledger.id) ?? 0,
+    }),
+  )
 }
 
 export function sumDepreciationHistoryForFy(

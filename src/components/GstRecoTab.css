@@ -39,11 +39,13 @@
 }
 
 .gst-simple-table th:not(:first-child),
-.gst-simple-table td:not(:first-child):not(.particulars-col):not(.gst-na-cell):not(.gst-inline-option) {
+.gst-simple-table td:not(:first-child):not(.particulars-col):not(.gst-itc-particular):not(.gst-na-cell):not(.gst-inline-option) {
   text-align: right;
 }
 
-.gst-simple-table .particulars-col {
+.gst-simple-table .particulars-col,
+.gst-simple-table .gst-itc-particular {
+  text-align: left;
   font-weight: 500;
   color: #1e293b;
 }
@@ -207,9 +209,78 @@
 }
 
 .gst-sno-cell {
+  width: 3.25rem;
+  min-width: 3.25rem;
+  max-width: 3.5rem;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
   text-align: center;
   font-weight: 600;
+  font-size: 0.8rem;
   color: #64748b;
+  white-space: nowrap;
+}
+
+.gst-simple-table.gst-itc-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 56rem;
+}
+
+.gst-simple-table.gst-itc-table col.gst-itc-col-sno {
+  width: 3.5rem;
+}
+
+.gst-simple-table.gst-itc-table col.gst-itc-col-particular {
+  width: auto;
+}
+
+.gst-simple-table.gst-itc-table col.gst-itc-col-tax {
+  width: 11.5rem;
+}
+
+.gst-simple-table.gst-itc-table th:nth-child(1),
+.gst-simple-table.gst-itc-table td.gst-sno-cell {
+  width: 3.5rem;
+  min-width: 3.5rem;
+  max-width: 3.5rem;
+}
+
+.gst-simple-table.gst-itc-table th:nth-child(2),
+.gst-simple-table.gst-itc-table td.gst-itc-particular {
+  width: auto;
+  min-width: 12rem;
+}
+
+.gst-simple-table.gst-itc-table th:nth-child(n + 3),
+.gst-simple-table.gst-itc-table td:nth-child(n + 3) {
+  width: 11.5rem;
+  min-width: 11.5rem;
+  text-align: right;
+}
+
+.gst-simple-table.gst-itc-table thead th:nth-child(n + 3) {
+  text-align: right;
+  padding-left: 0.5rem;
+  padding-right: 0.75rem;
+}
+
+.gst-simple-table.gst-itc-table td:nth-child(n + 3) {
+  padding-left: 0.5rem;
+  padding-right: 0.65rem;
+}
+
+.gst-simple-table.gst-itc-table td:nth-child(n + 3) .gst-amount-input,
+.gst-simple-table.gst-itc-table td:nth-child(n + 3) .gst-readonly-cell {
+  min-width: 9.5rem;
+}
+
+.gst-simple-table.gst-itc-table thead th:nth-child(1) {
+  text-align: center;
+}
+
+.gst-simple-table.gst-itc-table thead th:nth-child(2) {
+  text-align: left;
 }
 
 .gst-itc-particular.is-input {
@@ -286,6 +357,20 @@
 
 .gst-itc-table .gst-itc-particular {
   text-align: left;
+  padding-left: 0.75rem;
+  padding-right: 0.65rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.gst-simple-table.gst-itc-table td.gst-itc-particular {
+  text-align: left;
+}
+
+.fs-page .data-table.gst-simple-table.gst-itc-table th.particulars-col,
+.fs-page .data-table.gst-simple-table.gst-itc-table td.gst-itc-particular,
+.fs-page .data-table.gst-simple-table.gst-itc-table td.particulars-col {
+  text-align: left !important;
 }
 
 .gst-simple-reco .gst-reco-particular {

@@ -4,16 +4,26 @@ import { getLedgerGroupOptions } from '../utils/ledgerUtils'
 import './LedgerGroupSearch.css'
 
 interface LedgerGroupSearchProps {
-  value: keyof FsNotes
-  onChange: (group: keyof FsNotes) => void
+  value: keyof FsNotes | ''
+  onChange: (group: keyof FsNotes | '') => void
   disabled?: boolean
+  allowAll?: boolean
+  allLabel?: string
+  compact?: boolean
 }
 
 function formatGroupOption(option: ReturnType<typeof getLedgerGroupOptions>[number]) {
   return `Note ${option.noteNo}: ${option.label}`
 }
 
-export function LedgerGroupSearch({ value, onChange, disabled }: LedgerGroupSearchProps) {
+export function LedgerGroupSearch({
+  value,
+  onChange,
+  disabled,
+  allowAll = false,
+  allLabel = 'All Groups',
+  compact = false,
+}: LedgerGroupSearchProps) {
   const options = useMemo(() => getLedgerGroupOptions(), [])
   const containerRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -77,14 +87,25 @@ export function LedgerGroupSearch({ value, onChange, disabled }: LedgerGroupSear
     }
   }, [open])
 
-  const handleSelect = (group: keyof FsNotes) => {
+  const handleSelect = (group: keyof FsNotes | '') => {
     onChange(group)
     setOpen(false)
     setQuery('')
   }
 
+  const showAllOption =
+    allowAll &&
+    (!query.trim() ||
+      allLabel.toLowerCase().includes(query.trim().toLowerCase()) ||
+      'all groups'.includes(query.trim().toLowerCase()))
+
   return (
-    <div className={`ledger-group-search${open ? ' is-open' : ''}`} ref={containerRef}>
+    <div
+      className={`ledger-group-search${open ? ' is-open' : ''}${
+        compact ? ' ledger-group-search-compact' : ''
+      }`}
+      ref={containerRef}
+    >
       <button
         type="button"
         className="ledger-group-search-trigger"
@@ -94,11 +115,15 @@ export function LedgerGroupSearch({ value, onChange, disabled }: LedgerGroupSear
         aria-expanded={open}
       >
         <span className="ledger-group-search-trigger-text">
-          {selected ? (
+          {allowAll && value === '' ? (
+            <span className="ledger-group-search-label">{allLabel}</span>
+          ) : selected ? (
             <>
               <span className="ledger-group-search-note">Note {selected.noteNo}</span>
               <span className="ledger-group-search-label">{selected.label}</span>
-              <span className="ledger-group-search-section">{selected.section}</span>
+              {!compact && (
+                <span className="ledger-group-search-section">{selected.section}</span>
+              )}
             </>
           ) : (
             'Select ledger group'
@@ -127,7 +152,23 @@ export function LedgerGroupSearch({ value, onChange, disabled }: LedgerGroupSear
           </div>
 
           <div className="ledger-group-search-results">
-            {filteredOptions.length === 0 ? (
+            {showAllOption && (
+              <button
+                type="button"
+                role="option"
+                aria-selected={value === ''}
+                className={`ledger-group-search-option${value === '' ? ' is-selected' : ''}`}
+                onClick={() => handleSelect('')}
+              >
+                <span className="ledger-group-search-option-main">
+                  <span className="ledger-group-search-label">{allLabel}</span>
+                </span>
+                {!compact && (
+                  <span className="ledger-group-search-section">Show ledgers from every group</span>
+                )}
+              </button>
+            )}
+            {filteredOptions.length === 0 && !showAllOption ? (
               <p className="ledger-group-search-empty">No groups match your search.</p>
             ) : (
               filteredOptions.map((option) => {
@@ -146,7 +187,9 @@ export function LedgerGroupSearch({ value, onChange, disabled }: LedgerGroupSear
                       <span className="ledger-group-search-note">Note {option.noteNo}</span>
                       <span className="ledger-group-search-label">{option.label}</span>
                     </span>
-                    <span className="ledger-group-search-section">{option.section}</span>
+                    {!compact && (
+                      <span className="ledger-group-search-section">{option.section}</span>
+                    )}
                   </button>
                 )
               })

@@ -39,6 +39,36 @@ export async function confirmProceed(options: {
   return result.isConfirmed
 }
 
+export async function promptDepreciationAssetSelect(
+  ledgers: Array<{ id: string; name: string }>,
+): Promise<string | null> {
+  const inputOptions: Record<string, string> = {}
+  for (const ledger of ledgers) {
+    inputOptions[ledger.id] = ledger.name
+  }
+
+  const result = await SwalApp.fire({
+    icon: 'question',
+    title: 'Add Asset',
+    text: 'Select a fixed asset to add to the depreciation schedule.',
+    input: 'select',
+    inputOptions,
+    inputPlaceholder: 'Choose asset',
+    showCancelButton: true,
+    confirmButtonText: 'Continue',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: SWAL_CONFIRM_COLOR,
+    cancelButtonColor: '#6b7280',
+    inputValidator: (value) => (!value ? 'Please select an asset' : undefined),
+  })
+
+  if (!result.isConfirmed || !result.value) {
+    return null
+  }
+
+  return String(result.value)
+}
+
 export async function confirmSave(options: {
   action: 'add' | 'edit'
   itemLabel: string

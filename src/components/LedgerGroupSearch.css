@@ -156,3 +156,18 @@
   font-size: 0.88rem;
   text-align: center;
 }
+
+.ledger-group-search-compact .ledger-group-search-trigger {
+  min-height: 2.65rem;
+}
+
+.ledger-group-search-compact .ledger-group-search-trigger-text {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.ledger-group-search-compact .ledger-group-search-panel {
+  min-width: 280px;
+}

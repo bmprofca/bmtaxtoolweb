@@ -2327,9 +2327,23 @@ input.fs-readonly-input {
 }
 
 .fs-tab-panel[data-fs-tab='profit-loss'] .statement-table .statement-head-row th {
-  background: #eef2f7;
+  background: #dce4ee;
   font-weight: 700;
   color: #0f172a;
+  border: 1px solid #94a3b8;
+  border-top: 2px solid #475569;
+}
+
+.fs-tab-panel[data-fs-tab='balance-sheet'] .fs-balance-sheet-print-body .statement-head-row th {
+  background: #dce4ee;
+  font-weight: 700;
+  color: #0f172a;
+  border: 1px solid #94a3b8;
+  border-top: 2px solid #475569;
+}
+
+.fs-tab-panel[data-fs-tab='balance-sheet'] .fs-balance-sheet-print-body .statement-head-row th.statement-amount-col .statement-fy-label--unified {
+  font-weight: 700;
 }
 
 .fs-tab-panel[data-fs-tab='profit-loss'] .statement-table tbody > tr:first-child td {
@@ -2338,9 +2352,17 @@ input.fs-readonly-input {
 }
 
 .fs-tab-panel[data-fs-tab='profit-loss'] .pl-appropriation-table .pl-appr-head-row th {
-  background: #eef2f7;
+  background: #dce4ee;
   font-weight: 700;
   color: #0f172a;
+  border: 1px solid #94a3b8;
+  border-top: 2px solid #475569;
+}
+
+.fs-profit-loss-print-body .pl-appropriation-panel {
+  margin-top: 1.25rem;
+  padding-top: 0;
+  border-top: none;
 }
 
 .fs-tab-panel[data-fs-tab='notes'] .notes-table .notes-head-row th {
@@ -2554,6 +2576,11 @@ input.fs-readonly-input {
   vertical-align: top;
   padding-top: 0.45rem;
   padding-bottom: 0.45rem;
+  background: #dce4ee;
+  font-weight: 700;
+  color: #0f172a;
+  border: 1px solid #94a3b8;
+  border-top: 2px solid #475569;
 }
 
 .fs-balance-sheet-print-body .statement-head-row th.statement-note-col {
@@ -2638,13 +2665,31 @@ input.fs-readonly-input {
   display: none;
 }
 
-.fs-balance-sheet-print-body .statement-grand-total-row td {
-  background: #eef2f7;
+.fs-balance-sheet-print-body .statement-total-row td {
+  background: #f1f5f9;
+  border-top: 1px solid #64748b;
+  border-bottom: 1px solid #cbd5e1;
+  font-weight: 700;
 }
 
+.fs-balance-sheet-print-body .statement-total-row .statement-particular-col,
+.fs-balance-sheet-print-body .statement-total-row .statement-amount-value {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.fs-balance-sheet-print-body .statement-grand-total-row td {
+  background: #c9d4e3;
+  border-top: 2px solid #475569;
+  border-bottom: 2px solid #475569;
+  font-weight: 800;
+}
+
+.fs-balance-sheet-print-body .statement-grand-total-row .statement-particular-col,
 .fs-balance-sheet-print-body .statement-grand-total-row .statement-amount-value,
 .fs-balance-sheet-print-body .statement-grand-total-row .statement-amount-print {
-  font-weight: 700;
+  font-weight: 800;
+  color: #0f172a;
 }
 
 .notes-row-highlight td {
@@ -3059,9 +3104,16 @@ input.fs-readonly-input {
 }
 
 .pl-appropriation-total-row td {
-  font-weight: 600;
-  background: #fffbeb;
-  border-top: 1px solid #fde68a;
+  background: #c9d4e3;
+  border-top: 2px solid #475569;
+  border-bottom: 2px solid #475569;
+  font-weight: 700;
+}
+
+.pl-appropriation-total-row .pl-appr-particular-col,
+.pl-appropriation-total-row .pl-appr-total-value {
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .schedule-table {

@@ -7,9 +7,10 @@ import {
   computeLoanForFinancialYear,
   createEmptyLoanForm,
   getFinancialYearMonthBounds,
+  getLoanBalanceAtMonthStart,
   loanToFormInput,
+  normalizeLoanMonthField,
   summarizeCashFlowByYear,
-  toLoanMonthStartIso,
 } from '../utils/loanCalculator'
 import { formatAmount } from '../utils/fsCalculator'
 import { confirmSave, showAddedAlert, showUpdatedAlert } from '../utils/sweetAlert'
@@ -32,21 +33,16 @@ interface LoanModalProps {
 }
 
 function dateToMonthInput(value: string) {
-  if (!value) {
+  const normalized = normalizeLoanMonthField(value)
+  if (!normalized) {
     return ''
   }
-  const parts = value.split('-')
-  if (parts.length >= 2) {
-    return `${parts[0]}-${parts[1]}`
-  }
-  return ''
+
+  return normalized.slice(0, 7)
 }
 
 function monthToIsoDate(value: string) {
-  if (!value) {
-    return ''
-  }
-  return toLoanMonthStartIso(`${value}-01`)
+  return normalizeLoanMonthField(value)
 }
 
 function LoanModal({
@@ -63,8 +59,12 @@ function LoanModal({
   onClose,
   onSaved,
 }: LoanModalProps) {
+  const isEditMode = Boolean(loan)
   const [form, setForm] = useState<LoanFormInput>(() =>
     loan ? loanToFormInput(loan) : createEmptyLoanForm(fyStartYear),
+  )
+  const [preClosureEnabled, setPreClosureEnabled] = useState(
+    () => Boolean(loan && (loan.prepaymentAmount > 0 || loan.prepaymentDate)),
   )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -75,17 +75,26 @@ function LoanModal({
   )
 
   useEffect(() => {
-    setForm(
-      loan
-        ? loanToFormInput(loan)
-        : createEmptyLoanForm(fyStartYear),
-    )
+    setForm(loan ? loanToFormInput(loan) : createEmptyLoanForm(fyStartYear))
+    setPreClosureEnabled(Boolean(loan && (loan.prepaymentAmount > 0 || loan.prepaymentDate)))
     setSaveError('')
   }, [loan, fyStartYear])
 
+  const effectiveForm = useMemo<LoanFormInput>(() => {
+    if (!isEditMode || !preClosureEnabled) {
+      return {
+        ...form,
+        prepaymentAmount: 0,
+        prepaymentDate: '',
+      }
+    }
+
+    return form
+  }, [form, isEditMode, preClosureEnabled])
+
   const preview = useMemo(
-    () => computeLoanForFinancialYear({ ...form, id: loan?.id }, fyStartYear, fyEndYear),
-    [form, loan?.id, fyStartYear, fyEndYear],
+    () => computeLoanForFinancialYear({ ...effectiveForm, id: loan?.id }, fyStartYear, fyEndYear),
+    [effectiveForm, loan?.id, fyStartYear, fyEndYear],
   )
 
   const updateField = (field: keyof LoanFormInput, value: string) => {
@@ -110,7 +119,8 @@ function LoanModal({
 
         if (
           !current.emiStartDate ||
-          current.emiStartDate === current.disbursementDate
+          normalizeLoanMonthField(current.emiStartDate) ===
+            normalizeLoanMonthField(current.disbursementDate)
         ) {
           next.emiStartDate = normalizedDisbursement
         }
@@ -125,10 +135,20 @@ function LoanModal({
       }
 
       if (field === 'prepaymentDate' && value) {
-        next.prepaymentDate = clampLoanMonthToFinancialYear(
+        const normalizedPreClosureDate = clampLoanMonthToFinancialYear(
           monthToIsoDate(value),
           fyStartYear,
           fyEndYear,
+        )
+        next.prepaymentDate = normalizedPreClosureDate
+        next.prepaymentAmount = getLoanBalanceAtMonthStart(
+          {
+            ...current,
+            prepaymentAmount: 0,
+            prepaymentDate: '',
+          },
+          fyStartYear,
+          normalizedPreClosureDate,
         )
       }
 
@@ -141,6 +161,28 @@ function LoanModal({
       return
     }
 
+    if (form.tenureMonths < 1) {
+      setSaveError('Tenure must be at least 1 month.')
+      return
+    }
+
+    const principal = form.openingBalance + form.disbursement
+    if (principal <= 0) {
+      setSaveError('Enter opening balance or a new loan / disbursement amount.')
+      return
+    }
+
+    if (isEditMode && preClosureEnabled) {
+      if (!form.prepaymentDate) {
+        setSaveError('Select the pre-closure month.')
+        return
+      }
+      if (form.prepaymentAmount <= 0) {
+        setSaveError('Enter the pre-closure amount.')
+        return
+      }
+    }
+
     const confirmed = await confirmSave({
       action: loan ? 'edit' : 'add',
       itemLabel: form.lender.trim(),
@@ -150,7 +192,7 @@ function LoanModal({
     }
 
     const computed = computeLoanForFinancialYear(
-      { ...form, id: loan?.id },
+      { ...effectiveForm, id: loan?.id },
       fyStartYear,
       fyEndYear,
     )
@@ -169,8 +211,8 @@ function LoanModal({
             interestRate: computed.interestRate,
             tenureMonths: computed.tenureMonths,
             emiStartDate: computed.emiStartDate,
-            prepaymentAmount: computed.prepaymentAmount,
-            prepaymentDate: computed.prepaymentDate,
+            prepaymentAmount: effectiveForm.prepaymentAmount,
+            prepaymentDate: effectiveForm.prepaymentDate,
           }
 
     const exists = existingLoans.some((item) => item.id === nextLoan.id)
@@ -199,15 +241,16 @@ function LoanModal({
   }
 
   const basePrincipal = form.openingBalance + form.disbursement
-  const estimatedEmi = calculateEmi(basePrincipal, form.interestRate, form.tenureMonths)
+  const estimatedEmi = calculateEmi(basePrincipal, form.interestRate, Math.max(1, form.tenureMonths))
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="loan-modal" onClick={(event) => event.stopPropagation()}>
         <h2>{title}</h2>
         <p className="loan-modal-subtitle">
-          FY {fyLabel} (Apr {fyStartYear} – Mar {fyEndYear}) — loan is saved immediately. First EMI
-          is generated from the start installment month within this financial year.
+          FY {fyLabel} (Apr {fyStartYear} – Mar {fyEndYear}) — confirm to save immediately. The full
+          EMI schedule starts from the selected installment month and continues until the loan is fully
+          repaid.
         </p>
 
         {saveError && <div className="alert loan-modal-error">{saveError}</div>}
@@ -252,6 +295,19 @@ function LoanModal({
             </label>
           )}
 
+          {!openingBalanceReadOnly && (
+            <label className="loan-field">
+              Opening Balance
+              <input
+                type="number"
+                value={form.openingBalance || ''}
+                onChange={(e) => updateField('openingBalance', e.target.value)}
+                placeholder="0"
+                disabled={saving}
+              />
+            </label>
+          )}
+
           <label className="loan-field">
             New Loan / Disbursement
             <input
@@ -292,6 +348,7 @@ function LoanModal({
             Tenure (months)
             <input
               type="number"
+              min={1}
               value={form.tenureMonths || ''}
               onChange={(e) => updateField('tenureMonths', e.target.value)}
               placeholder="12"
@@ -315,29 +372,58 @@ function LoanModal({
             </span>
           </label>
 
-          <label className="loan-field">
-            Prepayment Amount (optional)
-            <input
-              type="number"
-              value={form.prepaymentAmount || ''}
-              onChange={(e) => updateField('prepaymentAmount', e.target.value)}
-              placeholder="0"
-              disabled={saving}
-            />
-          </label>
-
-          <label className="loan-field">
-            Prepayment Period (optional, FY month)
-            <input
-              type="month"
-              className="loan-period-input"
-              min={fyMonthBounds.min}
-              max={fyMonthBounds.max}
-              value={dateToMonthInput(form.prepaymentDate)}
-              onChange={(e) => updateField('prepaymentDate', e.target.value)}
-              disabled={saving}
-            />
-          </label>
+          {isEditMode && (
+            <div className="loan-field loan-field--wide loan-preclosure-panel">
+              <label className="loan-preclosure-toggle">
+                <input
+                  type="checkbox"
+                  checked={preClosureEnabled}
+                  onChange={(e) => {
+                    const enabled = e.target.checked
+                    setPreClosureEnabled(enabled)
+                    if (!enabled) {
+                      setForm((current) => ({
+                        ...current,
+                        prepaymentAmount: 0,
+                        prepaymentDate: '',
+                      }))
+                    }
+                  }}
+                  disabled={saving}
+                />
+                Apply pre-closure
+              </label>
+              {preClosureEnabled && (
+                <div className="loan-preclosure-fields">
+                  <label className="loan-field">
+                    Pre-closure Month
+                    <input
+                      type="month"
+                      className="loan-period-input"
+                      min={fyMonthBounds.min}
+                      max={fyMonthBounds.max}
+                      value={dateToMonthInput(form.prepaymentDate)}
+                      onChange={(e) => updateField('prepaymentDate', e.target.value)}
+                      disabled={saving}
+                    />
+                  </label>
+                  <label className="loan-field">
+                    Pre-closure Amount
+                    <input
+                      type="number"
+                      value={form.prepaymentAmount || ''}
+                      onChange={(e) => updateField('prepaymentAmount', e.target.value)}
+                      placeholder="Auto-filled from month"
+                      disabled={saving}
+                    />
+                    <span className="loan-field-hint">
+                      Fills automatically when you select the pre-closure month
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="loan-preview">
@@ -350,7 +436,7 @@ function LoanModal({
         </div>
 
         <LoanCashFlowTable
-          title="Cash flow by year"
+          title="Cash flow by year (projected until loan closure)"
           rows={summarizeCashFlowByYear(preview.monthlySchedule)}
           compact
         />
@@ -371,11 +457,14 @@ function LoanModal({
               </thead>
               <tbody>
                 {preview.monthlySchedule.map((row) => (
-                  <tr key={`${row.serialNo}-${row.month}`} className={row.isPrepayment ? 'prepay-row' : undefined}>
+                  <tr
+                    key={`${row.serialNo}-${row.year}-${row.month}`}
+                    className={row.isPrepayment || row.isPreClosure ? 'prepay-row' : undefined}
+                  >
                     <td>{row.serialNo}</td>
                     <td>
                       {row.monthLabel}
-                      {row.isPrepayment ? ' (Prepay)' : ''}
+                      {row.isPreClosure || row.isPrepayment ? ' (Pre-closure)' : ''}
                     </td>
                     <td>{row.year}</td>
                     <td>{formatAmount(row.emi)}</td>

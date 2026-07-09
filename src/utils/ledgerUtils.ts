@@ -147,3 +147,44 @@ export function getLedgerGroupOptions() {
     })),
   )
 }
+
+export type LedgerGroupOption = ReturnType<typeof getLedgerGroupOptions>[number]
+
+export function getLedgerSearchText(
+  ledger: LedgerRecord,
+  groupOption: LedgerGroupOption | undefined,
+) {
+  return [
+    ledger.name,
+    getNoteFieldLabel(ledger.group),
+    groupOption?.section,
+    groupOption ? String(groupOption.noteNo) : '',
+    groupOption ? `Note ${groupOption.noteNo}` : '',
+    normalizeLedgerSign(ledger.sign) === 'less' ? 'less deduct' : 'add',
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+}
+
+export function filterLedgers(
+  ledgers: LedgerRecord[],
+  searchQuery: string,
+  groupFilter: keyof FsNotes | '',
+  groupOptions: LedgerGroupOption[] = getLedgerGroupOptions(),
+) {
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+
+  return ledgers.filter((ledger) => {
+    if (groupFilter && ledger.group !== groupFilter) {
+      return false
+    }
+
+    if (!normalizedQuery) {
+      return true
+    }
+
+    const groupOption = groupOptions.find((item) => item.group === ledger.group)
+    return getLedgerSearchText(ledger, groupOption).includes(normalizedQuery)
+  })
+}

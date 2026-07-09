@@ -98,3 +98,29 @@ export function isPlaceholderDepreciationRow(row: DepreciationRow): boolean {
 export function getDepreciationClosingWdv(row: DepreciationRow): number {
   return resolveEffectiveClosingWdv(row)
 }
+
+/** Row still belongs on the schedule (not fully written off with no current-year activity). */
+export function isActiveDepreciationRow(row: DepreciationRow): boolean {
+  if (isPlaceholderDepreciationRow(row)) {
+    return false
+  }
+
+  // Ledger-linked assets stay on the schedule (including new purchases with zero WDV).
+  if (row.ledgerId) {
+    return true
+  }
+
+  const calc = recalcDepreciationRow(row)
+  return (
+    calc.closingWdv > 0 ||
+    calc.openingWdv > 0 ||
+    calc.additionBeforeOct3 > 0 ||
+    calc.additionOnAfterOct3 > 0 ||
+    calc.assetDeletion > 0 ||
+    calc.depreciation > 0
+  )
+}
+
+export function filterActiveDepreciationSchedule(schedule: DepreciationRow[]): DepreciationRow[] {
+  return normalizeDepreciationSchedule(schedule).filter(isActiveDepreciationRow)
+}

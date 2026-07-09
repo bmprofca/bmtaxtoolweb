@@ -9,6 +9,83 @@
   flex-shrink: 0;
 }
 
+.ledger-list-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
+.ledger-list-toolbar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ledger-list-toolbar h2 {
+  margin: 0;
+}
+
+.ledger-count-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.ledger-list-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr);
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.ledger-list-search {
+  display: block;
+  width: 100%;
+}
+
+.ledger-list-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 0.72rem 0.85rem 0.72rem 2.35rem;
+  font: inherit;
+  color: #0f172a;
+  background: #fff
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 24 24'%3E%3Cpath d='M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z'/%3E%3C/svg%3E")
+    no-repeat 0.75rem center;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ledger-list-search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.ledger-list-group-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.ledger-list-filter-label {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .ledger-table-wrap {
   overflow-x: auto;
   margin-top: 0.35rem;
@@ -489,6 +566,10 @@
 }
 
 @media (max-width: 640px) {
+  .ledger-list-filters {
+    grid-template-columns: 1fr;
+  }
+
   .ledger-type-toggle {
     grid-template-columns: 1fr;
   }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { APP_NAME } from '../config/app'
+import { APP_NAME, APP_TAGLINE } from '../config/app'
 import './Login.css'
 
 function Login() {
@@ -16,7 +16,7 @@ function Login() {
     setLoading(true)
 
     try {
-      await login(username, password)
+      await login(username.trim(), password)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
@@ -26,45 +26,62 @@ function Login() {
 
   return (
     <div className="login-page">
-      <div className="login-card">
-        <div className="login-header">
+      <div className="login-shell">
+        <section className="login-brand" aria-hidden="true">
+          <div className="login-brand-mark">BM</div>
           <h1>{APP_NAME}</h1>
-          <p>Sign in to your client workspace</p>
-        </div>
+          <p>{APP_TAGLINE}</p>
+        </section>
 
-        {error && <div className="login-error">{error}</div>}
+        <section className="login-card">
+          <div className="login-card-header">
+            <h2>Welcome back</h2>
+            <p>Sign in with your workspace credentials</p>
+          </div>
 
-        <form className="login-form" onSubmit={handleSubmit}>
-          <label>
-            Username
-            <input
-              type="text"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="Enter username"
-              autoComplete="username"
-              required
-            />
-          </label>
+          {error && (
+            <div className="login-error" role="alert">
+              {error}
+            </div>
+          )}
 
-          <label>
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Enter password"
-              autoComplete="current-password"
-              required
-            />
-          </label>
+          <form className="login-form" onSubmit={handleSubmit} autoComplete="on">
+            <label className="login-field">
+              <span>Username</span>
+              <input
+                type="text"
+                name="username"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                placeholder="Your username"
+                autoComplete="username"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                required
+              />
+            </label>
 
-          <button type="submit" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
+            <label className="login-field">
+              <span>Password</span>
+              <input
+                type="password"
+                name="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Your password"
+                autoComplete="current-password"
+                required
+              />
+            </label>
 
-        <p className="login-hint">Default: admin / admin123</p>
+            <button type="submit" className="login-submit" disabled={loading}>
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+
+          <p className="login-footer">Secure access to your client workspace</p>
+        </section>
       </div>
     </div>
   )
