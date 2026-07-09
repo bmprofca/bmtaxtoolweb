@@ -1,14 +1,17 @@
 import type { BankAccountRecord } from '../types/bankAccount'
 import { isBankAccountActive } from './bankAccount'
 import type {
+  AdministrativeExpenseLine,
   DepreciationRow,
   FinancialStatementData,
   FsNotes,
+  ManualNoteLine,
   NoteSubAmounts,
   PreviousYearDepreciationSummary,
   AssetDepreciationHistoryRow,
 } from '../types/fs'
 import type { LoanRecord } from '../types/loan'
+import { manualNoteLineSubId } from './manualNoteLineConfig'
 import type { LedgerRecord } from '../types/ledger'
 import type { FinancialYear } from '../types'
 import { recalcDepreciationRow, sumDepreciationSchedule, getDepreciationClosingWdv, isPlaceholderDepreciationRow, resolveEffectiveClosingWdv } from './depreciation'
@@ -58,84 +61,8 @@ function getBalanceSheetNoteKeys(): Set<keyof FsNotes> {
   return balanceSheetNoteKeysCache
 }
 
-const EXPLICIT_OPENING_TARGET_SUBS = new Set(
-  NOTE_OPENING_CARRY_RULES.map((rule) => `${rule.targetNoteKey}.${rule.targetSubId}`),
-)
-
-const NON_CARRY_SUB_ID_PATTERNS = [
-  /^loan-/,
-  /^bank-/,
-  /^bank-st-/,
-  /^interest-/,
-  /^interest-manual-st-/,
-]
-
-const NON_CARRY_SUB_IDS = new Set([
-  'cash-flow-adjustment',
-  'capital-closing',
-  'gross-book-value',
-  'less-depreciation',
-  'net-book-value',
-  'total-a',
-  'total-cogs',
-  'gross-profit',
-  'gross-profit-pct',
-  'trade-total',
-  'itr-total',
-  'bra-total',
-  'cash-bank-total',
-  'cash-in-hand-total',
-  'long-term-total',
-  'short-term-total',
-  'admin-total',
-  'total-finance-cost',
-  'revenue-total',
-  'other-income-total',
-  'employee-total',
-])
-
 function generateRowId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
-}
-
-function isCarryableBalanceSheetSub(noteKey: keyof FsNotes, subId: string) {
-  if (!getBalanceSheetNoteKeys().has(noteKey)) {
-    return false
-  }
-
-  if (EXPLICIT_OPENING_TARGET_SUBS.has(`${noteKey}.${subId}`)) {
-    return false
-  }
-
-  if (NON_CARRY_SUB_IDS.has(subId) || subId.endsWith('-total')) {
-    return false
-  }
-
-  return !NON_CARRY_SUB_ID_PATTERNS.some((pattern) => pattern.test(subId))
-}
-
-function shouldSkipNoteKeyForSubCarry(noteKey: keyof FsNotes, priorFs: FinancialStatementData) {
-  if (noteKey === 'depreciationAmortization') {
-    return true
-  }
-
-  const hasLongTermLoans = priorFs.loans.some((loan) => loan.loanType === 'long-term')
-  const hasShortTermLoans = priorFs.loans.some((loan) => loan.loanType === 'short-term')
-  const hasCashBanks = priorFs.bankAccounts.some((account) => account.closingBalance !== 0)
-
-  if (noteKey === 'longTermBorrowings' && hasLongTermLoans) {
-    return true
-  }
-
-  if (noteKey === 'shortTermBorrowings' && (hasShortTermLoans || hasCashBanks)) {
-    return true
-  }
-
-  if (noteKey === 'cashAtBank' && hasCashBanks) {
-    return true
-  }
-
-  return false
 }
 
 export interface OpeningBalanceLocks {
@@ -143,6 +70,10 @@ export interface OpeningBalanceLocks {
   loanIds: Set<string>
   bankIds: Set<string>
   depRowIds: Set<string>
+  /** Prior-year admin expense lines — category is fixed; current-year amount stays editable. */
+  adminExpenseLineIds: Set<string>
+  /** Prior-year manual note lines — category is fixed; current-year amount stays editable. */
+  manualNoteLineIds: Set<string>
   previousYearDepOpening: boolean
   /** Previous year depreciation row is fully linked from prior FY schedule totals. */
   previousYearDepLinked: boolean
@@ -168,6 +99,36 @@ export function isNoteOpeningSubLocked(
   subId: string,
 ): boolean {
   return locks?.noteSubs.has(noteSubLockKey(noteKey, subId)) ?? false
+}
+
+export function isAdminExpenseLineCategoryLocked(
+  locks: OpeningBalanceLocks | null | undefined,
+  lineId: string,
+): boolean {
+  return locks?.adminExpenseLineIds.has(lineId) ?? false
+}
+
+function manualNoteLineLockKey(noteKey: keyof FsNotes, lineId: string) {
+  return `${noteKey}.${lineId}`
+}
+
+export function isManualNoteLineCategoryLocked(
+  locks: OpeningBalanceLocks | null | undefined,
+  noteKey: keyof FsNotes,
+  lineId: string,
+): boolean {
+  return locks?.manualNoteLineIds.has(manualNoteLineLockKey(noteKey, lineId)) ?? false
+}
+
+const ALLOWED_NOTE_SUB_LOCKS = new Set([
+  noteSubLockKey('capitalAccount', 'opening-balance'),
+  noteSubLockKey('costOfGoodsSold', 'opening-stock'),
+])
+
+export function sanitizeNoteSubLocks(locks: OpeningBalanceLocks) {
+  locks.noteSubs = new Set(
+    [...locks.noteSubs].filter((key) => ALLOWED_NOTE_SUB_LOCKS.has(key)),
+  )
 }
 
 export function isOpeningSubField(noteKey: keyof FsNotes, subId: string): boolean {
@@ -398,14 +359,16 @@ function hasMeaningfulPriorYearData(
 function applyNoteOpeningCarryForward(
   noteSubAmounts: NoteSubAmounts,
   priorClosing: PriorClosingSnapshot,
-  priorFs: FinancialStatementData,
   locks: OpeningBalanceLocks,
 ): NoteSubAmounts {
   let next: NoteSubAmounts = { ...noteSubAmounts }
 
   for (const rule of NOTE_OPENING_CARRY_RULES) {
     const amount = priorClosing.noteSubs[rule.sourceNoteKey]?.[rule.sourceSubId]
-    if (amount === undefined || amount === 0) {
+    if (amount === undefined) {
+      continue
+    }
+    if (amount === 0 && rule.targetSubId !== 'opening-stock' && rule.targetSubId !== 'opening-balance') {
       continue
     }
 
@@ -418,37 +381,9 @@ function applyNoteOpeningCarryForward(
         current: amount,
       },
     }
-    locks.noteSubs.add(noteSubLockKey(rule.targetNoteKey, rule.targetSubId))
-  }
 
-  for (const noteKey of getBalanceSheetNoteKeys()) {
-    if (shouldSkipNoteKeyForSubCarry(noteKey, priorFs)) {
-      continue
-    }
-
-    const priorSubs = priorClosing.noteSubs[noteKey]
-    if (!priorSubs) {
-      continue
-    }
-
-    for (const [subId, amount] of Object.entries(priorSubs)) {
-      if (!isCarryableBalanceSheetSub(noteKey, subId) || amount === 0) {
-        continue
-      }
-
-      const existing = next[noteKey]?.[subId] ?? { current: 0, previous: 0 }
-      if (existing.current !== 0) {
-        continue
-      }
-
-      next[noteKey] = {
-        ...next[noteKey],
-        [subId]: {
-          ...existing,
-          current: amount,
-        },
-      }
-      locks.noteSubs.add(noteSubLockKey(noteKey, subId))
+    if (rule.targetSubId === 'opening-balance' || rule.targetSubId === 'opening-stock') {
+      locks.noteSubs.add(noteSubLockKey(rule.targetNoteKey, rule.targetSubId))
     }
   }
 
@@ -462,36 +397,82 @@ function copyLinesIfEmpty<T extends { id: string }>(current: T[], prior: T[]): T
   return prior.map((line) => ({ ...line }))
 }
 
-function carryDynamicLineAmounts(
-  noteSubAmounts: NoteSubAmounts,
-  noteKey: keyof FsNotes,
-  linePrefix: string,
-  lines: Array<{ id: string }>,
+function carryAdministrativeExpenseLines(
+  lines: AdministrativeExpenseLine[],
   priorClosing: PriorClosingSnapshot,
   locks: OpeningBalanceLocks,
-): NoteSubAmounts {
-  let next = { ...noteSubAmounts }
-
+) {
   for (const line of lines) {
-    const subId = `${linePrefix}${line.id}`
+    const subId = `admin-line-${line.id}`
+    const amount = priorClosing.noteSubs.otherAdministrativeExpenses?.[subId]
+    if (amount !== undefined && amount !== 0) {
+      locks.adminExpenseLineIds.add(line.id)
+    }
+  }
+}
+
+function carryManualNoteLines(
+  lines: ManualNoteLine[],
+  priorClosing: PriorClosingSnapshot,
+  locks: OpeningBalanceLocks,
+) {
+  for (const line of lines) {
+    const noteKey = line.noteKey as keyof FsNotes
+    const subId = manualNoteLineSubId(line.id)
     const amount = priorClosing.noteSubs[noteKey]?.[subId]
-    if (amount === undefined || amount === 0) {
-      continue
+    if (amount !== undefined) {
+      locks.manualNoteLineIds.add(manualNoteLineLockKey(noteKey, line.id))
     }
+  }
+}
 
-    const existing = next[noteKey]?.[subId] ?? { current: 0, previous: 0 }
-    if (existing.current !== 0) {
-      continue
-    }
+const NON_RESETTABLE_SUB_IDS = new Set([
+  'opening-balance',
+  'opening-stock',
+  'inventories',
+  'capital-closing',
+  'cash-flow-adjustment',
+  'gross-book-value',
+  'less-depreciation',
+  'net-book-value',
+  'gross-profit',
+  'gross-profit-pct',
+  'total-cogs',
+  'cash-at-bank',
+])
 
-    next[noteKey] = {
-      ...next[noteKey],
-      [subId]: {
-        ...existing,
-        current: amount,
-      },
+function shouldResetAutoCarriedCurrentSub(subId: string) {
+  if (NON_RESETTABLE_SUB_IDS.has(subId) || subId.endsWith('-total')) {
+    return false
+  }
+
+  return !/^(loan-|bank-|bank-st-|interest-|interest-manual-st-)/.test(subId)
+}
+
+function resetAutoCarriedManualEntryAmounts(
+  noteSubAmounts: NoteSubAmounts,
+  priorClosing: PriorClosingSnapshot,
+): NoteSubAmounts {
+  let next: NoteSubAmounts = { ...noteSubAmounts }
+
+  for (const [noteKey, subs] of Object.entries(priorClosing.noteSubs) as Array<
+    [keyof FsNotes, Record<string, number>]
+  >) {
+    for (const [subId, priorAmount] of Object.entries(subs)) {
+      if (!shouldResetAutoCarriedCurrentSub(subId)) {
+        continue
+      }
+
+      const existing = next[noteKey]?.[subId]
+      if (!existing || existing.current !== priorAmount) {
+        continue
+      }
+
+      next[noteKey] = {
+        ...next[noteKey],
+        [subId]: { current: 0, previous: 0 },
+      }
     }
-    locks.noteSubs.add(noteSubLockKey(noteKey, subId))
   }
 
   return next
@@ -969,6 +950,8 @@ export function applyOpeningBalanceCarryForward(params: {
     loanIds: new Set(),
     bankIds: new Set(),
     depRowIds: new Set(),
+    adminExpenseLineIds: new Set(),
+    manualNoteLineIds: new Set(),
     previousYearDepOpening: false,
     previousYearDepLinked: false,
   }
@@ -993,45 +976,13 @@ export function applyOpeningBalanceCarryForward(params: {
   let noteSubAmounts = applyNoteOpeningCarryForward(
     current.noteSubAmounts,
     priorClosing,
-    priorFs,
     locks,
   )
 
-  noteSubAmounts = carryDynamicLineAmounts(
-    noteSubAmounts,
-    'otherAdministrativeExpenses',
-    'admin-line-',
-    administrativeExpenseLines,
-    priorClosing,
-    locks,
-  )
-  noteSubAmounts = carryDynamicLineAmounts(
-    noteSubAmounts,
-    'shortTermBorrowings',
-    'manual-st-',
-    otherShortTermBorrowingLines,
-    priorClosing,
-    locks,
-  )
-  noteSubAmounts = carryDynamicLineAmounts(
-    noteSubAmounts,
-    'capitalAccount',
-    'capital-line-',
-    capitalAccountLines,
-    priorClosing,
-    locks,
-  )
-
-  for (const line of manualNoteLines) {
-    noteSubAmounts = carryDynamicLineAmounts(
-      noteSubAmounts,
-      line.noteKey as keyof FsNotes,
-      'manual-nl-',
-      [line],
-      priorClosing,
-      locks,
-    )
-  }
+  carryAdministrativeExpenseLines(administrativeExpenseLines, priorClosing, locks)
+  carryManualNoteLines(manualNoteLines, priorClosing, locks)
+  noteSubAmounts = resetAutoCarriedManualEntryAmounts(noteSubAmounts, priorClosing)
+  sanitizeNoteSubLocks(locks)
 
   const { loans: carriedLoans, changed: loansCarriedForward } = carryForwardLoans(
     current.loans,

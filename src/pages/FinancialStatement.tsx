@@ -129,6 +129,7 @@ import { getGstTaxableSalesTotal, isGstLinkedRevenueSub } from '../utils/gstCalc
 import { applyGstSalesLinkToRevenue } from '../utils/gstRevenueLink'
 import {
   applyClosingStockLink,
+  applyOpeningStockLink,
   isClosingStockLinkedInventoriesSub,
 } from '../utils/closingStockLink'
 import {
@@ -145,6 +146,8 @@ import {
 } from '../utils/bankAccount'
 import {
   defaultLedgerIdForGroup,
+  firstUnusedLedgerIdForGroup,
+  hasUnusedLedgerInGroup,
   getLedgersForGroup,
   getFixedAssetLedgers,
   normalizeLedgerSign,
@@ -179,9 +182,14 @@ import {
   buildPriorYearClosingSnapshot,
   buildPriorDepClosingsByLedgerId,
   hasPriorYearDepreciationData,
-  isNoteOpeningSubLocked,
+  isAdminExpenseLineCategoryLocked,
+  isManualNoteLineCategoryLocked,
   type OpeningBalanceLocks,
 } from '../utils/openingBalanceCarryForward'
+import {
+  currentYearReadOnlyHint,
+  isNoteSubCurrentYearReadOnly,
+} from '../utils/noteSubEditability'
 import {
   CONSOLIDATED_BUSINESS_ID,
   CONSOLIDATED_BUSINESS_LABEL,
@@ -1060,6 +1068,8 @@ function FinancialStatement() {
           loanIds: new Set(),
           bankIds: new Set(),
           depRowIds: new Set(),
+          adminExpenseLineIds: new Set(),
+          manualNoteLineIds: new Set(),
           previousYearDepOpening: false,
           previousYearDepLinked: false,
         }
@@ -1102,6 +1112,7 @@ function FinancialStatement() {
             },
           })
           noteSubAmounts = carryResult.data.noteSubAmounts
+          noteSubAmounts = applyOpeningStockLink(noteSubAmounts, priorSubAmounts)
           noteSubAmounts = applyClosingStockLink(noteSubAmounts)
           loans = carryResult.data.loans
           bankAccounts = carryResult.data.bankAccounts
@@ -1176,6 +1187,11 @@ function FinancialStatement() {
           loadedLedgers,
         )
       }
+
+      if (priorSubAmounts) {
+        noteSubAmounts = applyOpeningStockLink(noteSubAmounts, priorSubAmounts)
+      }
+      noteSubAmounts = applyClosingStockLink(noteSubAmounts)
 
       const nextFsData = {
         ...fs,
@@ -1501,7 +1517,21 @@ function FinancialStatement() {
   )
 
   const updateSubNote = (noteKey: keyof FsNotes, subId: string, value: string) => {
-    if (!fsData || isNoteOpeningSubLocked(openingBalanceLocks, noteKey, subId)) {
+    if (!fsData) {
+      return
+    }
+
+    if (
+      isNoteSubCurrentYearReadOnly(
+        noteKey,
+        { id: subId, kind: 'entry' },
+        {
+          openingBalanceLocks,
+          previousYearSubAmounts,
+          linkGstSales: fsData.gstReco.linkSalesToRevenueNote,
+        },
+      )
+    ) {
       return
     }
 
@@ -1618,8 +1648,21 @@ function FinancialStatement() {
       return
     }
 
+    const usedCategoryIds = (fsData.administrativeExpenseLines ?? []).map((line) => line.categoryId)
+    const categoryId = firstUnusedLedgerIdForGroup(
+      ledgers,
+      'otherAdministrativeExpenses',
+      usedCategoryIds,
+    )
+    if (!categoryId) {
+      void showActionAlert(
+        'Cannot add line',
+        'All administrative expense categories are already in use.',
+      )
+      return
+    }
+
     const lineId = Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
-    const categoryId = defaultLedgerIdForGroup(ledgers, 'otherAdministrativeExpenses')
     const subId = adminExpenseSubId(lineId)
 
     setFsData({
@@ -1640,7 +1683,14 @@ function FinancialStatement() {
   }
 
   const updateAdministrativeExpenseCategory = (lineId: string, categoryId: string) => {
-    if (!fsData) {
+    if (!fsData || isAdminExpenseLineCategoryLocked(openingBalanceLocks, lineId)) {
+      return
+    }
+
+    const usedByOther = (fsData.administrativeExpenseLines ?? []).some(
+      (line) => line.id !== lineId && line.categoryId === categoryId,
+    )
+    if (usedByOther) {
       return
     }
 
@@ -1654,7 +1704,7 @@ function FinancialStatement() {
   }
 
   const removeAdministrativeExpenseLine = (lineId: string) => {
-    if (!fsData) {
+    if (!fsData || isAdminExpenseLineCategoryLocked(openingBalanceLocks, lineId)) {
       return
     }
 
@@ -1770,7 +1820,7 @@ function FinancialStatement() {
   }
 
   const updateManualNoteLineType = (noteKey: ManualNoteLineKey, lineId: string, typeId: string) => {
-    if (!fsData) {
+    if (!fsData || isManualNoteLineCategoryLocked(openingBalanceLocks, noteKey, lineId)) {
       return
     }
 
@@ -1784,7 +1834,7 @@ function FinancialStatement() {
   }
 
   const removeManualNoteLine = (noteKey: ManualNoteLineKey, lineId: string) => {
-    if (!fsData) {
+    if (!fsData || isManualNoteLineCategoryLocked(openingBalanceLocks, noteKey, lineId)) {
       return
     }
 
@@ -1898,6 +1948,7 @@ function FinancialStatement() {
   const renderLedgerSelectOptions = (
     group: keyof FsNotes,
     sign?: CapitalAccountLineSign,
+    options?: { disabledIds?: Set<string> },
   ) => {
     let groupLedgers = getLedgersForGroup(ledgers, group)
     if (group === 'capitalAccount' && sign) {
@@ -1906,7 +1957,11 @@ function FinancialStatement() {
       )
     }
     return groupLedgers.map((ledger) => (
-      <option key={ledger.id} value={ledger.id}>
+      <option
+        key={ledger.id}
+        value={ledger.id}
+        disabled={options?.disabledIds?.has(ledger.id)}
+      >
         {ledger.name}
       </option>
     ))
@@ -1951,32 +2006,15 @@ function FinancialStatement() {
       Boolean(fsData?.gstReco.linkSalesToRevenueNote) &&
       noteKey === 'revenueFromOperations' &&
       isGstLinkedRevenueSub(sub.id)
-    const closingStockLinked = isClosingStockLinkedInventoriesSub(noteKey, sub.id)
 
-    if (!sub.editable || gstSalesLinked || closingStockLinked) {
-      const scheduleHint = closingStockLinked
-        ? 'Auto: Closing stock from Note 21 (Cost of Goods Sold)'
-        : gstSalesLinked
-        ? sub.id === 'sales-goods'
-          ? 'Auto: Taxable sales from GST Reco (Sales + Amended sales)'
-          : 'Not used when GST Reco sales are linked'
-        : isNoteOpeningSubLocked(openingBalanceLocks, noteKey, sub.id)
-          ? 'Opening balance carried from previous year closing (not editable)'
-          : noteKey === 'depreciationAmortization' && sub.isAuto
-          ? 'Auto from Depreciation Schedule'
-          : noteKey === 'financeCost' && sub.kind === 'auto' && sub.id.startsWith('interest-')
-            ? 'Auto: Interest paid from Repayment Schedule'
-            : (noteKey === 'longTermBorrowings' || noteKey === 'shortTermBorrowings') &&
-                sub.kind === 'auto' &&
-                sub.id.startsWith('loan-')
-              ? 'Auto: Closing balance from Loan Repayment Schedule'
-              : noteKey === 'cashAtBank' && sub.kind === 'auto' && sub.id.startsWith('bank-') && !sub.id.startsWith('bank-st-')
-              ? 'Auto: Credit balance from Bank Account tab (Current / Savings)'
-              : noteKey === 'cashInHand' && sub.id === 'cash-flow-adjustment'
-                ? 'Auto: Sources vs Application difference (Cash Flow Adjustment)'
-                : noteKey === 'shortTermBorrowings' && sub.kind === 'auto' && sub.id.startsWith('bank-st-')
-                ? 'Auto: Debit balance from Bank Account tab (CC / OD)'
-                : undefined
+    if (!sub.editable || gstSalesLinked) {
+      const scheduleHint =
+        currentYearReadOnlyHint(noteKey, sub.id, sub.kind) ??
+        (gstSalesLinked
+          ? sub.id === 'sales-goods'
+            ? 'Auto: Taxable sales from GST Reco (Sales + Amended sales)'
+            : 'Not used when GST Reco sales are linked'
+          : undefined)
       return (
         <>
           <div
@@ -2087,6 +2125,11 @@ function FinancialStatement() {
     }
 
     if (field.key === 'otherAdministrativeExpenses') {
+      const canAddAdminLine = hasUnusedLedgerInGroup(
+        ledgers,
+        'otherAdministrativeExpenses',
+        (fsData?.administrativeExpenseLines ?? []).map((line) => line.categoryId),
+      )
       return (
         <div className="notes-main-label-row">
           <span>{field.label}</span>
@@ -2094,8 +2137,13 @@ function FinancialStatement() {
             type="button"
             className="notes-add-round-btn"
             onClick={addAdministrativeExpenseLine}
-            title="Add administrative expense"
+            title={
+              canAddAdminLine
+                ? 'Add administrative expense'
+                : 'All administrative expense categories are already in use'
+            }
             aria-label="Add administrative expense"
+            disabled={!canAddAdminLine}
           >
             +
           </button>
@@ -2187,6 +2235,12 @@ function FinancialStatement() {
     const lineId = sub.id.replace('admin-line-', '')
     const line = fsData?.administrativeExpenseLines?.find((item) => item.id === lineId)
     const categoryId = line?.categoryId ?? defaultLedgerIdForGroup(ledgers, 'otherAdministrativeExpenses')
+    const categoryLocked = isAdminExpenseLineCategoryLocked(openingBalanceLocks, lineId)
+    const usedCategoryIds = new Set(
+      (fsData?.administrativeExpenseLines ?? [])
+        .filter((item) => item.id !== lineId)
+        .map((item) => item.categoryId),
+    )
 
     return (
       <div className="notes-admin-field">
@@ -2195,10 +2249,17 @@ function FinancialStatement() {
           <select
             className="notes-admin-category-select"
             value={categoryId}
-            title={resolveAdminExpenseLabel(ledgers, categoryId)}
+            title={
+              categoryLocked
+                ? `${resolveAdminExpenseLabel(ledgers, categoryId)} — carried from previous year`
+                : resolveAdminExpenseLabel(ledgers, categoryId)
+            }
+            disabled={categoryLocked}
             onChange={(event) => updateAdministrativeExpenseCategory(lineId, event.target.value)}
           >
-            {renderLedgerSelectOptions('otherAdministrativeExpenses')}
+            {renderLedgerSelectOptions('otherAdministrativeExpenses', undefined, {
+              disabledIds: usedCategoryIds,
+            })}
           </select>
         </div>
         <button
@@ -2207,6 +2268,7 @@ function FinancialStatement() {
           onClick={() => removeAdministrativeExpenseLine(lineId)}
           title="Remove expense line"
           aria-label="Remove expense line"
+          disabled={categoryLocked}
         >
           ×
         </button>
@@ -2249,6 +2311,7 @@ function FinancialStatement() {
     const lineId = sub.id.replace('manual-nl-', '')
     const line = fsData?.manualNoteLines?.find((item) => item.id === lineId && item.noteKey === noteKey)
     const typeId = line?.typeId ?? defaultLedgerIdForGroup(ledgers, noteKey)
+    const categoryLocked = isManualNoteLineCategoryLocked(openingBalanceLocks, noteKey, lineId)
 
     return (
       <div className="notes-admin-field">
@@ -2257,7 +2320,12 @@ function FinancialStatement() {
           <select
             className="notes-admin-category-select"
             value={typeId}
-            title={resolveManualNoteLineLabel(ledgers, noteKey, typeId)}
+            title={
+              categoryLocked
+                ? `${resolveManualNoteLineLabel(ledgers, noteKey, typeId)} — carried from previous year`
+                : resolveManualNoteLineLabel(ledgers, noteKey, typeId)
+            }
+            disabled={categoryLocked}
             onChange={(event) => updateManualNoteLineType(noteKey, lineId, event.target.value)}
           >
             {renderLedgerSelectOptions(noteKey)}
@@ -2269,6 +2337,7 @@ function FinancialStatement() {
           onClick={() => removeManualNoteLine(noteKey, lineId)}
           title="Remove line"
           aria-label="Remove line"
+          disabled={categoryLocked}
         >
           ×
         </button>
@@ -3114,6 +3183,7 @@ function FinancialStatement() {
       savedSubAmounts = migrateOtherShortTermSubAmounts(savedOtherStLines, savedSubAmounts)
       savedSubAmounts = migrateManualNoteLineSubAmounts(savedManualLines, savedSubAmounts)
       savedSubAmounts = migrateCapitalAccountSubAmounts(savedCapitalLines, savedSubAmounts)
+      savedSubAmounts = applyOpeningStockLink(savedSubAmounts, previousYearSubAmounts)
       savedSubAmounts = applyClosingStockLink(savedSubAmounts)
 
       const nextState = {

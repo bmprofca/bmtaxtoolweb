@@ -2009,6 +2009,20 @@ input.fs-readonly-input {
   transform: translateY(0);
 }
 
+.notes-add-round-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.notes-admin-category-select:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
+  background: #f8fafc;
+  color: #334155;
+}
+
 .notes-admin-empty-row td {
   background: #fafbfc;
 }

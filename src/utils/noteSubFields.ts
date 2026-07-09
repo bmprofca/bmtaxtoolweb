@@ -12,7 +12,8 @@ import type {
 import type { LoanRecord } from '../types/loan'
 import type { BankAccountRecord } from '../types/bankAccount'
 import type { OpeningBalanceLocks } from './openingBalanceCarryForward'
-import { isNoteOpeningSubLocked, isOpeningSubField, NOTE_OPENING_CARRY_RULES } from './openingBalanceCarryForward'
+import { NOTE_OPENING_CARRY_RULES } from './openingBalanceCarryForward'
+import { isNoteSubCurrentYearReadOnly } from './noteSubEditability'
 import {
   bankAccountSubId,
   bankShortTermSubId,
@@ -358,7 +359,7 @@ function resolveEntryStored(
     }
     const priorAmount =
       ctx.previousYearSubAmounts?.[rule.sourceNoteKey]?.[rule.sourceSubId]?.current
-    if (priorAmount !== undefined && priorAmount !== 0) {
+    if (priorAmount !== undefined) {
       stored = { ...stored, current: priorAmount }
     }
   }
@@ -706,7 +707,10 @@ export function migrateManualNoteLineSubAmounts(
 
     const legacy = subs[config.legacySubId]
     if (legacy && noteLines.length === 1 && !subs[manualNoteLineSubId(noteLines[0].id)]) {
-      subs[manualNoteLineSubId(noteLines[0].id)] = legacy
+      subs[manualNoteLineSubId(noteLines[0].id)] = {
+        current: legacy.current,
+        previous: 0,
+      }
       delete subs[config.legacySubId]
     }
 
@@ -863,7 +867,10 @@ export function normalizeNoteSubAmounts(
 
       const fromStore = stored[sub.id]
       if (fromStore) {
-        result[noteKey]![sub.id] = fromStore
+        result[noteKey]![sub.id] = {
+          current: Number(fromStore.current) || 0,
+          previous: 0,
+        }
         continue
       }
 
@@ -1257,18 +1264,10 @@ export function resolveNoteSubRows(
     }
 
     const value = resolved.get(def.id) ?? emptyCell()
-    const hasPriorYearClosingLink = NOTE_OPENING_CARRY_RULES.some((rule) => {
-      if (noteKey !== rule.targetNoteKey || def.id !== rule.targetSubId) {
-        return false
-      }
-      const priorAmount =
-        ctx.previousYearSubAmounts?.[rule.sourceNoteKey]?.[rule.sourceSubId]?.current
-      return priorAmount !== undefined && priorAmount !== 0
+    const editable = !isNoteSubCurrentYearReadOnly(noteKey, def, {
+      openingBalanceLocks: ctx.openingBalanceLocks,
+      previousYearSubAmounts: ctx.previousYearSubAmounts,
     })
-    const editable =
-      (def.kind === 'entry' || def.kind === 'less') &&
-      !isNoteOpeningSubLocked(ctx.openingBalanceLocks, noteKey, def.id) &&
-      !(isOpeningSubField(noteKey, def.id) && hasPriorYearClosingLink)
     return {
       id: def.id,
       label: def.label,

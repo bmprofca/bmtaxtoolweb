@@ -99,6 +99,24 @@ export function defaultLedgerIdForGroup(ledgers: LedgerRecord[], group: keyof Fs
   return getLedgersForGroup(ledgers, group)[0]?.id ?? ''
 }
 
+export function firstUnusedLedgerIdForGroup(
+  ledgers: LedgerRecord[],
+  group: keyof FsNotes,
+  usedIds: Iterable<string>,
+) {
+  const used = new Set(usedIds)
+  return getLedgersForGroup(ledgers, group).find((ledger) => !used.has(ledger.id))?.id ?? ''
+}
+
+export function hasUnusedLedgerInGroup(
+  ledgers: LedgerRecord[],
+  group: keyof FsNotes,
+  usedIds: Iterable<string>,
+) {
+  const used = new Set(usedIds)
+  return getLedgersForGroup(ledgers, group).some((ledger) => !used.has(ledger.id))
+}
+
 export function resolveAdminExpenseLabel(ledgers: LedgerRecord[], categoryId: string) {
   return (
     getLedgerLabel(ledgers, 'otherAdministrativeExpenses', categoryId) ||
