@@ -161,8 +161,10 @@ import {
   formatBalanceSheetReportTitle,
   formatFinancialStatementPageTitle,
   formatFyDisplay,
+  formatBalanceSheetColumnLabel,
   formatBalanceSheetPrintColumnLabel,
   formatProfitLossColumnLabel,
+  formatProfitLossColumnLabelCompact,
   formatNotesReportTitle,
   formatProfitLossReportTitle,
   formatProfitLossTabLabel,
@@ -392,8 +394,8 @@ function StatementTable({
             <colgroup>
               <col className="bs-col-particular" />
               <col className="bs-col-note" />
-              <col className="bs-col-prev" />
               <col className="bs-col-curr" />
+              <col className="bs-col-prev" />
               <col className="bs-col-change" />
               <col className="bs-col-pct" />
             </colgroup>
@@ -402,11 +404,11 @@ function StatementTable({
             <tr className="statement-head-row">
               <th className="statement-particular-col">Particulars</th>
               {showNoteColumn && <th className="statement-note-col">Note</th>}
-              <th className="statement-amount-col statement-prev-col">
-                {renderColumnHeaderLabel(previousLabel, printPreviousLabel)}
-              </th>
               <th className="statement-amount-col statement-curr-col">
                 {renderColumnHeaderLabel(currentLabel, printCurrentLabel)}
+              </th>
+              <th className="statement-amount-col statement-prev-col">
+                {renderColumnHeaderLabel(previousLabel, printPreviousLabel)}
               </th>
               <th className="statement-variance-col statement-change-col">
                 <span className="statement-fy-label">Change</span>
@@ -483,11 +485,11 @@ function StatementTable({
                     {row.label}
                   </td>
                   {showNoteColumn && renderNoteCell(row)}
-                  <td className="statement-amount-col statement-prev-col">
-                    {renderAmount(row.previous, 'prev', blankAmounts)}
-                  </td>
                   <td className="statement-amount-col statement-curr-col">
                     {renderAmount(row.current, 'curr', blankAmounts)}
+                  </td>
+                  <td className="statement-amount-col statement-prev-col">
+                    {renderAmount(row.previous, 'prev', blankAmounts)}
                   </td>
                   {renderVariance(change, pct, blankAmounts)}
                 </tr>
@@ -1103,6 +1105,13 @@ function FinancialStatement() {
           noteSubAmounts = applyClosingStockLink(noteSubAmounts)
           loans = carryResult.data.loans
           bankAccounts = carryResult.data.bankAccounts
+          if (carryResult.loansCarriedForward) {
+            try {
+              loans = (await saveLoans(clientId, fyId, businessId, loans)).loans
+            } catch {
+              // Loan carry-forward remains in memory; user can save manually.
+            }
+          }
           carriedDepreciationSchedule = carryResult.data.depreciationSchedule
           carriedPreviousYearDepreciation = carryResult.data.previousYearDepreciation
           administrativeExpenseLines =
@@ -1238,9 +1247,13 @@ function FinancialStatement() {
     ? buildShortFyLabel(fy.startYear - 1, fy.endYear - 1)
     : 'Previous'
   const currentFyLabel = fy ? buildShortFyLabel(fy.startYear, fy.endYear) : 'Current'
-  const balanceSheetPreviousLabel = fy ? formatBalanceSheetPrintColumnLabel(fy.endYear - 1) : 'Previous'
+  const balanceSheetCurrentColumnLabel = fy ? formatBalanceSheetColumnLabel(fy.endYear) : 'Current'
+  const balanceSheetPreviousColumnLabel = fy ? formatBalanceSheetColumnLabel(fy.endYear - 1) : 'Previous'
   const balanceSheetCurrentLabel = fy ? formatBalanceSheetPrintColumnLabel(fy.endYear) : 'Current'
-  const profitLossPreviousLabel = fy ? formatProfitLossColumnLabel(fy.endYear - 1) : 'Previous'
+  const profitLossCurrentColumnLabel = fy ? formatProfitLossColumnLabelCompact(fy.endYear) : 'Current'
+  const profitLossPreviousColumnLabel = fy ? formatProfitLossColumnLabelCompact(fy.endYear - 1) : 'Previous'
+  const notesCurrentColumnLabel = profitLossCurrentColumnLabel
+  const notesPreviousColumnLabel = profitLossPreviousColumnLabel
   const profitLossCurrentLabel = fy ? formatProfitLossColumnLabel(fy.endYear) : 'Current'
 
   const computedLoans = useMemo(() => {
@@ -1267,6 +1280,7 @@ function FinancialStatement() {
     }
     return recomputeLoansForFy(previousYearLoans, fy.startYear - 1, fy.endYear - 1).map((loan) => ({
       id: loan.id,
+      closingBalance: loan.closingBalance,
       interestForYear: loan.interestForYear,
       lender: loan.lender,
     }))
@@ -2004,8 +2018,8 @@ function FinancialStatement() {
 
   const renderEmptyNoteHeadCells = (hideVariance = false) => (
     <>
-      <td className="notes-amount-col notes-prev-col notes-head-empty-col" aria-hidden="true" />
       <td className="notes-amount-col notes-curr-col notes-head-empty-col" aria-hidden="true" />
+      <td className="notes-amount-col notes-prev-col notes-head-empty-col" aria-hidden="true" />
       {!hideVariance && (
         <>
           <td className="notes-variance-col notes-change-col notes-head-empty-col" aria-hidden="true" />
@@ -2486,14 +2500,14 @@ function FinancialStatement() {
               <td className="notes-particular-col notes-sub-label notes-gst-ref-label">
                 As per GST Reco
               </td>
-              <td className="notes-amount-col notes-prev-col">
-                <div className="note-prev-ref" title={`${previousFyLabel} — reference only`}>
-                  {previous ? formatAmount(previous) : '—'}
-                </div>
-              </td>
               <td className="notes-amount-col notes-curr-col">
                 <div className="note-sub-auto is-auto-calc" title="Taxable sales from GST Reco">
                   {current ? formatAmount(current) : '—'}
+                </div>
+              </td>
+              <td className="notes-amount-col notes-prev-col">
+                <div className="note-prev-ref" title={`${previousFyLabel} — reference only`}>
+                  {previous ? formatAmount(previous) : '—'}
                 </div>
               </td>
               {!hideVariance && (
@@ -2594,11 +2608,11 @@ function FinancialStatement() {
                   : null}
               </td>
               <td className="notes-particular-col notes-sub-label">{renderSubLabel(sub)}</td>
-              <td className="notes-amount-col notes-prev-col">
-                {renderSubPreviousRef(sub, noteKey)}
-              </td>
               <td className="notes-amount-col notes-curr-col">
                 {renderSubCurrentCell(noteKey, sub)}
+              </td>
+              <td className="notes-amount-col notes-prev-col">
+                {renderSubPreviousRef(sub, noteKey)}
               </td>
               {!hideVariance && renderSubVarianceCells(sub)}
             </tr>
@@ -3506,15 +3520,15 @@ function FinancialStatement() {
     sections.push(
       renderSection(
         'Balance Sheet',
-        ['Particular', 'Note', previousFyLabel, currentFyLabel],
-        balanceSheetLines.map((line) => [line.label, line.noteNo || '', line.previous, line.current]),
+        ['Particular', 'Note', currentFyLabel, previousFyLabel],
+        balanceSheetLines.map((line) => [line.label, line.noteNo || '', line.current, line.previous]),
       ),
     )
     sections.push(
       renderSection(
         'Profit & Loss',
-        ['Particular', 'Note', previousFyLabel, currentFyLabel],
-        computed.profitAndLoss.map((line) => [line.label, line.noteNo || '', line.previous, line.current]),
+        ['Particular', 'Note', currentFyLabel, previousFyLabel],
+        computed.profitAndLoss.map((line) => [line.label, line.noteNo || '', line.current, line.previous]),
       ),
     )
 
@@ -3586,13 +3600,13 @@ function FinancialStatement() {
 
     pushSection(
       'Balance Sheet',
-      ['Particular', 'Note', previousFyLabel, currentFyLabel],
-      balanceSheetLines.map((line) => [line.label, line.noteNo || '', num(line.previous), num(line.current)]),
+      ['Particular', 'Note', currentFyLabel, previousFyLabel],
+      balanceSheetLines.map((line) => [line.label, line.noteNo || '', num(line.current), num(line.previous)]),
     )
     pushSection(
       'Profit & Loss',
-      ['Particular', 'Note', previousFyLabel, currentFyLabel],
-      computed.profitAndLoss.map((line) => [line.label, line.noteNo || '', num(line.previous), num(line.current)]),
+      ['Particular', 'Note', currentFyLabel, previousFyLabel],
+      computed.profitAndLoss.map((line) => [line.label, line.noteNo || '', num(line.current), num(line.previous)]),
     )
 
     const csv = `\uFEFF${rows.map((row) => row.map(csvEscape).join(',')).join('\n')}`
@@ -3938,8 +3952,8 @@ function FinancialStatement() {
               <colgroup>
                 <col className="notes-sno-col" />
                 <col className="notes-particular-col" />
-                <col className="notes-amount-col notes-prev-col" />
                 <col className="notes-amount-col notes-curr-col" />
+                <col className="notes-amount-col notes-prev-col" />
                 <col className="notes-variance-col notes-change-col" />
                 <col className="notes-variance-col notes-pct-col" />
               </colgroup>
@@ -3969,17 +3983,11 @@ function FinancialStatement() {
                 <tr className="notes-head-row">
                   <th className="notes-sno-col">Note</th>
                   <th className="notes-particular-col">Particulars</th>
-                  <th className="notes-amount-col notes-prev-col">
-                    <span className="notes-fy-label fs-screen-only">{previousFyLabel}</span>
-                    <span className="notes-fy-label statement-fy-label--print fs-print-only">
-                      {profitLossPreviousLabel}
-                    </span>
-                  </th>
                   <th className="notes-amount-col notes-curr-col">
-                    <span className="notes-fy-label fs-screen-only">{currentFyLabel}</span>
-                    <span className="notes-fy-label statement-fy-label--print fs-print-only">
-                      {profitLossCurrentLabel}
-                    </span>
+                    <span className="notes-fy-label statement-fy-label--unified">{notesCurrentColumnLabel}</span>
+                  </th>
+                  <th className="notes-amount-col notes-prev-col">
+                    <span className="notes-fy-label statement-fy-label--unified">{notesPreviousColumnLabel}</span>
                   </th>
                   <th className="notes-variance-col notes-change-col">
                     <span className="notes-fy-label">Change</span>
@@ -4078,8 +4086,8 @@ function FinancialStatement() {
             title={`${balanceSheetLabel} — Sources of Funds — ${balanceSheetCurrentLabel}`}
             lines={sourcesOfFundsLines}
             wrapperClassName="statement-table-wrap--balance-sheet statement-table-wrap--balance-sheet-sources"
-            currentLabel={balanceSheetCurrentLabel}
-            previousLabel={balanceSheetPreviousLabel}
+            currentLabel={balanceSheetCurrentColumnLabel}
+            previousLabel={balanceSheetPreviousColumnLabel}
             showNoteColumn
             useStatementAmountFormat
             onNoteNavigate={navigateToNote}
@@ -4089,8 +4097,8 @@ function FinancialStatement() {
             title={`${balanceSheetLabel} — Application of Funds — ${balanceSheetCurrentLabel}`}
             lines={applicationOfFundsLines}
             wrapperClassName="statement-table-wrap--balance-sheet statement-table-wrap--balance-sheet-application"
-            currentLabel={balanceSheetCurrentLabel}
-            previousLabel={balanceSheetPreviousLabel}
+            currentLabel={balanceSheetCurrentColumnLabel}
+            previousLabel={balanceSheetPreviousColumnLabel}
             showNoteColumn
             useStatementAmountFormat
             onNoteNavigate={navigateToNote}
@@ -4113,8 +4121,8 @@ function FinancialStatement() {
           <StatementTable
             title={`${profitLossLabel} — ${profitLossCurrentLabel}`}
             lines={computed.profitAndLoss}
-            currentLabel={profitLossCurrentLabel}
-            previousLabel={profitLossPreviousLabel}
+            currentLabel={profitLossCurrentColumnLabel}
+            previousLabel={profitLossPreviousColumnLabel}
             showNoteColumn
             useStatementAmountFormat
             onNoteNavigate={navigateToNote}
@@ -4161,25 +4169,19 @@ function FinancialStatement() {
               <table className="data-table pl-appropriation-table">
                 <colgroup>
                   <col className="pl-col-particular" />
-                  <col className="pl-col-prev" />
                   <col className="pl-col-curr" />
+                  <col className="pl-col-prev" />
                   <col className="pl-col-change" />
                   <col className="pl-col-pct" />
                 </colgroup>
                 <thead>
                   <tr className="pl-appr-head-row">
                     <th className="pl-appr-particular-col">Particular</th>
-                    <th className="pl-appr-amount-col pl-appr-prev-col">
-                      <span className="notes-fy-label fs-screen-only">{previousFyLabel}</span>
-                      <span className="notes-fy-label statement-fy-label--print fs-print-only">
-                        {profitLossPreviousLabel}
-                      </span>
-                    </th>
                     <th className="pl-appr-amount-col pl-appr-curr-col">
-                      <span className="notes-fy-label fs-screen-only">{currentFyLabel}</span>
-                      <span className="notes-fy-label statement-fy-label--print fs-print-only">
-                        {profitLossCurrentLabel}
-                      </span>
+                      <span className="notes-fy-label">{profitLossCurrentColumnLabel}</span>
+                    </th>
+                    <th className="pl-appr-amount-col pl-appr-prev-col">
+                      <span className="notes-fy-label">{profitLossPreviousColumnLabel}</span>
                     </th>
                     <th className="pl-appr-variance-col pl-appr-change-col">
                       <span className="notes-fy-label">Change</span>
@@ -4235,14 +4237,6 @@ function FinancialStatement() {
                             </button>
                           </div>
                         </td>
-                        <td className="pl-appr-amount-col pl-appr-prev-col">
-                          <div
-                            className="note-prev-ref notes-admin-prev-ref"
-                            title={`${previousFyLabel} — reference only`}
-                          >
-                            {previousRef ? formatAmount(previousRef) : '—'}
-                          </div>
-                        </td>
                         <td className="pl-appr-amount-col pl-appr-curr-col">
                           <input
                             type="number"
@@ -4257,6 +4251,14 @@ function FinancialStatement() {
                             {currentValue ? formatAmount(currentValue) : '—'}
                           </span>
                         </td>
+                        <td className="pl-appr-amount-col pl-appr-prev-col">
+                          <div
+                            className="note-prev-ref notes-admin-prev-ref"
+                            title={`${previousFyLabel} — reference only`}
+                          >
+                            {previousRef ? formatAmount(previousRef) : '—'}
+                          </div>
+                        </td>
                         <td className={`pl-appr-variance-col pl-appr-change-col ${varianceClass(change)}`}>
                           <div className="note-variance-value">{formatChangeAmount(change)}</div>
                         </td>
@@ -4270,14 +4272,14 @@ function FinancialStatement() {
                   })}
                   <tr className="pl-appropriation-total-row">
                     <td className="pl-appr-particular-col">Total P&L Appropriation</td>
-                    <td className="pl-appr-amount-col pl-appr-prev-col pl-appr-total-value">
-                      {plAppropriationTotal.previous
-                        ? formatAmount(plAppropriationTotal.previous)
-                        : '—'}
-                    </td>
                     <td className="pl-appr-amount-col pl-appr-curr-col pl-appr-total-value">
                       {plAppropriationTotal.current
                         ? formatAmount(plAppropriationTotal.current)
+                        : '—'}
+                    </td>
+                    <td className="pl-appr-amount-col pl-appr-prev-col pl-appr-total-value">
+                      {plAppropriationTotal.previous
+                        ? formatAmount(plAppropriationTotal.previous)
                         : '—'}
                     </td>
                     <td
@@ -5249,8 +5251,8 @@ function FinancialStatement() {
                   <thead>
                     <tr>
                       <th>Particular</th>
-                      <th>{previousFyLabel}</th>
                       <th>{currentFyLabel}</th>
+                      <th>{previousFyLabel}</th>
                       <th>Change</th>
                       <th>% Change</th>
                     </tr>
@@ -5259,8 +5261,8 @@ function FinancialStatement() {
                     {finalInfoSummaryRows.map((row) => (
                       <tr key={row.label}>
                         <td>{row.label}</td>
-                        <td>{formatAmount(row.previous)}</td>
                         <td>{formatAmount(row.current)}</td>
+                        <td>{formatAmount(row.previous)}</td>
                         <td>{formatChangeAmount(row.change)}</td>
                         <td>{formatPercentChange(row.pct)}</td>
                       </tr>
@@ -5640,8 +5642,8 @@ function FinancialStatement() {
                     <tr>
                       <th className="fs-qe-col-no">#</th>
                       <th className="fs-qe-col-particular">Particulars</th>
-                      <th className="fs-qe-col-amount">{previousFyLabel}</th>
-                      <th className="fs-qe-col-amount">{currentFyLabel}</th>
+                      <th className="fs-qe-col-amount">{notesCurrentColumnLabel}</th>
+                      <th className="fs-qe-col-amount">{notesPreviousColumnLabel}</th>
                     </tr>
                   </thead>
                   <tbody>

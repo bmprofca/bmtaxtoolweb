@@ -235,8 +235,16 @@ export function formatFyEndDateLong(endYear: number): string {
   return `31st March ${endYear}`
 }
 
+export function formatBalanceSheetColumnLabel(endYear: number): string {
+  return `As on ${formatFyEndDateShort(endYear)}`
+}
+
 export function formatBalanceSheetPrintColumnLabel(endYear: number): string {
   return `As at ${formatFyEndDateLong(endYear)}`
+}
+
+export function formatProfitLossColumnLabelCompact(endYear: number): string {
+  return `Year ended ${formatFyEndDateShort(endYear)}`
 }
 
 export function formatProfitLossColumnLabel(endYear: number): string {
@@ -244,6 +252,16 @@ export function formatProfitLossColumnLabel(endYear: number): string {
 }
 
 export function formatPrintReportPeriod(
+  reportKind: 'balance-sheet' | 'profit-loss' | 'notes' | 'other',
+  fy: Pick<FinancialYear, 'endYear'>,
+): string {
+  if (reportKind === 'balance-sheet') {
+    return formatBalanceSheetColumnLabel(fy.endYear)
+  }
+  return formatProfitLossColumnLabelCompact(fy.endYear)
+}
+
+export function formatPrintReportPeriodLong(
   reportKind: 'balance-sheet' | 'profit-loss' | 'notes' | 'other',
   fy: Pick<FinancialYear, 'endYear'>,
 ): string {

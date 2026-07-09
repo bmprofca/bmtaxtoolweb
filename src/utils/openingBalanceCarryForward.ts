@@ -14,7 +14,7 @@ import type { FinancialYear } from '../types'
 import { recalcDepreciationRow, sumDepreciationSchedule, getDepreciationClosingWdv, isPlaceholderDepreciationRow, resolveEffectiveClosingWdv } from './depreciation'
 import { expandPriorScheduleWithHistory, sumDepreciationHistoryForFy } from './depreciationLedgerSync'
 import { NOTE_FIELDS, notesWithPreviousFromPriorFy } from './fsDefaults'
-import { recomputeLoansForFy } from './loanCalculator'
+import { defaultClosingAdjustmentFields, recomputeLoansForFy } from './loanCalculator'
 import { buildEffectiveNotes } from './noteCalculator'
 import { sumPlAppropriation } from './plAppropriation'
 import {
@@ -228,6 +228,7 @@ export function buildPriorYearClosingSnapshot(params: {
     previousYearLoans && previousYearLoans.length > 0
       ? recomputeLoansForFy(previousYearLoans, fyStartYear - 1, fyEndYear - 1).map((loan) => ({
           id: loan.id,
+          closingBalance: loan.closingBalance,
           interestForYear: loan.interestForYear,
           lender: loan.lender,
         }))
@@ -496,21 +497,62 @@ function carryDynamicLineAmounts(
   return next
 }
 
+function carryForwardExistingLoan(
+  loan: LoanRecord,
+  priorClosingBalance: number,
+): { loan: LoanRecord; changed: boolean } {
+  const openingChanged = loan.openingBalance !== priorClosingBalance
+  if (!openingChanged) {
+    return { loan, changed: false }
+  }
+
+  return {
+    loan: {
+      ...loan,
+      openingBalance: priorClosingBalance,
+      ...defaultClosingAdjustmentFields(),
+    },
+    changed: true,
+  }
+}
+
+function carryForwardNewLoanFromPrior(
+  priorLoan: LoanRecord,
+  priorClosingBalance: number,
+): LoanRecord {
+  return {
+    ...priorLoan,
+    openingBalance: priorClosingBalance,
+    disbursement: 0,
+    disbursementDate: '',
+    prepaymentAmount: 0,
+    prepaymentDate: '',
+    ...defaultClosingAdjustmentFields(),
+  }
+}
+
 function carryForwardLoans(
   loans: LoanRecord[],
   priorLoans: LoanRecord[],
   priorClosing: PriorClosingSnapshot,
   locks: OpeningBalanceLocks,
-): LoanRecord[] {
+): { loans: LoanRecord[]; changed: boolean } {
   const priorById = new Map(priorLoans.map((loan) => [loan.id, loan]))
+  let changed = false
+
   const next = loans.map((loan) => {
     const priorClosingBalance = priorClosing.loanClosings.get(loan.id)
     if (priorClosingBalance === undefined) {
       return loan
     }
 
+    const carried = carryForwardExistingLoan(loan, priorClosingBalance)
+    if (carried.changed) {
+      changed = true
+    }
+
     locks.loanIds.add(loan.id)
-    return { ...loan, openingBalance: priorClosingBalance }
+    return carried.loan
   })
 
   const existingIds = new Set(next.map((loan) => loan.id))
@@ -525,17 +567,11 @@ function carryForwardLoans(
     }
 
     locks.loanIds.add(loanId)
-    next.push({
-      ...priorLoan,
-      openingBalance: priorClosingBalance,
-      disbursement: 0,
-      disbursementDate: '',
-      prepaymentAmount: 0,
-      prepaymentDate: '',
-    })
+    next.push(carryForwardNewLoanFromPrior(priorLoan, priorClosingBalance))
+    changed = true
   }
 
-  return next
+  return { loans: next, changed }
 }
 
 function carryForwardBankAccounts(
@@ -917,15 +953,15 @@ export function applyOpeningBalanceCarryForward(params: {
     | 'manualNoteLines'
     | 'capitalAccountLines'
   >
-}): { data: typeof params.current; locks: OpeningBalanceLocks | null } {
+}): { data: typeof params.current; locks: OpeningBalanceLocks | null; loansCarriedForward: boolean } {
   const { business, priorFy, priorFs, priorClosing, current } = params
 
   if (!canCarryForwardFromPriorYear(business, priorFy)) {
-    return { data: current, locks: null }
+    return { data: current, locks: null, loansCarriedForward: false }
   }
 
   if (!hasMeaningfulPriorYearData(priorFs, priorClosing)) {
-    return { data: current, locks: null }
+    return { data: current, locks: null, loansCarriedForward: false }
   }
 
   const locks: OpeningBalanceLocks = {
@@ -997,10 +1033,17 @@ export function applyOpeningBalanceCarryForward(params: {
     )
   }
 
+  const { loans: carriedLoans, changed: loansCarriedForward } = carryForwardLoans(
+    current.loans,
+    priorFs.loans,
+    priorClosing,
+    locks,
+  )
+
   return {
     data: {
       noteSubAmounts,
-      loans: carryForwardLoans(current.loans, priorFs.loans, priorClosing, locks),
+      loans: carriedLoans,
       bankAccounts: carryForwardBankAccounts(
         current.bankAccounts,
         priorFs.bankAccounts,
@@ -1015,5 +1058,6 @@ export function applyOpeningBalanceCarryForward(params: {
       capitalAccountLines,
     },
     locks,
+    loansCarriedForward,
   }
 }

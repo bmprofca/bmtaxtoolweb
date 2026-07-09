@@ -1346,7 +1346,12 @@ export function buildSubResolveContext(
   loans: LoanRecord[],
   computedLoans: { id: string; closingBalance: number; interestForYear: number; lender: string }[],
   administrativeExpenseLines: AdministrativeExpenseLine[] = [],
-  previousYearComputedLoans: { id: string; interestForYear: number; lender: string }[] = [],
+  previousYearComputedLoans: {
+    id: string
+    closingBalance: number
+    interestForYear: number
+    lender: string
+  }[] = [],
   otherShortTermBorrowingLines: OtherShortTermBorrowingLine[] = [],
   manualNoteLines: ManualNoteLine[] = [],
   plAppropriationTotal: NoteValue = { current: 0, previous: 0 },
@@ -1365,6 +1370,12 @@ export function buildSubResolveContext(
   const loanInterests = new Map<string, NoteValue>()
   const bankBalances = buildBankCashAtBankBalances(bankAccounts, previousYearBankAccounts)
   const bankStBalances = buildBankShortTermBorrowingBalances(bankAccounts, previousYearBankAccounts)
+  const prevClosingById = new Map(
+    previousYearComputedLoans.map((loan) => [loan.id, loan.closingBalance]),
+  )
+  const prevClosingByLender = new Map(
+    previousYearComputedLoans.map((loan) => [loan.lender.trim().toLowerCase(), loan.closingBalance]),
+  )
   const prevInterestById = new Map(
     previousYearComputedLoans.map((loan) => [loan.id, loan.interestForYear]),
   )
@@ -1374,12 +1385,26 @@ export function buildSubResolveContext(
 
   for (const loan of computedLoans) {
     const lenderKey = loan.lender.trim().toLowerCase()
-    const storedPrev = previousYearSubAmounts?.financeCost?.[`interest-${loan.id}`]?.current ?? 0
-    const previous =
-      prevInterestById.get(loan.id) ?? prevInterestByLender.get(lenderKey) ?? storedPrev
+    const storedPrevClosingLt =
+      previousYearSubAmounts?.longTermBorrowings?.[`loan-${loan.id}`]?.current ?? 0
+    const storedPrevClosingSt =
+      previousYearSubAmounts?.shortTermBorrowings?.[`loan-${loan.id}`]?.current ?? 0
+    const storedPrevClosing = storedPrevClosingLt || storedPrevClosingSt
+    const previousClosing =
+      prevClosingById.get(loan.id) ??
+      prevClosingByLender.get(lenderKey) ??
+      storedPrevClosing
 
-    loanClosings.set(`loan-${loan.id}`, { current: loan.closingBalance, previous: 0 })
-    loanInterests.set(`interest-${loan.id}`, { current: loan.interestForYear, previous })
+    const storedPrevInterest =
+      previousYearSubAmounts?.financeCost?.[`interest-${loan.id}`]?.current ?? 0
+    const previousInterest =
+      prevInterestById.get(loan.id) ?? prevInterestByLender.get(lenderKey) ?? storedPrevInterest
+
+    loanClosings.set(`loan-${loan.id}`, {
+      current: loan.closingBalance,
+      previous: previousClosing,
+    })
+    loanInterests.set(`interest-${loan.id}`, { current: loan.interestForYear, previous: previousInterest })
   }
 
   const revenueRows = resolveNoteSubRows('revenueFromOperations', {
@@ -1472,7 +1497,12 @@ export function buildNotesFromSubAmounts(
   loans: LoanRecord[],
   computedLoans: { id: string; closingBalance: number; interestForYear: number; lender: string }[],
   administrativeExpenseLines: AdministrativeExpenseLine[] = [],
-  previousYearComputedLoans: { id: string; interestForYear: number; lender: string }[] = [],
+  previousYearComputedLoans: {
+    id: string
+    closingBalance: number
+    interestForYear: number
+    lender: string
+  }[] = [],
   otherShortTermBorrowingLines: OtherShortTermBorrowingLine[] = [],
   manualNoteLines: ManualNoteLine[] = [],
   plAppropriationTotal: NoteValue = { current: 0, previous: 0 },

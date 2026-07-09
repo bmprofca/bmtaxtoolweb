@@ -83,6 +83,9 @@ export interface LoanHistoryRow {
   interestForYear: number
   principalRepaid: number
   closingBalance: number
+  scheduleClosingBalance?: number
+  closingAdjustmentPrincipalApplied?: number
+  closingAdjustmentInterestApplied?: number
   monthlySchedule: LoanMonthRow[]
 }
 

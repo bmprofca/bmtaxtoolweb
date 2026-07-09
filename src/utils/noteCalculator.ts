@@ -28,7 +28,12 @@ export interface NoteCalcContext {
   fyStartYear: number
   fyEndYear: number
   computedLoans: { id: string; closingBalance: number; interestForYear: number; lender: string }[]
-  previousYearComputedLoans: { id: string; interestForYear: number; lender: string }[]
+  previousYearComputedLoans: {
+    id: string
+    closingBalance: number
+    interestForYear: number
+    lender: string
+  }[]
   administrativeExpenseLines: AdministrativeExpenseLine[]
   otherShortTermBorrowingLines: OtherShortTermBorrowingLine[]
   manualNoteLines: ManualNoteLine[]

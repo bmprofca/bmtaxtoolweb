@@ -124,7 +124,6 @@ export function buildBalanceSheetLines(input: BalanceSheetBuildInput): Statement
       noteNo: '1',
       noteKey: 'capitalAccount',
     }),
-    line('', ownersFund.current, ownersFund.previous, { isTotal: true, indent: 1 }),
 
     line('2. Non-current liabilities', 0, 0, { isSubHeader: true }),
     line('(a) Long-term borrowings', notes.longTermBorrowings.current, notes.longTermBorrowings.previous, {
