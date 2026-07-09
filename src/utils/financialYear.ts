@@ -239,6 +239,10 @@ export function formatBalanceSheetPrintColumnLabel(endYear: number): string {
   return `As at ${formatFyEndDateLong(endYear)}`
 }
 
+export function formatProfitLossColumnLabel(endYear: number): string {
+  return `Year ended ${formatFyEndDateLong(endYear)}`
+}
+
 export function formatPrintReportPeriod(
   reportKind: 'balance-sheet' | 'profit-loss' | 'notes' | 'other',
   fy: Pick<FinancialYear, 'endYear'>,
@@ -266,6 +270,42 @@ export function formatProfitLossReportTitle(statementType?: string): string {
 export function formatNotesReportTitle(statementType?: string): string {
   const qualifier = getStatementTypeQualifier(statementType)
   return qualifier ? `${qualifier} Notes to Accounts` : 'Notes to Accounts'
+}
+
+export type FsPrintTab =
+  | 'balance-sheet'
+  | 'profit-loss'
+  | 'notes'
+  | 'depreciation'
+  | 'repayment'
+  | 'bank-account'
+  | 'gst-reco'
+  | 'final-info'
+  | 'udin-details'
+
+export function formatFsTabPrintTitle(tab: FsPrintTab, statementType?: string): string {
+  switch (tab) {
+    case 'balance-sheet':
+      return formatBalanceSheetReportTitle(statementType)
+    case 'profit-loss':
+      return formatProfitLossReportTitle(statementType)
+    case 'notes':
+      return formatNotesReportTitle(statementType)
+    case 'depreciation':
+      return 'Depreciation Schedule'
+    case 'repayment':
+      return 'Loan Repayment Schedule'
+    case 'bank-account':
+      return 'Bank Accounts'
+    case 'gst-reco':
+      return 'GST Reconciliation'
+    case 'final-info':
+      return 'Final Info'
+    case 'udin-details':
+      return 'UDIN Details'
+    default:
+      return 'Financial Statement'
+  }
 }
 
 export function buildFsTabOptions(statementType?: string): Array<

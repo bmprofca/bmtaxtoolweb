@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { saveBankAccounts } from '../api/fs'
 import type { BankAccountFormInput, BankAccountRecord } from '../types/bankAccount'
-import { BANK_ACCOUNT_TYPES } from '../types/bankAccount'
+import { BANK_ACCOUNT_STATUSES, BANK_ACCOUNT_TYPES } from '../types/bankAccount'
 import {
   createEmptyBankAccountForm,
   createBankAccountFromForm,
@@ -37,6 +37,7 @@ function BankAccountModal({
           bankName: account.bankName,
           accountNumber: account.accountNumber,
           accountType: account.accountType,
+          status: account.status,
         }
       : createEmptyBankAccountForm(),
   )
@@ -50,6 +51,7 @@ function BankAccountModal({
             bankName: account.bankName,
             accountNumber: account.accountNumber,
             accountType: account.accountType,
+            status: account.status,
           }
         : createEmptyBankAccountForm(),
     )
@@ -62,7 +64,9 @@ function BankAccountModal({
       [field]:
         field === 'accountType'
           ? normalizeBankAccountTypeId(value)
-          : value,
+          : field === 'status'
+            ? (value === 'closed' ? 'closed' : 'active')
+            : value,
     }))
   }
 
@@ -79,7 +83,7 @@ function BankAccountModal({
       return
     }
 
-    const nextAccount = createBankAccountFromForm(form, account)
+    const nextAccount = createBankAccountFromForm(form, account, fyId)
     const exists = existingAccounts.some((item) => item.id === nextAccount.id)
     const bankAccounts = exists
       ? existingAccounts.map((item) => (item.id === nextAccount.id ? nextAccount : item))
@@ -116,7 +120,8 @@ function BankAccountModal({
         <h2>{title}</h2>
         <p className="bank-account-modal-subtitle">
           Enter bank details. The account is saved immediately. Opening balance, debit, credit and
-          charges are entered in the table after saving.
+          charges are entered in the table after saving. Active accounts carry forward to the next
+          financial year until marked closed.
         </p>
 
         {saveError && <div className="alert bank-account-modal-error">{saveError}</div>}
@@ -159,6 +164,28 @@ function BankAccountModal({
               ))}
             </select>
           </label>
+
+          {account && (
+            <label className="bank-account-form-span">
+              Status
+              <select
+                value={form.status}
+                onChange={(event) => updateField('status', event.target.value)}
+                disabled={saving}
+              >
+                {BANK_ACCOUNT_STATUSES.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+              {form.status === 'closed' && (
+                <span className="bank-account-status-hint">
+                  Closed accounts stay visible in this financial year only and will not carry forward.
+                </span>
+              )}
+            </label>
+          )}
         </div>
 
         <div className="bank-account-modal-actions">

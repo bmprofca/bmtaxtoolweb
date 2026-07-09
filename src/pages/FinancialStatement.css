@@ -280,6 +280,43 @@ input.fs-readonly-input {
   margin-top: 1rem;
 }
 
+.fs-print-all-modal {
+  max-width: 480px;
+}
+
+.fs-print-all-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.fs-print-all-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 50vh;
+  overflow-y: auto;
+  margin-bottom: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+.fs-print-all-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.9rem;
+  color: #1e293b;
+  cursor: pointer;
+}
+
+.fs-print-all-option input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
 .fs-udin-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1246,7 +1283,7 @@ input.fs-readonly-input {
 }
 
 .notes-prev-col {
-  background: #fafafa;
+  background: #fffbeb;
 }
 
 .notes-prev-col .notes-fy-label {
@@ -1254,11 +1291,11 @@ input.fs-readonly-input {
 }
 
 .notes-curr-col {
-  background: #f0f9ff;
+  background: #fff;
 }
 
 .notes-curr-col .notes-fy-label {
-  color: #1d4ed8;
+  color: #0f3460;
 }
 
 .notes-table tbody td.notes-amount-col,
@@ -1334,11 +1371,11 @@ input.fs-readonly-input {
 }
 
 .notes-table tbody tr:not(.notes-section-row):hover td.notes-prev-col {
-  background: #f3f4f6;
+  background: #fef3c7;
 }
 
 .notes-table tbody tr:not(.notes-section-row):hover td.notes-curr-col {
-  background: #e0f2fe;
+  background: #fff;
 }
 
 .note-prev-ref,
@@ -1382,8 +1419,8 @@ input.fs-readonly-input {
 
 .note-prev-ref {
   color: #9ca3af;
-  background: #f3f4f6;
-  border-color: #e5e7eb;
+  background: #fffbeb;
+  border-color: #fde68a;
 }
 
 .note-amount-input {
@@ -2289,6 +2326,34 @@ input.fs-readonly-input {
   color: #475569;
 }
 
+.fs-tab-panel[data-fs-tab='profit-loss'] .statement-table .statement-head-row th {
+  background: #eef2f7;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.fs-tab-panel[data-fs-tab='profit-loss'] .statement-table tbody > tr:first-child td {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+.fs-tab-panel[data-fs-tab='profit-loss'] .pl-appropriation-table .pl-appr-head-row th {
+  background: #eef2f7;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.fs-tab-panel[data-fs-tab='notes'] .notes-table .notes-head-row th {
+  background: #eef2f7;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.fs-tab-panel[data-fs-tab='notes'] .notes-table .notes-main-row-header td {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
 .statement-head-row th.statement-particular-col {
   text-align: left;
 }
@@ -2414,10 +2479,15 @@ input.fs-readonly-input {
   margin: 0;
 }
 
+.fs-balance-sheet-print-body .statement-table.has-note-col {
+  min-width: 64rem;
+}
+
 .fs-balance-sheet-print-body .statement-table-container {
   border: none;
   border-radius: 0;
   box-shadow: none;
+  overflow-x: auto;
 }
 
 .fs-balance-sheet-print-body .statement-table-wrap--balance-sheet-application .statement-table-container {
@@ -2425,44 +2495,48 @@ input.fs-readonly-input {
 }
 
 .fs-balance-sheet-print-body .statement-particular-col {
-  width: 52%;
+  width: auto;
 }
 
 .fs-balance-sheet-print-body .statement-note-col {
-  width: 8%;
+  width: 7%;
   text-align: center;
   vertical-align: middle;
 }
 
 .fs-balance-sheet-print-body .statement-particular-col,
-.fs-balance-sheet-print-body .statement-amount-col {
+.fs-balance-sheet-print-body .statement-amount-col,
+.fs-balance-sheet-print-body .statement-change-col,
+.fs-balance-sheet-print-body .statement-pct-col {
   vertical-align: middle;
 }
 
-.fs-balance-sheet-print-body .statement-prev-col {
-  width: 20%;
-}
-
+.fs-balance-sheet-print-body .statement-prev-col,
 .fs-balance-sheet-print-body .statement-curr-col {
-  width: 20%;
+  width: 14%;
+  max-width: 14%;
+  min-width: 0;
 }
 
 .fs-balance-sheet-print-body col.bs-col-particular {
-  width: 52%;
+  width: 36%;
 }
 
 .fs-balance-sheet-print-body col.bs-col-note {
-  width: 8%;
+  width: 7%;
 }
 
 .fs-balance-sheet-print-body col.bs-col-prev,
 .fs-balance-sheet-print-body col.bs-col-curr {
-  width: 20%;
+  width: 14%;
 }
 
-.fs-balance-sheet-print-body col.bs-col-change,
+.fs-balance-sheet-print-body col.bs-col-change {
+  width: 14.5%;
+}
+
 .fs-balance-sheet-print-body col.bs-col-pct {
-  width: 0;
+  width: 14.5%;
 }
 
 .fs-balance-sheet-print-body .statement-amount-col,
@@ -2488,6 +2562,32 @@ input.fs-readonly-input {
 
 .fs-balance-sheet-print-body .statement-head-row th.statement-amount-col {
   text-align: right;
+}
+
+.fs-balance-sheet-print-body .statement-head-row th.statement-variance-col {
+  text-align: right;
+  white-space: nowrap;
+  font-size: 0.78rem;
+}
+
+.fs-balance-sheet-print-body .statement-fy-label--unified {
+  display: block;
+  white-space: nowrap;
+}
+
+.fs-balance-sheet-print-body .statement-change-col,
+.fs-balance-sheet-print-body .statement-pct-col {
+  text-align: right;
+}
+
+.fs-balance-sheet-print-body .statement-variance-value {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 1.85rem;
+  padding: 0.25rem 0.45rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
 }
 
 .fs-balance-sheet-print-body .statement-table tbody td {
@@ -2582,11 +2682,11 @@ input.fs-readonly-input {
 }
 
 .statement-prev-col {
-  background: #fafafa;
+  background: #fffbeb;
 }
 
 .statement-curr-col {
-  background: #f0f9ff;
+  background: #fff;
 }
 
 .statement-change-col {
@@ -2620,7 +2720,7 @@ input.fs-readonly-input {
 }
 
 .statement-curr-col .statement-fy-label {
-  color: #1d4ed8;
+  color: #0f3460;
 }
 
 .statement-table tbody td.statement-amount-col,
@@ -2649,14 +2749,14 @@ input.fs-readonly-input {
 
 .statement-amount-prev {
   color: #64748b;
-  background: #f3f4f6;
-  border-color: #e5e7eb;
+  background: #fffbeb;
+  border-color: #fde68a;
 }
 
 .statement-amount-curr {
   color: #0f3460;
   background: #fff;
-  border-color: #bfdbfe;
+  border-color: #e5e7eb;
 }
 
 .statement-variance-value {
@@ -2735,11 +2835,11 @@ input.fs-readonly-input {
 }
 
 .statement-table tbody tr:not(.statement-section-row):hover td.statement-prev-col {
-  background: #f3f4f6;
+  background: #fef3c7;
 }
 
 .statement-table tbody tr:not(.statement-section-row):hover td.statement-curr-col {
-  background: #e0f2fe;
+  background: #fff;
 }
 
 .statement-table tbody tr:not(.statement-section-row):hover td.statement-change-col {
@@ -2799,6 +2899,10 @@ input.fs-readonly-input {
   color: #b45309;
   font-size: 0.84rem;
   font-style: italic;
+}
+
+.pl-appropriation-table-wrap--empty {
+  display: none;
 }
 
 .pl-appropriation-table-wrap {
@@ -2885,7 +2989,7 @@ input.fs-readonly-input {
 }
 
 .pl-appr-prev-col {
-  background: #fafafa;
+  background: #fffbeb;
 }
 
 .pl-appr-prev-col .notes-fy-label {
@@ -2893,11 +2997,11 @@ input.fs-readonly-input {
 }
 
 .pl-appr-curr-col {
-  background: #f0f9ff;
+  background: #fff;
 }
 
 .pl-appr-curr-col .notes-fy-label {
-  color: #1d4ed8;
+  color: #0f3460;
 }
 
 .pl-appr-data-row:hover td {
@@ -2905,11 +3009,11 @@ input.fs-readonly-input {
 }
 
 .pl-appr-data-row:hover td.pl-appr-prev-col {
-  background: #f3f4f6;
+  background: #fef3c7;
 }
 
 .pl-appr-data-row:hover td.pl-appr-curr-col {
-  background: #e0f2fe;
+  background: #fff;
 }
 
 .pl-appr-data-row:hover td.pl-appr-change-col {
@@ -3325,6 +3429,10 @@ input.fs-readonly-input {
   width: 10%;
 }
 
+.bank-account-table col.bank-col-status {
+  width: 7%;
+}
+
 .bank-account-table col.bank-col-amount {
   width: 8%;
 }
@@ -3435,6 +3543,37 @@ input.fs-readonly-input {
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: middle;
+}
+
+.bank-status-badge {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.bank-status-badge.bank-status-active {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.bank-status-badge.bank-status-closed {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.bank-data-row-closed {
+  background: #fffbeb;
+}
+
+.bank-data-row-closed .bank-amount-input {
+  background: #fffdf5;
 }
 
 .bank-amount-input {
@@ -3892,7 +4031,12 @@ input.fs-readonly-input {
 }
 
 .fs-page .note-prev-ref,
-.fs-page .statement-amount-prev,
+.fs-page .statement-amount-prev {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #64748b;
+}
+
 .fs-page .notes-table input:disabled,
 .fs-page .note-amount-input:disabled,
 .fs-page .schedule-table input:disabled,
@@ -3924,13 +4068,24 @@ input.fs-readonly-input {
 .fs-page .statement-prev-col,
 .fs-page .statement-curr-col,
 .fs-page .statement-change-col,
-.fs-page .statement-pct-col {
+.fs-page .statement-pct-col,
+.fs-page .pl-appr-prev-col,
+.fs-page .pl-appr-curr-col,
+.fs-page .pl-appr-change-col,
+.fs-page .pl-appr-pct-col {
   background: #fff;
 }
 
 .fs-page .notes-prev-col,
-.fs-page .statement-prev-col {
-  background: #fafafa;
+.fs-page .statement-prev-col,
+.fs-page .pl-appr-prev-col {
+  background: #fffbeb;
+}
+
+.fs-page .notes-curr-col,
+.fs-page .statement-curr-col,
+.fs-page .pl-appr-curr-col {
+  background: #fff;
 }
 
 .fs-page .notes-variance-group-head,
@@ -4045,14 +4200,19 @@ input.fs-readonly-input {
 }
 
 .fs-page .notes-table tbody tr:not(.notes-section-row):hover td.notes-prev-col,
-.fs-page .statement-table tbody tr:not(.statement-section-row):hover td.statement-prev-col {
-  background: #f3f4f6;
+.fs-page .statement-table tbody tr:not(.statement-section-row):hover td.statement-prev-col,
+.fs-page .pl-appr-data-row:hover td.pl-appr-prev-col {
+  background: #fef3c7;
 }
 
 .fs-page .notes-table tbody tr:not(.notes-section-row):hover td.notes-curr-col,
+.fs-page .statement-table tbody tr:not(.statement-section-row):hover td.statement-curr-col,
+.fs-page .pl-appr-data-row:hover td.pl-appr-curr-col {
+  background: #fff;
+}
+
 .fs-page .notes-table tbody tr:not(.notes-section-row):hover td.notes-change-col,
 .fs-page .notes-table tbody tr:not(.notes-section-row):hover td.notes-pct-col,
-.fs-page .statement-table tbody tr:not(.statement-section-row):hover td.statement-curr-col,
 .fs-page .statement-table tbody tr:not(.statement-section-row):hover td.statement-change-col {
   background: #f8fafc;
 }

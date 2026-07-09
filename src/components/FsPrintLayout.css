@@ -16,11 +16,19 @@
   body {
     width: 100% !important;
     height: auto !important;
+    min-height: 0 !important;
     overflow: visible !important;
     background: #fff !important;
     color: #000 !important;
     print-color-adjust: economy;
     -webkit-print-color-adjust: economy;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
   }
 
   .dashboard,
@@ -29,9 +37,16 @@
   .fs-print-body {
     width: 100% !important;
     max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     overflow: visible !important;
     background: #fff !important;
     color: #000 !important;
+  }
+
+  .dashboard {
+    display: block !important;
   }
 
   .dashboard .sidebar,
@@ -44,17 +59,21 @@
   }
 
   .fs-page {
-    padding: 0 3mm !important;
+    padding: 0 !important;
     margin: 0 !important;
     display: flex;
     flex-direction: column;
   }
 
+  .fs-page.fs-page--cash-adjust-banner {
+    padding-bottom: 0 !important;
+  }
+
   .fs-print-header,
   .fs-print-body,
   .fs-print-footer {
-    padding-left: 1.5mm;
-    padding-right: 1.5mm;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
   }
 
   .fs-print-only {
@@ -68,13 +87,16 @@
   /* Flow layout: header → body → footer (footer after content) */
   .fs-print-header {
     order: 1;
+    flex: 0 0 auto;
     position: relative;
     background: #fff;
     border: none;
-    padding: 0 0 1.5mm;
+    padding: 0 0 2mm !important;
     margin: 0;
     max-height: none;
     overflow: visible;
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   .fs-print-header-report-right {
@@ -94,13 +116,14 @@
 
   .fs-print-body {
     order: 2;
+    flex: 0 0 auto;
     margin: 0;
     padding: 0 !important;
-    flex: 1 1 auto;
   }
 
   .fs-print-footer {
     order: 3;
+    flex: 0 0 auto;
     position: static;
     background: #fff;
     border: none;
@@ -116,6 +139,166 @@
   .fs-print-header-center {
     text-align: center;
     color: #000;
+  }
+
+  .fs-print-header-business {
+    margin-bottom: 1mm;
+  }
+
+  .fs-print-header-report {
+    margin: 0;
+  }
+
+  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-print-header {
+    display: none !important;
+  }
+
+  .fs-print-notes-stationery,
+  .fs-print-notes-stationery *,
+  .fs-print-notes-banner-cell,
+  .fs-print-notes-banner-cell * {
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+    word-wrap: normal !important;
+    hyphens: manual !important;
+  }
+
+  .fs-print-notes-stationery {
+    display: none !important;
+  }
+
+  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-print-notes-stationery {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 0 4mm;
+    background: #fff;
+    z-index: 2;
+    text-align: center;
+  }
+
+  .fs-print-notes-report-block {
+    margin-top: 1.2mm;
+    margin-bottom: 1.5mm;
+  }
+
+  .fs-print-notes-stationery .fs-print-header-business,
+  .fs-print-notes-banner-cell .fs-print-header-business {
+    margin-bottom: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .fs-print-notes-stationery .fs-print-business-name,
+  .fs-print-notes-banner-cell .fs-print-business-name {
+    margin: 0;
+    font-size: 10pt !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.03em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .fs-print-notes-stationery .fs-print-proprietorship,
+  .fs-print-notes-banner-cell .fs-print-proprietorship {
+    margin: 0.6mm 0 0;
+    font-size: 7pt !important;
+    font-weight: 500 !important;
+    line-height: 1.2;
+  }
+
+  .fs-print-notes-stationery .fs-print-location,
+  .fs-print-notes-banner-cell .fs-print-location {
+    margin: 0.5mm 0 0;
+    font-size: 6pt !important;
+    font-weight: 400 !important;
+    line-height: 1.25;
+  }
+
+  .fs-print-notes-report-line {
+    margin: 0;
+    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif;
+    font-size: 8.5pt !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.2;
+    color: #000;
+  }
+
+  .fs-print-notes-period-line {
+    margin: 0.4mm 0 0;
+    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif;
+    font-size: 6.5pt !important;
+    font-weight: 500 !important;
+    line-height: 1.15;
+    color: #000;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .fs-print-notes-banner-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .fs-print-body.fs-print-statement-format .notes-table .fs-print-notes-banner-cell,
+  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .notes-table .fs-print-notes-banner-cell {
+    border: none !important;
+    border-bottom: none !important;
+    padding: 0 0 2.5mm !important;
+    text-align: center !important;
+    font-weight: 400 !important;
+    background: #fff !important;
+    vertical-align: bottom !important;
+    height: auto !important;
+    min-height: 0 !important;
+    line-height: normal !important;
+    font-size: inherit !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .fs-page.fs-print-notes-section .fs-print-body .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th,
+  .fs-page.fs-print-all .fs-print-body .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th {
+    border-top: 0.5px solid #000 !important;
+    background: #eef2f7 !important;
+    color: #000 !important;
+    font-weight: 700 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    vertical-align: bottom !important;
+  }
+
+  /* Notes-only print: borderless spacer clears fixed stationery; header row carries top border */
+  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .fs-print-notes-head-spacer-cell {
+    height: 32mm;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    background: #fff !important;
+    line-height: 0 !important;
+    font-size: 0 !important;
+  }
+
+  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th {
+    padding: 3pt 4pt !important;
+  }
+
+  /* Print-all notes: space between business banner and column headers */
+  .fs-page.fs-print-all.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .fs-print-notes-banner-cell {
+    padding-bottom: 5mm !important;
+  }
+
+  .fs-page.fs-print-all.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th {
+    padding-top: 2pt !important;
+    padding-right: 4pt !important;
+    padding-bottom: 3pt !important;
+    padding-left: 4pt !important;
   }
 
   .fs-print-business-name {
@@ -246,6 +429,72 @@
     width: 38mm;
   }
 
+  /* P&L print: include appropriation detail table (part 2) */
+  .fs-print-body .pl-appropriation-header,
+  .fs-print-body .pl-appropriation-empty {
+    display: none !important;
+  }
+
+  .fs-print-body .pl-appr-print-title {
+    display: block !important;
+    margin: 2mm 0 1mm;
+    padding: 0;
+    text-align: center;
+    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif;
+    font-size: 12pt;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #000;
+  }
+
+  .fs-print-body .pl-appropriation-panel {
+    margin-top: 2mm !important;
+    padding-top: 0 !important;
+    border-top: none !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .fs-print-body .pl-appr-particular-col .notes-admin-field,
+  .fs-print-body .pl-appr-particular-col select {
+    display: none !important;
+  }
+
+  .fs-print-body .pl-appr-particular-print {
+    display: block !important;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: #000;
+  }
+
+  .fs-print-body .pl-appr-head-row th .notes-fy-hint {
+    display: none !important;
+  }
+
+  .fs-print-body .pl-appropriation-table .statement-fy-label--print {
+    display: block !important;
+    font-size: 12pt !important;
+    font-weight: 600 !important;
+    white-space: normal !important;
+    line-height: 12pt !important;
+    text-align: right !important;
+  }
+
+  .fs-print-body .pl-appropriation-table .pl-appr-head-row th.pl-appr-particular-col {
+    text-align: left !important;
+  }
+
+  .fs-print-body .pl-appropriation-table .pl-appr-head-row th.pl-appr-amount-col {
+    text-align: right !important;
+  }
+
+  .fs-print-body .pl-appropriation-table-wrap--empty {
+    display: block !important;
+  }
+
   .fs-print-seal-image {
     display: block;
     flex: 0 0 auto;
@@ -266,6 +515,13 @@
   .fs-page.fs-print-all .fs-print-body {
     display: flex;
     flex-direction: column;
+    break-before: avoid;
+    page-break-before: avoid;
+  }
+
+  .fs-page.fs-print-all .fs-print-header {
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='balance-sheet'] {
@@ -300,35 +556,58 @@
     order: 8;
   }
 
+  .fs-print-body .panel,
+  .fs-print-body .fs-tab-panel {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
   .fs-tab-panel {
     display: block !important;
     break-inside: auto;
     page-break-inside: auto;
     page-break-before: auto;
     break-before: auto;
-    margin-bottom: 1mm;
+    margin-bottom: 0 !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
     background: #fff !important;
   }
 
-  .fs-page.fs-print-all .fs-tab-panel:not([data-fs-tab='balance-sheet']) {
+  .fs-page.fs-print-all .fs-tab-panel.fs-print-tab-skip {
+    display: none !important;
+  }
+
+  .fs-page.fs-print-all .fs-tab-panel.fs-print-section-break {
     break-before: page;
-    page-break-before: always;
+    page-break-before: page;
   }
 
   .fs-page:not(.fs-print-all) .fs-tab-panel:not(.is-active) {
     display: none !important;
   }
 
+  .fs-tab-panel[data-fs-tab='final-info'],
+  .fs-tab-panel.fs-no-print,
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='final-info'] {
+    display: none !important;
+  }
+
   .fs-tab-panel::before {
     content: attr(data-print-title);
     display: block;
-    font-size: 8pt;
+    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif;
+    font-size: 12pt;
     font-weight: 700;
+    line-height: 1.2;
     color: #000;
-    margin: 0 0 1mm;
+    text-align: center;
+    margin: 0 0 2mm;
     padding: 0;
     border: none;
     break-after: avoid;
@@ -337,6 +616,10 @@
 
   .fs-page:not(.fs-print-all) .fs-tab-panel::before {
     display: none;
+  }
+
+  .fs-print-body .empty-state {
+    display: none !important;
   }
 
   .fs-tab-panel > h2,
@@ -385,6 +668,63 @@
     background: #fff !important;
   }
 
+  /* P&L print: highlight table header and first body row */
+  .fs-print-body .fs-tab-panel[data-fs-tab='profit-loss'] .statement-table .statement-head-row th {
+    background: #eef2f7 !important;
+    font-weight: 700 !important;
+    border-bottom: 0.5px solid #000 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .fs-print-body .fs-tab-panel[data-fs-tab='profit-loss'] .statement-table tbody > tr:first-child td {
+    background: #f1f5f9 !important;
+    font-weight: 600 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .fs-print-body .fs-tab-panel[data-fs-tab='profit-loss'] .pl-appropriation-table .pl-appr-head-row th {
+    background: #eef2f7 !important;
+    font-weight: 700 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .fs-print-body .fs-tab-panel[data-fs-tab='notes'] .notes-table .notes-head-row th {
+    background: #eef2f7 !important;
+    font-weight: 700 !important;
+    border-bottom: 0.5px solid #000 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .fs-print-body .fs-tab-panel[data-fs-tab='notes'] .notes-table .notes-main-row-header td {
+    background: #f1f5f9 !important;
+    font-weight: 600 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='notes']::before {
+    display: none !important;
+  }
+
+  .fs-page.fs-print-notes-section .fs-print-note-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .fs-page.fs-print-notes-section .fs-print-note-group {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .fs-print-body .fs-print-note-block tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
   .fs-print-body input,
   .fs-print-body select,
   .fs-print-body textarea {
@@ -425,7 +765,22 @@
     margin: 0 !important;
     color: #000 !important;
     font: inherit !important;
-    font-size: 6pt !important;
+    font-size: inherit !important;
+    font-weight: 400 !important;
+    cursor: default !important;
+    text-decoration: none !important;
+    pointer-events: none !important;
+  }
+
+  .fs-print-body .notes-repayment-link-btn {
+    display: inline !important;
+    border: none !important;
+    background: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: #000 !important;
+    font: inherit !important;
+    font-size: inherit !important;
     font-weight: 400 !important;
     cursor: default !important;
     text-decoration: none !important;
@@ -501,6 +856,11 @@
     border: none !important;
     border-bottom: 0.15px solid #ddd !important;
     line-height: 1 !important;
+  }
+
+  .fs-print-body .notes-head-row th {
+    overflow-wrap: normal !important;
+    word-break: normal !important;
   }
 
   .fs-print-body .statement-fy-label--print {
@@ -658,7 +1018,7 @@
     margin-bottom: 1mm;
   }
 
-  /* Balance sheet: grid borders on cells only, no outer body box */
+  /* Balance sheet: aligned cell grid — outer frame from table cell borders */
   .fs-print-body .fs-balance-sheet-print-body {
     border: none !important;
     box-sizing: border-box !important;
@@ -668,6 +1028,8 @@
     background: #fff !important;
     font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif !important;
     font-size: 12pt !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-table-wrap--balance-sheet {
@@ -689,13 +1051,47 @@
     table-layout: fixed !important;
     border-collapse: collapse !important;
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     box-sizing: border-box !important;
     font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif !important;
     font-size: 12pt !important;
   }
 
+  .fs-print-body .fs-balance-sheet-print-body .statement-table.has-note-col {
+    min-width: 0 !important;
+  }
+
+  .fs-print-body .fs-balance-sheet-print-body .statement-table-wrap--balance-sheet-sources .statement-head-row th {
+    border-top: 0.5px solid #000 !important;
+  }
+
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-change-col,
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-pct-col {
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-curr-col {
+    border-right: 0.5px solid #000 !important;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body .statement-pct-col {
+    border-right: 0.5px solid #000 !important;
+  }
+
+  .fs-print-body .fs-balance-sheet-print-body .statement-particular-col {
+    border-left: 0.5px solid #000 !important;
+  }
+
+  .fs-print-body .fs-balance-sheet-print-body .statement-section-row td,
+  .fs-print-body .fs-balance-sheet-print-body .statement-subheader-row td {
+    border-right: 0.5px solid #000 !important;
+    border-left: 0.5px solid #000 !important;
+  }
+
   .fs-print-body .fs-balance-sheet-print-body col.bs-col-particular {
-    width: 52% !important;
+    width: 60% !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body col.bs-col-note {
@@ -704,7 +1100,7 @@
 
   .fs-print-body .fs-balance-sheet-print-body col.bs-col-prev,
   .fs-print-body .fs-balance-sheet-print-body col.bs-col-curr {
-    width: 20% !important;
+    width: 16% !important;
   }
 
   .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body col.bs-col-change,
@@ -713,7 +1109,7 @@
   }
 
   .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body col.bs-col-particular {
-    width: 36% !important;
+    width: 42% !important;
   }
 
   .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body col.bs-col-note {
@@ -722,7 +1118,7 @@
 
   .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body col.bs-col-prev,
   .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body col.bs-col-curr {
-    width: 18% !important;
+    width: 15% !important;
   }
 
   .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body col.bs-col-change {
@@ -734,7 +1130,7 @@
   }
 
   .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-particular-col {
-    width: 52% !important;
+    width: 60% !important;
   }
 
   .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-note-col {
@@ -743,11 +1139,11 @@
 
   .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-prev-col,
   .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-curr-col {
-    width: 20% !important;
+    width: 16% !important;
   }
 
   .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body .statement-particular-col {
-    width: 34% !important;
+    width: 40% !important;
   }
 
   .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body .statement-note-col {
@@ -756,7 +1152,7 @@
 
   .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body .statement-prev-col,
   .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body .statement-curr-col {
-    width: 18% !important;
+    width: 15% !important;
   }
 
   .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body .statement-change-col {
@@ -836,7 +1232,8 @@
     text-align: right !important;
   }
 
-  .fs-print-body .fs-balance-sheet-print-body .statement-head-row th.statement-amount-col .statement-fy-label--print {
+  .fs-print-body .fs-balance-sheet-print-body .statement-head-row th.statement-amount-col .statement-fy-label--print,
+  .fs-print-body .fs-balance-sheet-print-body .statement-head-row th.statement-amount-col .statement-fy-label--unified {
     display: block;
     font-family: inherit !important;
     font-size: 12pt !important;
@@ -848,7 +1245,7 @@
 
   .fs-print-body .fs-balance-sheet-print-body .statement-particular-col {
     text-align: left !important;
-    width: 52% !important;
+    width: 60% !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-note-col {
@@ -983,6 +1380,7 @@
   .fs-page:not(.fs-print-with-comparison) .fs-print-body.fs-print-statement-format .statement-particular-col,
   .fs-page:not(.fs-print-with-comparison) .fs-print-body.fs-print-statement-format .pl-appr-particular-col {
     width: 52% !important;
+    min-width: 0 !important;
     text-align: left !important;
   }
 
@@ -990,29 +1388,85 @@
   .fs-page:not(.fs-print-with-comparison) .fs-print-body.fs-print-statement-format .statement-amount-col,
   .fs-page:not(.fs-print-with-comparison) .fs-print-body.fs-print-statement-format .pl-appr-amount-col {
     width: 20% !important;
+    min-width: 0 !important;
     text-align: right !important;
     font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .notes-sno-col,
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .statement-note-col {
+    width: 7% !important;
+    text-align: center !important;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .notes-particular-col,
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .statement-particular-col {
+    width: 38% !important;
+    min-width: 0 !important;
+    text-align: left !important;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .notes-amount-col,
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .statement-amount-col {
+    width: 15% !important;
+    min-width: 0 !important;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .notes-variance-col,
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .statement-change-col,
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .statement-pct-col {
+    width: 12.5% !important;
+    min-width: 0 !important;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-sno-col {
+    width: 8%;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-particular-col {
+    width: 52%;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-prev-col,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-curr-col {
+    width: 20%;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-sno-col {
+    width: 7%;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-particular-col {
+    width: 38%;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-prev-col,
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-curr-col {
+    width: 15%;
+  }
+
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-change-col,
+  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-pct-col {
+    width: 12.5%;
   }
 
   .fs-print-body.fs-print-statement-format .statement-amount-print,
   .fs-print-body.fs-print-statement-format .statement-note-print-value,
-  .fs-print-body.fs-print-statement-format .note-prev-ref,
-  .fs-print-body.fs-print-statement-format .note-variance-value {
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .note-amount-print,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .note-variance-value {
     display: block !important;
     width: 100% !important;
+    text-align: right !important;
     border: none !important;
     background: transparent !important;
-    box-shadow: none !important;
     padding: 0 !important;
     margin: 0 !important;
     line-height: 12pt !important;
     font-variant-numeric: tabular-nums !important;
-  }
-
-  .fs-print-body.fs-print-statement-format .statement-amount-print,
-  .fs-print-body.fs-print-statement-format .note-prev-ref,
-  .fs-print-body.fs-print-statement-format .note-variance-value {
-    text-align: right !important;
   }
 
   .fs-print-body.fs-print-statement-format .statement-note-print-value,
@@ -1024,12 +1478,17 @@
     display: none !important;
   }
 
-  .fs-print-body.fs-print-statement-format .statement-head-row th,
-  .fs-print-body.fs-print-statement-format .notes-head-row th {
+  .fs-print-body.fs-print-statement-format .statement-head-row th {
     font-weight: 700 !important;
     height: auto !important;
     min-height: 15pt !important;
     padding: 2pt 4pt !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .notes-head-row th {
+    font-weight: 700 !important;
+    height: auto !important;
+    min-height: 15pt !important;
   }
 
   .fs-print-body.fs-print-statement-format .statement-section-row td,
@@ -1048,10 +1507,227 @@
     -webkit-print-color-adjust: exact !important;
   }
 
-  .fs-print-note-block,
-  .fs-print-note-group,
+  /* Notes print: match P&L statement table formatting */
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table-wrap {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-fy-hint {
+    display: none !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th .statement-fy-label--print {
+    display: block !important;
+    font-size: 12pt !important;
+    font-weight: 600 !important;
+    white-space: normal !important;
+    line-height: 12pt !important;
+    text-align: right !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th.notes-sno-col,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th.notes-particular-col {
+    text-align: left !important;
+    vertical-align: middle !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th.notes-amount-col,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th.notes-variance-col {
+    text-align: right !important;
+    vertical-align: middle !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-main-row-header .notes-main-label,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-main-row .notes-main-label {
+    padding-left: 0 !important;
+    text-align: left !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-amount-col,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-prev-col,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-curr-col,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-change-col,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-pct-col {
+    text-align: right !important;
+    vertical-align: middle !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-particular-col,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-sub-label {
+    text-align: left !important;
+    vertical-align: middle !important;
+    min-width: 0 !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-sno-col {
+    text-align: center !important;
+    vertical-align: middle !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-section-row td {
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    background: #fff !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-sub-row .notes-particular-col,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-sub-label:not(.notes-main-label) {
+    padding-left: 2mm !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-admin-field-marker,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-gst-link-bar,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-schedule-link-bar,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-lt-empty-row,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-finance-empty-row,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-st-empty-row,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-admin-empty-row,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-manual-empty-row,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-capital-empty-row {
+    display: none !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .note-amount-input {
+    display: none !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .note-amount-print {
+    display: block !important;
+    width: 100% !important;
+    text-align: right !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 12pt !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-main-label-row,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-revenue-header {
+    display: block !important;
+    gap: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-main-row-revenue .notes-main-label {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-main-row-header .note-head-empty {
+    display: none !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-main-row-header .notes-head-empty-col {
+    background: #f1f5f9 !important;
+    padding: 1.5pt 4pt !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-empty-col {
+    background: #f1f5f9 !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-section-row td {
+    padding: 1.5pt 4pt !important;
+    border-top: none !important;
+    height: 15pt !important;
+    min-height: 15pt !important;
+    line-height: 12pt !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-finance-header-row td,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-finance-main-header td,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-st-manual-header-row td {
+    padding: 1.5pt 4pt !important;
+    border-top: none !important;
+    background: #fff !important;
+    height: 15pt !important;
+    min-height: 15pt !important;
+    line-height: 12pt !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-finance-section-title,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-finance-subsection-title {
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 12pt !important;
+    font-size: 12pt !important;
+    color: #000 !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-finance-subsection-title {
+    padding-left: 2mm !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-main-row-header td,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-main-row td {
+    padding: 1.5pt 4pt !important;
+    height: 15pt !important;
+    min-height: 15pt !important;
+    line-height: 12pt !important;
+    background: #f1f5f9 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .fs-print-note-group {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .fs-print-note-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Notes print: single clean border grid (no screen double borders) */
+  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .table-wrap,
+  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table-wrap {
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table th,
+  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table td {
+    border: 0.5px solid #000 !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table th.fs-print-notes-banner-cell {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table th.fs-print-notes-head-spacer-cell {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table {
+    border: none !important;
+  }
+
   .fs-print-body .loan-card,
-  .fs-print-body .pl-appropriation-panel,
   .fs-print-body .dep-schedule-wrap,
   .fs-print-body .gst-reco-section,
   .fs-print-section-block {
@@ -1059,9 +1735,33 @@
     page-break-inside: avoid;
   }
 
-  .fs-print-note-block,
-  .fs-print-note-group {
+  .fs-print-note-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
     break-before: auto;
     page-break-before: auto;
+  }
+
+  .fs-print-note-group {
+    break-inside: auto;
+    page-break-inside: auto;
+    break-before: auto;
+    page-break-before: auto;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .fs-print-note-block tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Notes print: visible repeating column headers with top border on header row only */
+  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th {
+    padding: 3pt 4pt !important;
+    background: #eef2f7 !important;
+    border: 0.5px solid #000 !important;
+    border-top: 0.5px solid #000 !important;
+    color: #000 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
   }
 }

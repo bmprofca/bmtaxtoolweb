@@ -89,7 +89,7 @@ export function formatStatementAmount(value: number) {
 }
 
 export function formatBalanceSheetAsAtLabel(endYear: number) {
-  return `As at 31ST MARCH ${endYear}`
+  return `As at 31st March ${endYear}`
 }
 
 export function calcValueChange(current: number, previous: number) {

@@ -1,4 +1,5 @@
 import type { BankAccountRecord } from '../types/bankAccount'
+import { isBankAccountActive } from './bankAccount'
 import type {
   DepreciationRow,
   FinancialStatementData,
@@ -355,7 +356,10 @@ function hasMeaningfulPriorYearData(
 
   if (
     priorFs.bankAccounts.some(
-      (account) => account.closingBalance !== 0 || account.openingBalance !== 0,
+      (account) =>
+        isBankAccountActive(account) ||
+        account.closingBalance !== 0 ||
+        account.openingBalance !== 0,
     )
   ) {
     return true
@@ -558,13 +562,15 @@ function carryForwardBankAccounts(
     }
 
     const priorAccount = priorById.get(accountId)
-    if (!priorAccount) {
+    if (!priorAccount || !isBankAccountActive(priorAccount)) {
       continue
     }
 
     locks.bankIds.add(accountId)
     next.push({
       ...priorAccount,
+      status: 'active',
+      closedInFyId: undefined,
       openingBalance: priorClosingBalance,
       debit: 0,
       credit: 0,

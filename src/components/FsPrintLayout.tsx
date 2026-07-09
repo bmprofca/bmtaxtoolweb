@@ -1,7 +1,8 @@
+import { useEffect } from 'react'
 import type { Client, FinancialYear } from '../types'
 import type { CaProfile } from '../types/caProfile'
-import { isProprietorshipType } from '../utils/businessUtils'
 import { formatPrintReportPeriod } from '../utils/financialYear'
+import FsPrintBusinessHeader from './FsPrintBusinessHeader'
 import './FsPrintLayout.css'
 
 interface PrintBusinessInfo {
@@ -25,6 +26,8 @@ interface FsPrintLayoutProps {
   activeTabLabel?: string
   reportKind?: 'balance-sheet' | 'profit-loss' | 'notes' | 'other'
   printAll?: boolean
+  hideBusinessHeader?: boolean
+  hidePrintHeader?: boolean
 }
 
 function formatUdinDate(value?: string) {
@@ -42,16 +45,8 @@ function formatUdinDate(value?: string) {
   })
 }
 
-function buildAddressLine(client: Client, business: PrintBusinessInfo | null, isConsolidated: boolean) {
-  const address = (isConsolidated ? client.address : business?.address || client.address || '').trim()
-  return address || ''
-}
-
-function buildPinLine(client: Client) {
-  return client.pin?.trim() ? `PIN ${client.pin.trim()}` : ''
-}
-
 function FsPrintLayout({
+  documentTitle,
   client,
   business,
   isConsolidated,
@@ -63,50 +58,65 @@ function FsPrintLayout({
   activeTabLabel,
   reportKind = 'other',
   printAll,
+  hideBusinessHeader = false,
+  hidePrintHeader = false,
 }: FsPrintLayoutProps) {
   const showCaSigning = udinApplicable && Boolean(caProfile.id && (caProfile.firmName || caProfile.partnerName))
   const showUdin = udinApplicable && Boolean(udinNumber?.trim())
   const formattedUdinDate = formatUdinDate(udinDate)
-  const isProprietorship = Boolean(business?.type && isProprietorshipType(business.type))
-  const addressLine = buildAddressLine(client, business, isConsolidated)
-  const pinLine = buildPinLine(client)
-  const locationLine = [addressLine, pinLine].filter(Boolean).join(' · ')
-  const reportTitle = printAll ? 'Financial Statement' : activeTabLabel || 'Financial Statement'
+  const reportTitle = printAll ? documentTitle || 'Financial Statement' : activeTabLabel || 'Financial Statement'
   const periodLabel = formatPrintReportPeriod(reportKind, fy)
   const entityName = isConsolidated ? client.name : business?.name || client.name
   const clientSignatoryName = client.name?.trim() || entityName
 
+  useEffect(() => {
+    const previousTitle = document.title
+    const fyLabel = fy.label?.trim() || `FY ${fy.endYear}`
+    const printDocumentTitle = printAll
+      ? `${entityName} - ${documentTitle || 'Financial Statement'} - ${fyLabel}`
+      : `${entityName} - ${reportTitle} - ${fyLabel}`
+
+    const onBeforePrint = () => {
+      document.title = printDocumentTitle
+    }
+    const onAfterPrint = () => {
+      document.title = previousTitle
+    }
+
+    window.addEventListener('beforeprint', onBeforePrint)
+    window.addEventListener('afterprint', onAfterPrint)
+
+    return () => {
+      window.removeEventListener('beforeprint', onBeforePrint)
+      window.removeEventListener('afterprint', onAfterPrint)
+    }
+  }, [documentTitle, entityName, fy.endYear, fy.label, printAll, reportTitle])
+
   return (
     <>
-      <header className="fs-print-header fs-print-only" aria-hidden="true">
-        <div className="fs-print-header-center">
-          <h1 className="fs-print-business-name">{entityName}</h1>
-
-          {!isConsolidated && isProprietorship && (
-            <p className="fs-print-proprietorship">In Proprietorship of {client.name}</p>
+      {!hidePrintHeader && (
+        <header className="fs-print-header fs-print-only" aria-hidden="true">
+          {!hideBusinessHeader && (
+            <FsPrintBusinessHeader client={client} business={business} isConsolidated={isConsolidated} />
           )}
 
-          {isConsolidated && (
-            <p className="fs-print-proprietorship">Consolidated Financial Statements</p>
-          )}
+          <div className="fs-print-header-center fs-print-header-report">
+            {!printAll && (
+              <p className="fs-print-header-report-right">
+                <strong>{reportTitle}</strong>
+                {periodLabel ? ` — ${periodLabel}` : ''}
+              </p>
+            )}
 
-          {locationLine && <p className="fs-print-location">{locationLine}</p>}
-
-          {!printAll && (
-            <p className="fs-print-header-report-right">
-              <strong>{reportTitle}</strong>
-              {periodLabel ? ` — ${periodLabel}` : ''}
-            </p>
-          )}
-
-          {printAll && (
-            <>
-              <h2 className="fs-print-report-title">{reportTitle}</h2>
-              <p className="fs-print-period">{periodLabel}</p>
-            </>
-          )}
-        </div>
-      </header>
+            {printAll && (
+              <>
+                <h2 className="fs-print-report-title">{reportTitle}</h2>
+                <p className="fs-print-period">{periodLabel}</p>
+              </>
+            )}
+          </div>
+        </header>
+      )}
 
       <footer
         className={`fs-print-footer fs-print-only${showCaSigning ? '' : ' fs-print-footer--client-only'}`}

@@ -1,11 +1,17 @@
-import type { BankAccountRecord, BankAccountTypeId } from '../types/bankAccount'
+import type {
+  BankAccountFormInput,
+  BankAccountRecord,
+  BankAccountStatus,
+  BankAccountTypeId,
+} from '../types/bankAccount'
 import type { NoteValue } from '../types/fs'
-import { BANK_ACCOUNT_TYPES } from '../types/bankAccount'
+import { BANK_ACCOUNT_STATUSES, BANK_ACCOUNT_TYPES } from '../types/bankAccount'
 
 const typeLabelMap = new Map(BANK_ACCOUNT_TYPES.map((item) => [item.id, item.label]))
+const statusLabelMap = new Map(BANK_ACCOUNT_STATUSES.map((item) => [item.id, item.label]))
 
-function n(value: number) {
-  return Number.isFinite(value) ? value : 0
+function n(value: number | undefined) {
+  return Number.isFinite(value) ? Number(value) : 0
 }
 
 export function generateBankAccountId() {
@@ -23,11 +29,24 @@ export function normalizeBankAccountTypeId(typeId: string | undefined): BankAcco
   return 'current'
 }
 
+export function normalizeBankAccountStatus(status?: string): BankAccountStatus {
+  return status === 'closed' ? 'closed' : 'active'
+}
+
+export function isBankAccountActive(account: Pick<BankAccountRecord, 'status'>) {
+  return normalizeBankAccountStatus(account.status) === 'active'
+}
+
+export function getBankAccountStatusLabel(status?: BankAccountStatus) {
+  return statusLabelMap.get(normalizeBankAccountStatus(status)) ?? 'Active'
+}
+
 export function createEmptyBankAccountForm() {
   return {
     bankName: '',
     accountNumber: '',
     accountType: 'current' as BankAccountTypeId,
+    status: 'active' as BankAccountStatus,
   }
 }
 
@@ -44,19 +63,33 @@ function legacyCalcClosing(
   )
 }
 
-export function normalizeBankAccount(raw: BankAccountRecord & { closingBalance?: number }): BankAccountRecord {
+export function normalizeBankAccount(
+  raw: Partial<BankAccountRecord> & { closingBalance?: number; closed_in_fy_id?: string },
+): BankAccountRecord {
   const hasStoredClosing = raw.closingBalance !== undefined && raw.closingBalance !== null
+  const status = normalizeBankAccountStatus(raw.status)
+  const closedInFyId = String(raw.closedInFyId ?? raw.closed_in_fy_id ?? '').trim()
   return {
     id: raw.id || generateBankAccountId(),
     bankName: raw.bankName?.trim() ?? '',
     accountNumber: raw.accountNumber?.trim() ?? '',
     accountType: normalizeBankAccountTypeId(raw.accountType),
+    status,
+    closedInFyId: status === 'closed' && closedInFyId ? closedInFyId : undefined,
     openingBalance: n(raw.openingBalance),
     debit: n(raw.debit),
     credit: n(raw.credit),
     bankCharge: n(raw.bankCharge),
     interest: n(raw.interest),
-    closingBalance: hasStoredClosing ? n(raw.closingBalance) : legacyCalcClosing(raw),
+    closingBalance: hasStoredClosing
+      ? n(raw.closingBalance)
+      : legacyCalcClosing({
+          openingBalance: n(raw.openingBalance),
+          debit: n(raw.debit),
+          credit: n(raw.credit),
+          bankCharge: n(raw.bankCharge),
+          interest: n(raw.interest),
+        }),
   }
 }
 
@@ -65,14 +98,21 @@ export function normalizeBankAccounts(raw: BankAccountRecord[] | undefined): Ban
 }
 
 export function createBankAccountFromForm(
-  form: { bankName: string; accountNumber: string; accountType: BankAccountTypeId },
+  form: BankAccountFormInput,
   existing?: BankAccountRecord | null,
+  fyId?: string,
 ): BankAccountRecord {
+  const status = normalizeBankAccountStatus(form.status ?? existing?.status)
+  const closedInFyId =
+    status === 'closed' ? existing?.closedInFyId || fyId || undefined : undefined
+
   return {
     id: existing?.id ?? generateBankAccountId(),
     bankName: form.bankName.trim(),
     accountNumber: form.accountNumber.trim(),
     accountType: normalizeBankAccountTypeId(form.accountType),
+    status,
+    closedInFyId,
     openingBalance: existing?.openingBalance ?? 0,
     debit: existing?.debit ?? 0,
     credit: existing?.credit ?? 0,

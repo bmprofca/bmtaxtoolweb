@@ -91,3 +91,10 @@
   font: inherit;
   cursor: pointer;
 }
+
+.bank-account-status-hint {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #b45309;
+  line-height: 1.35;
+}
