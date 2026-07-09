@@ -1,0 +1,12 @@
+<IfModule mod_rewrite.c>
+RewriteEngine On
+
+# Same-origin API proxy (PHP — works on Hostinger without mod_proxy).
+RewriteCond %{REQUEST_URI} ^/api
+RewriteRule ^api/?(.*)$ api/proxy.php?__path=$1 [QSA,L]
+
+# SPA client-side routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
+</IfModule>

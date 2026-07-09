@@ -14,6 +14,17 @@ function isLocalHostname(hostname: string) {
   )
 }
 
+const PRODUCTION_HOSTNAMES = new Set([
+  'tool.bmtaxopc.com',
+  'www.tool.bmtaxopc.com',
+  'tools.bmtaxopc.com',
+  'www.tools.bmtaxopc.com',
+])
+
+function isProductionHostname(hostname: string) {
+  return PRODUCTION_HOSTNAMES.has(hostname)
+}
+
 function resolveBaseApiUrl() {
   if (typeof window !== 'undefined' && isLocalHostname(window.location.hostname)) {
     return '/api'
@@ -23,26 +34,21 @@ function resolveBaseApiUrl() {
     return '/api'
   }
 
+  // Same-origin /api is proxied to the Node backend via public/.htaccess on Hostinger.
+  // This is more reliable than cross-origin calls to toolserver.bmtaxopc.com.
+  if (typeof window !== 'undefined' && isProductionHostname(window.location.hostname)) {
+    return '/api'
+  }
+
   const envUrl = import.meta.env.BASE_API_URL?.trim()
   if (envUrl) {
     return `${normalizeBaseUrl(envUrl)}/api`
   }
 
-  if (typeof window !== 'undefined') {
-    const { hostname } = window.location
-
-    if (
-      hostname === 'tool.bmtaxopc.com' ||
-      hostname === 'www.tool.bmtaxopc.com' ||
-      hostname === 'tools.bmtaxopc.com' ||
-      hostname === 'www.tools.bmtaxopc.com'
-    ) {
-      return 'https://toolserver.bmtaxopc.com/api'
-    }
-  }
-
   return '/api'
 }
+
+export const REMOTE_API_BASE = 'https://toolserver.bmtaxopc.com/api'
 
 export const API_BASE = resolveBaseApiUrl()
 
@@ -61,10 +67,13 @@ export function formatApiFetchError(error: unknown, action = 'reach the API serv
         return `Could not ${action}. Start the API with \`npm run dev\` from the project root and open http://localhost:5173 (local API: http://localhost:3001).`
       }
 
-      const apiHint = API_BASE.startsWith('http')
-        ? API_BASE.replace(/\/api$/, '')
-        : 'the API server'
-      return `Could not ${action}. Check that ${apiHint} is online and that DNS is configured for toolserver.bmtaxopc.com.`
+      const apiHint =
+        typeof window !== 'undefined' && isProductionHostname(window.location.hostname)
+          ? window.location.origin
+          : API_BASE.startsWith('http')
+            ? API_BASE.replace(/\/api$/, '')
+            : 'the API server'
+      return `Could not ${action}. Check that ${apiHint} is online and try again in a few seconds.`
     }
   }
 

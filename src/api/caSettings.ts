@@ -5,41 +5,9 @@ import {
   normalizeCaStatus,
 } from '../types/caProfile'
 import { API_BASE } from '../config/api'
+import { apiRequest } from './http'
 
-function getAuthHeaders() {
-  const headers = new Headers({ 'Content-Type': 'application/json' })
-  const token = localStorage.getItem('authToken')
-
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`)
-  }
-
-  return headers
-}
-
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...options,
-    headers: getAuthHeaders(),
-  })
-
-  if (!response.ok) {
-    const contentType = response.headers.get('content-type') || ''
-    if (contentType.includes('application/json')) {
-      const error = await response.json().catch(() => ({ error: 'Request failed' }))
-      throw new Error(error.error || `Request failed (${response.status})`)
-    }
-
-    const text = await response.text().catch(() => '')
-    if (response.status === 404) {
-      throw new Error('API route not found. Restart the server and try again.')
-    }
-
-    throw new Error(text || `Request failed (${response.status})`)
-  }
-
-  return response.json()
-}
+const request = apiRequest
 
 export function normalizeCaProfile(raw?: Partial<CaProfile> | null): CaProfile {
   if (!raw) {

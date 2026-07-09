@@ -1,42 +1,8 @@
 import type { GlobalFinancialYear } from '../utils/globalFinancialYear'
 import { API_BASE } from '../config/api'
+import { apiRequest } from './http'
 
-function getAuthHeaders() {
-  const headers = new Headers({ 'Content-Type': 'application/json' })
-  const token = localStorage.getItem('authToken')
-
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`)
-  }
-
-  return headers
-}
-
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...options,
-    headers: getAuthHeaders(),
-  })
-
-  if (!response.ok) {
-    const contentType = response.headers.get('content-type') || ''
-    const error = contentType.includes('application/json')
-      ? await response.json().catch(() => ({ error: 'Request failed' }))
-      : {
-          error:
-            response.status === 404
-              ? 'API route not found. Restart the server with the latest code and try again.'
-              : `Request failed (${response.status}). Make sure the API server is running.`,
-        }
-    throw new Error(error.error || 'Request failed')
-  }
-
-  if (response.status === 204) {
-    return undefined as T
-  }
-
-  return response.json()
-}
+const request = apiRequest
 
 export function fetchGlobalFinancialYears(): Promise<{ financialYears: GlobalFinancialYear[] }> {
   return request(`${API_BASE}/settings/financial-years`)
