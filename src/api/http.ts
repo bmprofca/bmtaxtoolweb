@@ -1,23 +1,28 @@
 import { REMOTE_API_BASE, formatApiFetchError } from '../config/api'
 
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504])
-const MAX_ATTEMPTS = 4
+const MAX_ATTEMPTS = 5
+const REQUEST_TIMEOUT_MS = 90_000
 
 function isRetryableNetworkError(error: unknown) {
-  if (!(error instanceof TypeError)) {
-    return false
+  if (error instanceof TypeError) {
+    const message = error.message.toLowerCase()
+    return (
+      message.includes('failed to fetch') ||
+      message.includes('networkerror') ||
+      message.includes('load failed')
+    )
   }
 
-  const message = error.message.toLowerCase()
-  return (
-    message.includes('failed to fetch') ||
-    message.includes('networkerror') ||
-    message.includes('load failed')
-  )
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return true
+  }
+
+  return false
 }
 
 function retryDelayMs(attempt: number) {
-  return attempt * 600
+  return attempt * 800
 }
 
 function buildAuthHeaders(options?: RequestInit) {
@@ -36,24 +41,14 @@ function buildAuthHeaders(options?: RequestInit) {
 }
 
 function resolveRequestUrls(url: string): string[] {
-  const urls: string[] = []
-
-  if (url.startsWith('/api')) {
-    urls.push(url)
-    const remoteUrl = `${REMOTE_API_BASE}${url.slice(4)}`
-    if (!urls.includes(remoteUrl)) {
-      urls.push(remoteUrl)
-    }
-    return urls
+  if (url.startsWith(REMOTE_API_BASE)) {
+    const localUrl = `/api${url.slice(REMOTE_API_BASE.length)}`
+    return [url, localUrl]
   }
 
-  if (url.startsWith(REMOTE_API_BASE)) {
-    urls.push(url)
-    const localUrl = `/api${url.slice(REMOTE_API_BASE.length)}`
-    if (!urls.includes(localUrl)) {
-      urls.push(localUrl)
-    }
-    return urls
+  if (url.startsWith('/api')) {
+    const remoteUrl = `${REMOTE_API_BASE}${url.slice(4)}`
+    return [remoteUrl, url]
   }
 
   return [url]
@@ -93,6 +88,21 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
   return response.json()
 }
 
+async function fetchWithTimeout(url: string, options: RequestInit) {
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
+}
+
 export async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
   const requestUrls = resolveRequestUrls(url)
   let lastError: unknown
@@ -100,10 +110,9 @@ export async function apiRequest<T>(url: string, options?: RequestInit): Promise
   for (const requestUrl of requestUrls) {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        const response = await fetch(requestUrl, {
+        const response = await fetchWithTimeout(requestUrl, {
           ...options,
           headers: buildAuthHeaders(options),
-          cache: 'no-store',
         })
 
         if (!response.ok) {

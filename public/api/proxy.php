@@ -3,10 +3,20 @@ declare(strict_types=1);
 
 /**
  * Same-origin API proxy for Hostinger shared hosting.
- * Routes /api/* from tool.bmtaxopc.com to the Node.js backend.
+ * Uses IP resolve because shared PHP often cannot DNS-resolve toolserver.bmtaxopc.com.
  */
 
+$backendHost = 'toolserver.bmtaxopc.com';
 $backendBase = 'https://toolserver.bmtaxopc.com/api';
+$backendIps = [
+    '2.57.91.41',
+    '84.32.84.51',
+    '91.108.106.251',
+    '147.79.69.217',
+    '88.222.243.166',
+    '147.79.69.73',
+];
+
 $path = isset($_GET['__path']) ? (string) $_GET['__path'] : '';
 unset($_GET['__path']);
 
@@ -28,7 +38,7 @@ if (function_exists('getallheaders')) {
     }
 } else {
     foreach ($_SERVER as $key => $value) {
-        if (!str_starts_with($key, 'HTTP_')) {
+        if (!is_string($key) || !str_starts_with($key, 'HTTP_')) {
             continue;
         }
         $name = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($key, 5)))));
@@ -39,38 +49,54 @@ if (function_exists('getallheaders')) {
     }
 }
 
-$ch = curl_init($targetUrl);
-curl_setopt_array($ch, [
-    CURLOPT_CUSTOMREQUEST => $method,
-    CURLOPT_HTTPHEADER => $forwardHeaders,
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HEADER => true,
-    CURLOPT_TIMEOUT => 120,
-    CURLOPT_CONNECTTIMEOUT => 15,
-    CURLOPT_FOLLOWLOCATION => true,
-    CURLOPT_SSL_VERIFYPEER => true,
-]);
+$forwardHeaders[] = 'Host: ' . $backendHost;
 
-if ($rawBody !== false && $rawBody !== '') {
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $rawBody);
+$lastError = 'API backend unreachable';
+$response = false;
+$status = 502;
+$rawHeaders = '';
+$body = '';
+
+foreach ($backendIps as $ip) {
+    $ch = curl_init($targetUrl);
+    curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST => $method,
+        CURLOPT_HTTPHEADER => $forwardHeaders,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HEADER => true,
+        CURLOPT_TIMEOUT => 120,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_RESOLVE => ["{$backendHost}:443:{$ip}"],
+    ]);
+
+    if ($rawBody !== false && $rawBody !== '') {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $rawBody);
+    }
+
+    $response = curl_exec($ch);
+
+    if ($response !== false) {
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        $rawHeaders = substr($response, 0, $headerSize);
+        $body = substr($response, $headerSize);
+        curl_close($ch);
+        break;
+    }
+
+    $lastError = curl_error($ch) ?: $lastError;
+    curl_close($ch);
 }
-
-$response = curl_exec($ch);
 
 if ($response === false) {
     http_response_code(502);
     header('Content-Type: application/json');
-    echo json_encode(['error' => 'API backend unreachable: ' . curl_error($ch)]);
-    curl_close($ch);
+    echo json_encode(['error' => 'API backend unreachable: ' . $lastError]);
     exit;
 }
-
-$status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$headerSize = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-curl_close($ch);
-
-$rawHeaders = substr($response, 0, $headerSize);
-$body = substr($response, $headerSize);
 
 http_response_code($status);
 header('Content-Type: application/json; charset=utf-8');

@@ -25,6 +25,8 @@ function isProductionHostname(hostname: string) {
   return PRODUCTION_HOSTNAMES.has(hostname)
 }
 
+const REMOTE_API_BASE = 'https://toolserver.bmtaxopc.com/api'
+
 function resolveBaseApiUrl() {
   if (typeof window !== 'undefined' && isLocalHostname(window.location.hostname)) {
     return '/api'
@@ -34,10 +36,9 @@ function resolveBaseApiUrl() {
     return '/api'
   }
 
-  // Same-origin /api is proxied to the Node backend via public/.htaccess on Hostinger.
-  // This is more reliable than cross-origin calls to toolserver.bmtaxopc.com.
+  // Browser DNS resolves toolserver reliably; Hostinger PHP proxy DNS was failing.
   if (typeof window !== 'undefined' && isProductionHostname(window.location.hostname)) {
-    return '/api'
+    return REMOTE_API_BASE
   }
 
   const envUrl = import.meta.env.BASE_API_URL?.trim()
@@ -48,7 +49,7 @@ function resolveBaseApiUrl() {
   return '/api'
 }
 
-export const REMOTE_API_BASE = 'https://toolserver.bmtaxopc.com/api'
+export { REMOTE_API_BASE }
 
 export const API_BASE = resolveBaseApiUrl()
 
@@ -67,12 +68,9 @@ export function formatApiFetchError(error: unknown, action = 'reach the API serv
         return `Could not ${action}. Start the API with \`npm run dev\` from the project root and open http://localhost:5173 (local API: http://localhost:3001).`
       }
 
-      const apiHint =
-        typeof window !== 'undefined' && isProductionHostname(window.location.hostname)
-          ? window.location.origin
-          : API_BASE.startsWith('http')
-            ? API_BASE.replace(/\/api$/, '')
-            : 'the API server'
+      const apiHint = API_BASE.startsWith('http')
+        ? API_BASE.replace(/\/api$/, '')
+        : 'https://toolserver.bmtaxopc.com'
       return `Could not ${action}. Check that ${apiHint} is online and try again in a few seconds.`
     }
   }
