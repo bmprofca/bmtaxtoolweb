@@ -31,7 +31,12 @@ function resolveBaseApiUrl() {
   if (typeof window !== 'undefined') {
     const { hostname } = window.location
 
-    if (hostname === 'tools.bmtaxopc.com' || hostname === 'www.tools.bmtaxopc.com') {
+    if (
+      hostname === 'tool.bmtaxopc.com' ||
+      hostname === 'www.tool.bmtaxopc.com' ||
+      hostname === 'tools.bmtaxopc.com' ||
+      hostname === 'www.tools.bmtaxopc.com'
+    ) {
       return 'https://toolserver.bmtaxopc.com/api'
     }
   }
