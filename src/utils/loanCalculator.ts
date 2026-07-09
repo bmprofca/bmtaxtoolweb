@@ -1,4 +1,12 @@
-import type { Loan, LoanFormInput, LoanMonthRow, LoanRecord, LoanSummary, LoanYearCashFlow } from '../types/loan'
+import type {
+  Loan,
+  LoanClosingAdjustmentMode,
+  LoanFormInput,
+  LoanMonthRow,
+  LoanRecord,
+  LoanSummary,
+  LoanYearCashFlow,
+} from '../types/loan'
 
 const CALENDAR_MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -430,6 +438,74 @@ export function getLoanBalanceAtMonthStart(
   return 0
 }
 
+export function normalizeClosingAdjustmentMode(value: unknown): LoanClosingAdjustmentMode {
+  return value === 'target-balance' ? 'target-balance' : 'principal-interest'
+}
+
+export function defaultClosingAdjustmentFields(): Pick<
+  LoanFormInput,
+  | 'closingAdjustmentEnabled'
+  | 'closingAdjustmentMode'
+  | 'closingAdjustmentPrincipal'
+  | 'closingAdjustmentInterest'
+  | 'closingAdjustmentTargetBalance'
+> {
+  return {
+    closingAdjustmentEnabled: false,
+    closingAdjustmentMode: 'principal-interest',
+    closingAdjustmentPrincipal: 0,
+    closingAdjustmentInterest: 0,
+    closingAdjustmentTargetBalance: 0,
+  }
+}
+
+export function applyClosingBalanceAdjustments(
+  computed: { interestForYear: number; principalRepaid: number; closingBalance: number },
+  input: Pick<
+    LoanFormInput,
+    | 'closingAdjustmentEnabled'
+    | 'closingAdjustmentMode'
+    | 'closingAdjustmentPrincipal'
+    | 'closingAdjustmentInterest'
+    | 'closingAdjustmentTargetBalance'
+  >,
+) {
+  if (!input.closingAdjustmentEnabled) {
+    return {
+      interestForYear: computed.interestForYear,
+      principalRepaid: computed.principalRepaid,
+      closingBalance: computed.closingBalance,
+      principalAdjustment: 0,
+      interestAdjustment: 0,
+      scheduleClosingBalance: computed.closingBalance,
+    }
+  }
+
+  if (input.closingAdjustmentMode === 'target-balance') {
+    const target = Math.max(0, n(input.closingAdjustmentTargetBalance))
+    const principalAdjustment = computed.closingBalance - target
+    return {
+      interestForYear: computed.interestForYear,
+      principalRepaid: computed.principalRepaid + principalAdjustment,
+      closingBalance: target,
+      principalAdjustment,
+      interestAdjustment: 0,
+      scheduleClosingBalance: computed.closingBalance,
+    }
+  }
+
+  const principalAdjustment = n(input.closingAdjustmentPrincipal)
+  const interestAdjustment = n(input.closingAdjustmentInterest)
+  return {
+    interestForYear: computed.interestForYear + interestAdjustment,
+    principalRepaid: computed.principalRepaid + principalAdjustment,
+    closingBalance: Math.max(0, computed.closingBalance - principalAdjustment),
+    principalAdjustment,
+    interestAdjustment,
+    scheduleClosingBalance: computed.closingBalance,
+  }
+}
+
 export function computeLoanForFinancialYear(
   input: LoanFormInput & { id?: string },
   fyStartYear: number,
@@ -465,6 +541,11 @@ export function computeLoanForFinancialYear(
   const baseForEmi = balance > 0 ? balance : n(input.openingBalance) + n(input.disbursement)
   const emiAmount = calculateEmi(baseForEmi, n(input.interestRate), n(input.tenureMonths))
 
+  const adjusted = applyClosingBalanceAdjustments(
+    { interestForYear, principalRepaid, closingBalance },
+    input,
+  )
+
   return {
     id: input.id || generateId(),
     lender: input.lender.trim(),
@@ -478,10 +559,13 @@ export function computeLoanForFinancialYear(
     prepaymentAmount: n(input.prepaymentAmount),
     prepaymentDate: input.prepaymentDate || '',
     emiAmount,
-    interestForYear,
-    principalRepaid,
-    closingBalance,
+    interestForYear: adjusted.interestForYear,
+    principalRepaid: adjusted.principalRepaid,
+    closingBalance: adjusted.closingBalance,
     monthlySchedule: fullSchedule,
+    scheduleClosingBalance: adjusted.scheduleClosingBalance,
+    closingAdjustmentPrincipalApplied: adjusted.principalAdjustment,
+    closingAdjustmentInterestApplied: adjusted.interestAdjustment,
   }
 }
 
@@ -561,10 +645,22 @@ export function createEmptyLoanForm(fyStartYear?: number): LoanFormInput {
     emiStartDate: defaultMonth,
     prepaymentAmount: 0,
     prepaymentDate: '',
+    ...defaultClosingAdjustmentFields(),
   }
 }
 
 export function loanToFormInput(loan: LoanRecord | Loan): LoanFormInput {
+  const closingFields =
+    'closingAdjustmentEnabled' in loan
+      ? {
+          closingAdjustmentEnabled: Boolean(loan.closingAdjustmentEnabled),
+          closingAdjustmentMode: normalizeClosingAdjustmentMode(loan.closingAdjustmentMode),
+          closingAdjustmentPrincipal: n(loan.closingAdjustmentPrincipal),
+          closingAdjustmentInterest: n(loan.closingAdjustmentInterest),
+          closingAdjustmentTargetBalance: n(loan.closingAdjustmentTargetBalance),
+        }
+      : defaultClosingAdjustmentFields()
+
   return {
     lender: loan.lender,
     loanType: loan.loanType,
@@ -576,6 +672,7 @@ export function loanToFormInput(loan: LoanRecord | Loan): LoanFormInput {
     emiStartDate: normalizeLoanMonthField(loan.emiStartDate),
     prepaymentAmount: loan.prepaymentAmount,
     prepaymentDate: normalizeLoanMonthField(loan.prepaymentDate),
+    ...closingFields,
   }
 }
 
@@ -607,6 +704,7 @@ export function migrateRepaymentSchedule(
           emiStartDate: `${fyStartYear}-04-01`,
           prepaymentAmount: row.repayment,
           prepaymentDate: row.repayment ? `${fyEndYear}-03-01` : '',
+          ...defaultClosingAdjustmentFields(),
         },
         fyStartYear,
         fyEndYear,
@@ -616,6 +714,17 @@ export function migrateRepaymentSchedule(
 }
 
 export function loanToRecord(loan: Loan | LoanRecord): LoanRecord {
+  const closingFields =
+    'closingAdjustmentEnabled' in loan
+      ? {
+          closingAdjustmentEnabled: Boolean(loan.closingAdjustmentEnabled),
+          closingAdjustmentMode: normalizeClosingAdjustmentMode(loan.closingAdjustmentMode),
+          closingAdjustmentPrincipal: n(loan.closingAdjustmentPrincipal),
+          closingAdjustmentInterest: n(loan.closingAdjustmentInterest),
+          closingAdjustmentTargetBalance: n(loan.closingAdjustmentTargetBalance),
+        }
+      : defaultClosingAdjustmentFields()
+
   return {
     id: loan.id,
     lender: loan.lender,
@@ -628,6 +737,7 @@ export function loanToRecord(loan: Loan | LoanRecord): LoanRecord {
     emiStartDate: normalizeLoanMonthField(loan.emiStartDate),
     prepaymentAmount: loan.prepaymentAmount,
     prepaymentDate: normalizeLoanMonthField(loan.prepaymentDate),
+    ...closingFields,
   }
 }
 

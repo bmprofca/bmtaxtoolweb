@@ -128,6 +128,10 @@ import { normalizeGstReco } from '../utils/gstDefaults'
 import { getGstTaxableSalesTotal, isGstLinkedRevenueSub } from '../utils/gstCalculator'
 import { applyGstSalesLinkToRevenue } from '../utils/gstRevenueLink'
 import {
+  applyClosingStockLink,
+  isClosingStockLinkedInventoriesSub,
+} from '../utils/closingStockLink'
+import {
   getBankAccountStatusLabel,
   getBankAccountTypeLabel,
   getCreditClosingAmount,
@@ -994,6 +998,7 @@ function FinancialStatement() {
       if (gstReco.linkSalesToRevenueNote) {
         noteSubAmounts = applyGstSalesLinkToRevenue(noteSubAmounts, gstReco)
       }
+      noteSubAmounts = applyClosingStockLink(noteSubAmounts)
 
       const migratedNotes = migrateNotes(fs.notes as Parameters<typeof migrateNotes>[0])
       let nextOpeningLocks: OpeningBalanceLocks | null = null
@@ -1095,6 +1100,7 @@ function FinancialStatement() {
             },
           })
           noteSubAmounts = carryResult.data.noteSubAmounts
+          noteSubAmounts = applyClosingStockLink(noteSubAmounts)
           loans = carryResult.data.loans
           bankAccounts = carryResult.data.bankAccounts
           carriedDepreciationSchedule = carryResult.data.depreciationSchedule
@@ -1493,20 +1499,30 @@ function FinancialStatement() {
       return
     }
 
+    if (isClosingStockLinkedInventoriesSub(noteKey, subId)) {
+      return
+    }
+
     const existing = fsData.noteSubAmounts[noteKey]?.[subId] ?? { current: 0, previous: 0 }
+
+    let noteSubAmounts = {
+      ...fsData.noteSubAmounts,
+      [noteKey]: {
+        ...fsData.noteSubAmounts[noteKey],
+        [subId]: {
+          ...existing,
+          current: Number(value) || 0,
+        },
+      },
+    }
+
+    if (noteKey === 'costOfGoodsSold' && subId === 'less-closing-stock') {
+      noteSubAmounts = applyClosingStockLink(noteSubAmounts)
+    }
 
     setFsData({
       ...fsData,
-      noteSubAmounts: {
-        ...fsData.noteSubAmounts,
-        [noteKey]: {
-          ...fsData.noteSubAmounts[noteKey],
-          [subId]: {
-            ...existing,
-            current: Number(value) || 0,
-          },
-        },
-      },
+      noteSubAmounts,
     })
     setSaveMessage('')
   }
@@ -1921,9 +1937,12 @@ function FinancialStatement() {
       Boolean(fsData?.gstReco.linkSalesToRevenueNote) &&
       noteKey === 'revenueFromOperations' &&
       isGstLinkedRevenueSub(sub.id)
+    const closingStockLinked = isClosingStockLinkedInventoriesSub(noteKey, sub.id)
 
-    if (!sub.editable || gstSalesLinked) {
-      const scheduleHint = gstSalesLinked
+    if (!sub.editable || gstSalesLinked || closingStockLinked) {
+      const scheduleHint = closingStockLinked
+        ? 'Auto: Closing stock from Note 21 (Cost of Goods Sold)'
+        : gstSalesLinked
         ? sub.id === 'sales-goods'
           ? 'Auto: Taxable sales from GST Reco (Sales + Amended sales)'
           : 'Not used when GST Reco sales are linked'
@@ -3081,6 +3100,7 @@ function FinancialStatement() {
       savedSubAmounts = migrateOtherShortTermSubAmounts(savedOtherStLines, savedSubAmounts)
       savedSubAmounts = migrateManualNoteLineSubAmounts(savedManualLines, savedSubAmounts)
       savedSubAmounts = migrateCapitalAccountSubAmounts(savedCapitalLines, savedSubAmounts)
+      savedSubAmounts = applyClosingStockLink(savedSubAmounts)
 
       const nextState = {
         ...saved,
@@ -4718,6 +4738,18 @@ function FinancialStatement() {
                       <div>
                         <span>Closing</span>
                         <strong>{formatAmount(loan.closingBalance)}</strong>
+                        {Boolean(record.closingAdjustmentEnabled) && (
+                          <div className="loan-closing-adj-note">
+                            FY closing adjusted
+                            {record.closingAdjustmentMode === 'target-balance'
+                              ? ` to ${formatAmount(record.closingAdjustmentTargetBalance)}`
+                              : ''}
+                            {loan.scheduleClosingBalance != null &&
+                            loan.scheduleClosingBalance !== loan.closingBalance
+                              ? ` (schedule: ${formatAmount(loan.scheduleClosingBalance)})`
+                              : ''}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <LoanCashFlowTable

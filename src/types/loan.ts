@@ -1,5 +1,7 @@
 export type LoanType = 'long-term' | 'short-term'
 
+export type LoanClosingAdjustmentMode = 'principal-interest' | 'target-balance'
+
 export interface LoanRecord {
   id: string
   lender: string
@@ -12,6 +14,11 @@ export interface LoanRecord {
   emiStartDate: string
   prepaymentAmount: number
   prepaymentDate: string
+  closingAdjustmentEnabled: boolean
+  closingAdjustmentMode: LoanClosingAdjustmentMode
+  closingAdjustmentPrincipal: number
+  closingAdjustmentInterest: number
+  closingAdjustmentTargetBalance: number
 }
 
 export interface LoanMonthRow {
@@ -44,6 +51,9 @@ export interface Loan {
   principalRepaid: number
   closingBalance: number
   monthlySchedule: LoanMonthRow[]
+  scheduleClosingBalance?: number
+  closingAdjustmentPrincipalApplied?: number
+  closingAdjustmentInterestApplied?: number
 }
 
 export type LoanFormInput = Omit<LoanRecord, 'id'>

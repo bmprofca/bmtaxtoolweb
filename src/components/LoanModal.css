@@ -149,6 +149,41 @@
   gap: 0.75rem;
 }
 
+.loan-closing-adj-panel {
+  border-color: #dbeafe;
+  background: #f0f9ff;
+}
+
+.loan-closing-adj-intro {
+  margin: 0;
+}
+
+.loan-closing-adj-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.loan-closing-adj-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.loan-closing-adj-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 500;
+  color: #334155;
+}
+
+.loan-closing-adj-badge {
+  font-size: 0.85rem;
+  color: #0369a1;
+  font-weight: 600;
+}
+
 .loan-modal-actions {
   display: flex;
   justify-content: flex-end;

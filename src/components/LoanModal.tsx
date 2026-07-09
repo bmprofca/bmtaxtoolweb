@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { saveLoans } from '../api/fs'
-import type { LoanFormInput, LoanRecord } from '../types/loan'
+import type { LoanClosingAdjustmentMode, LoanFormInput, LoanRecord } from '../types/loan'
 import {
   calculateEmi,
   clampLoanMonthToFinancialYear,
   computeLoanForFinancialYear,
   createEmptyLoanForm,
+  defaultClosingAdjustmentFields,
   getFinancialYearMonthBounds,
   getLoanBalanceAtMonthStart,
   loanToFormInput,
@@ -66,6 +67,9 @@ function LoanModal({
   const [preClosureEnabled, setPreClosureEnabled] = useState(
     () => Boolean(loan && (loan.prepaymentAmount > 0 || loan.prepaymentDate)),
   )
+  const [closingAdjustmentEnabled, setClosingAdjustmentEnabled] = useState(
+    () => Boolean(loan?.closingAdjustmentEnabled),
+  )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
@@ -77,10 +81,11 @@ function LoanModal({
   useEffect(() => {
     setForm(loan ? loanToFormInput(loan) : createEmptyLoanForm(fyStartYear))
     setPreClosureEnabled(Boolean(loan && (loan.prepaymentAmount > 0 || loan.prepaymentDate)))
+    setClosingAdjustmentEnabled(Boolean(loan?.closingAdjustmentEnabled))
     setSaveError('')
   }, [loan, fyStartYear])
 
-  const effectiveForm = useMemo<LoanFormInput>(() => {
+  const baseForm = useMemo<LoanFormInput>(() => {
     if (!isEditMode || !preClosureEnabled) {
       return {
         ...form,
@@ -92,10 +97,32 @@ function LoanModal({
     return form
   }, [form, isEditMode, preClosureEnabled])
 
+  const effectiveForm = useMemo<LoanFormInput>(() => {
+    if (!closingAdjustmentEnabled) {
+      return {
+        ...baseForm,
+        ...defaultClosingAdjustmentFields(),
+      }
+    }
+
+    return {
+      ...baseForm,
+      closingAdjustmentEnabled: true,
+    }
+  }, [baseForm, closingAdjustmentEnabled])
+
   const preview = useMemo(
     () => computeLoanForFinancialYear({ ...effectiveForm, id: loan?.id }, fyStartYear, fyEndYear),
     [effectiveForm, loan?.id, fyStartYear, fyEndYear],
   )
+
+  const scheduleClosingBalance =
+    preview.scheduleClosingBalance ?? preview.closingBalance
+  const hasClosingAdjustment =
+    closingAdjustmentEnabled &&
+    (preview.closingAdjustmentPrincipalApplied !== 0 ||
+      preview.closingAdjustmentInterestApplied !== 0 ||
+      preview.closingBalance !== scheduleClosingBalance)
 
   const updateField = (field: keyof LoanFormInput, value: string) => {
     setForm((current) => {
@@ -183,6 +210,13 @@ function LoanModal({
       }
     }
 
+    if (closingAdjustmentEnabled) {
+      if (form.closingAdjustmentMode === 'target-balance' && form.closingAdjustmentTargetBalance < 0) {
+        setSaveError('Target closing balance cannot be negative.')
+        return
+      }
+    }
+
     const confirmed = await confirmSave({
       action: loan ? 'edit' : 'add',
       itemLabel: form.lender.trim(),
@@ -200,7 +234,17 @@ function LoanModal({
     const existing = existingLoans.find((item) => item.id === computed.id)
     const nextLoan: LoanRecord =
       existing && openingBalanceReadOnly
-        ? { ...computed, openingBalance: existing.openingBalance }
+        ? {
+            ...computed,
+            openingBalance: existing.openingBalance,
+            prepaymentAmount: effectiveForm.prepaymentAmount,
+            prepaymentDate: effectiveForm.prepaymentDate,
+            closingAdjustmentEnabled: effectiveForm.closingAdjustmentEnabled,
+            closingAdjustmentMode: effectiveForm.closingAdjustmentMode,
+            closingAdjustmentPrincipal: effectiveForm.closingAdjustmentPrincipal,
+            closingAdjustmentInterest: effectiveForm.closingAdjustmentInterest,
+            closingAdjustmentTargetBalance: effectiveForm.closingAdjustmentTargetBalance,
+          }
         : {
             id: computed.id,
             lender: computed.lender,
@@ -213,6 +257,11 @@ function LoanModal({
             emiStartDate: computed.emiStartDate,
             prepaymentAmount: effectiveForm.prepaymentAmount,
             prepaymentDate: effectiveForm.prepaymentDate,
+            closingAdjustmentEnabled: effectiveForm.closingAdjustmentEnabled,
+            closingAdjustmentMode: effectiveForm.closingAdjustmentMode,
+            closingAdjustmentPrincipal: effectiveForm.closingAdjustmentPrincipal,
+            closingAdjustmentInterest: effectiveForm.closingAdjustmentInterest,
+            closingAdjustmentTargetBalance: effectiveForm.closingAdjustmentTargetBalance,
           }
 
     const exists = existingLoans.some((item) => item.id === nextLoan.id)
@@ -424,6 +473,133 @@ function LoanModal({
               )}
             </div>
           )}
+
+          <div className="loan-field loan-field--wide loan-preclosure-panel loan-closing-adj-panel">
+            <label className="loan-preclosure-toggle">
+              <input
+                type="checkbox"
+                checked={closingAdjustmentEnabled}
+                onChange={(e) => {
+                  const enabled = e.target.checked
+                  setClosingAdjustmentEnabled(enabled)
+                  if (enabled) {
+                    setForm((current) => ({
+                      ...current,
+                      closingAdjustmentEnabled: true,
+                      closingAdjustmentMode: current.closingAdjustmentMode || 'principal-interest',
+                      closingAdjustmentTargetBalance:
+                        current.closingAdjustmentTargetBalance || scheduleClosingBalance,
+                    }))
+                  } else {
+                    setForm((current) => ({
+                      ...current,
+                      ...defaultClosingAdjustmentFields(),
+                    }))
+                  }
+                }}
+                disabled={saving}
+              />
+              Adjust closing balance (this financial year)
+            </label>
+            {closingAdjustmentEnabled && (
+              <div className="loan-closing-adj-body">
+                <p className="loan-field-hint loan-closing-adj-intro">
+                  Use this when the EMI schedule closing balance does not match your books for Mar{' '}
+                  {fyEndYear}. Adjustments apply only to this FY and carry forward to the next year
+                  opening balance.
+                </p>
+                <div className="loan-closing-adj-mode">
+                  <label className="loan-closing-adj-mode-option">
+                    <input
+                      type="radio"
+                      name="closingAdjustmentMode"
+                      value="principal-interest"
+                      checked={form.closingAdjustmentMode === 'principal-interest'}
+                      onChange={() =>
+                        setForm((current) => ({
+                          ...current,
+                          closingAdjustmentMode: 'principal-interest' as LoanClosingAdjustmentMode,
+                          closingAdjustmentEnabled: true,
+                        }))
+                      }
+                      disabled={saving}
+                    />
+                    By principal &amp; interest
+                  </label>
+                  <label className="loan-closing-adj-mode-option">
+                    <input
+                      type="radio"
+                      name="closingAdjustmentMode"
+                      value="target-balance"
+                      checked={form.closingAdjustmentMode === 'target-balance'}
+                      onChange={() =>
+                        setForm((current) => ({
+                          ...current,
+                          closingAdjustmentMode: 'target-balance' as LoanClosingAdjustmentMode,
+                          closingAdjustmentEnabled: true,
+                          closingAdjustmentTargetBalance:
+                            current.closingAdjustmentTargetBalance || scheduleClosingBalance,
+                        }))
+                      }
+                      disabled={saving}
+                    />
+                    Set target closing balance
+                  </label>
+                </div>
+                {form.closingAdjustmentMode === 'principal-interest' ? (
+                  <div className="loan-preclosure-fields">
+                    <label className="loan-field">
+                      Principal adjustment
+                      <input
+                        type="number"
+                        value={form.closingAdjustmentPrincipal || ''}
+                        onChange={(e) => updateField('closingAdjustmentPrincipal', e.target.value)}
+                        placeholder="0"
+                        disabled={saving}
+                      />
+                      <span className="loan-field-hint">
+                        Positive = extra principal repaid (reduces closing balance)
+                      </span>
+                    </label>
+                    <label className="loan-field">
+                      Interest adjustment
+                      <input
+                        type="number"
+                        value={form.closingAdjustmentInterest || ''}
+                        onChange={(e) => updateField('closingAdjustmentInterest', e.target.value)}
+                        placeholder="0"
+                        disabled={saving}
+                      />
+                      <span className="loan-field-hint">
+                        Adjusts interest expense for this FY only (does not change closing)
+                      </span>
+                    </label>
+                  </div>
+                ) : (
+                  <label className="loan-field loan-field--wide">
+                    Target closing balance (Mar {fyEndYear})
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.closingAdjustmentTargetBalance || ''}
+                      onChange={(e) =>
+                        updateField('closingAdjustmentTargetBalance', e.target.value)
+                      }
+                      placeholder={String(scheduleClosingBalance)}
+                      disabled={saving}
+                    />
+                    <span className="loan-field-hint">
+                      Schedule closing: {formatAmount(scheduleClosingBalance)} → implied principal
+                      adjustment:{' '}
+                      {formatAmount(
+                        scheduleClosingBalance - (form.closingAdjustmentTargetBalance || 0),
+                      )}
+                    </span>
+                  </label>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="loan-preview">
@@ -432,6 +608,14 @@ function LoanModal({
             <strong>Interest this FY:</strong> {formatAmount(preview.interestForYear)} |{' '}
             <strong>Principal this FY:</strong> {formatAmount(preview.principalRepaid)} |{' '}
             <strong>Closing Balance:</strong> {formatAmount(preview.closingBalance)}
+            {hasClosingAdjustment && (
+              <>
+                {' '}
+                <span className="loan-closing-adj-badge">
+                  (schedule: {formatAmount(scheduleClosingBalance)})
+                </span>
+              </>
+            )}
           </p>
         </div>
 

@@ -3392,6 +3392,13 @@ input.fs-readonly-input {
   color: #475569;
 }
 
+.loan-closing-adj-note {
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #0369a1;
+}
+
 .loan-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
