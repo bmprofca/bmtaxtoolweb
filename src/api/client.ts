@@ -12,7 +12,7 @@ import type {
   UpdateFinancialYearPayload,
   User,
 } from '../types'
-import { API_BASE } from '../config/api'
+import { API_BASE, formatApiFetchError } from '../config/api'
 
 let authToken: string | null = localStorage.getItem('authToken')
 
@@ -37,7 +37,12 @@ export async function request<T>(url: string, options?: RequestInit): Promise<T>
     headers.set('Authorization', `Bearer ${authToken}`)
   }
 
-  const response = await fetch(url, { ...options, headers })
+  let response: Response
+  try {
+    response = await fetch(url, { ...options, headers })
+  } catch (error) {
+    throw new Error(formatApiFetchError(error))
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }))
