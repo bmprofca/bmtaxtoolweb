@@ -12,6 +12,15 @@ export PATH="/opt/alt/alt-nodejs24/root/usr/bin:$PATH"
 cd "$SERVER_DIR"
 git pull origin main
 npm install --omit=dev
+if [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env
+  set +a
+  npm run db:ensure-gst || true
+else
+  echo "No .env in $SERVER_DIR — skip db:ensure-gst (API bootstrap still creates tables on start)"
+fi
 if command -v pm2 >/dev/null 2>&1; then
   pm2 restart bmtaxtoolserver || pm2 restart all || true
 else
