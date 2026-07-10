@@ -675,30 +675,37 @@ function FinancialStatement() {
     const linksToBs =
       !linksToPl &&
       (isBalanceSheetNoteNo(noteNo) || NOTE_SUB_BALANCE_SHEET_REFS[noteSubId ?? ''] !== undefined)
+    const printNote = <span className="statement-note-print-value fs-print-only">{noteNo}</span>
 
     if (linksToPl) {
       return (
-        <button
-          type="button"
-          className="statement-note-link"
-          onClick={() => navigateToProfitLoss(noteKey, noteSubId)}
-          title="View on Profit & Loss"
-        >
-          {noteNo}
-        </button>
+        <>
+          <button
+            type="button"
+            className="statement-note-link fs-screen-only"
+            onClick={() => navigateToProfitLoss(noteKey, noteSubId)}
+            title="View on Profit & Loss"
+          >
+            {noteNo}
+          </button>
+          {printNote}
+        </>
       )
     }
 
     if (linksToBs) {
       return (
-        <button
-          type="button"
-          className="statement-note-link"
-          onClick={() => navigateToBalanceSheet(noteKey, noteSubId)}
-          title="View on Balance Sheet"
-        >
-          {noteNo}
-        </button>
+        <>
+          <button
+            type="button"
+            className="statement-note-link fs-screen-only"
+            onClick={() => navigateToBalanceSheet(noteKey, noteSubId)}
+            title="View on Balance Sheet"
+          >
+            {noteNo}
+          </button>
+          {printNote}
+        </>
       )
     }
 

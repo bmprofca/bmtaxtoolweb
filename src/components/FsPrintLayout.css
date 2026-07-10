@@ -1913,6 +1913,13 @@
     vertical-align: middle !important;
   }
 
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-sno-col .statement-note-print-value {
+    display: block !important;
+    width: 100% !important;
+    text-align: center !important;
+    font-weight: 500 !important;
+  }
+
   .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-section-row td {
     font-weight: 700 !important;
     text-transform: uppercase;
