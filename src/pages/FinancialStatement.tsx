@@ -49,6 +49,7 @@ import {
   varianceClass,
 } from '../utils/fsCalculator'
 import { buildFsDerivedState, fsDataFingerprint } from '../utils/fsEngine'
+import { buildExportBusinessHeaderHtml, buildExportBusinessHeaderLines } from '../utils/printExportHeader'
 import { buildBalanceSheetLines, balanceSheetRowId, isBalanceSheetNoteNo, NOTE_SUB_BALANCE_SHEET_REFS } from '../utils/balanceSheetBuilder'
 import { isProfitLossNoteNo, profitLossRowId, NOTE_SUB_PL_REFS } from '../utils/plBuilder'
 import {
@@ -3587,6 +3588,42 @@ function FinancialStatement() {
       ),
     )
 
+    if (noteSubRowsMap) {
+      const noteRows: Array<Array<string | number>> = []
+      for (const field of NOTE_FIELDS) {
+        const subs = noteSubRowsMap[field.key] ?? []
+        for (const sub of subs) {
+          if (sub.kind === 'header') {
+            continue
+          }
+          noteRows.push([
+            field.noteNo,
+            sub.label,
+            sub.current,
+            sub.previous,
+            calcValueChange(sub.current, sub.previous),
+            calcPercentChange(sub.current, sub.previous) ?? 0,
+          ])
+        }
+      }
+      sections.push(
+        renderSection(
+          notesLabel,
+          ['Note', 'Particulars', notesCurrentColumnLabel, notesPreviousColumnLabel, 'Change', '% Change'],
+          noteRows,
+          2,
+        ),
+      )
+    }
+
+    const businessHeaderHtml = buildExportBusinessHeaderHtml(
+      client,
+      business ?? null,
+      isConsolidatedView,
+      escapeHtml,
+    )
+    const exportReportPeriod = fy ? formatPrintReportPeriod('notes', fy) : ''
+
     const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900')
     if (!printWindow) {
       window.alert('Popup blocked. Please allow popups to export PDF.')
@@ -3602,9 +3639,13 @@ function FinancialStatement() {
           <title>${escapeHtml(title)}</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
-            .header { margin-bottom: 16px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
-            .header h1 { margin: 0 0 6px; font-size: 20px; }
-            .meta { color: #475569; font-size: 12px; }
+            .header { margin-bottom: 16px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; text-align: center; }
+            .header h1 { margin: 0 0 8px; font-size: 18px; text-transform: uppercase; letter-spacing: 0.04em; }
+            .export-business-header { margin: 0 0 12px; }
+            .export-entity-name { margin: 0 0 6px; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+            .export-subline { margin: 0 0 4px; color: #334155; font-size: 12px; }
+            .export-report-title { margin: 10px 0 4px; font-size: 14px; font-weight: 700; text-transform: uppercase; }
+            .export-report-period { margin: 0; color: #475569; font-size: 12px; text-transform: uppercase; }
             .report-section { margin-top: 18px; }
             .report-section h3 { margin: 0 0 8px; font-size: 15px; color: #1e293b; }
             table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -3615,10 +3656,10 @@ function FinancialStatement() {
         </head>
         <body>
           <div class="header">
+            ${businessHeaderHtml}
             <h1>${escapeHtml(formatFinancialStatementPageTitle(statementType))}</h1>
-            <div class="meta">
-              Client: ${escapeHtml(client?.name || '—')} | Business: ${escapeHtml(business?.name || '—')} | FY: ${escapeHtml(fy?.label || '—')}
-            </div>
+            ${exportReportPeriod ? `<p class="export-report-period">${escapeHtml(exportReportPeriod)}</p>` : ''}
+            <p class="export-report-period">FY: ${escapeHtml(fy?.label || '—')}</p>
           </div>
           ${sections.join('')}
         </body>
@@ -3642,9 +3683,8 @@ function FinancialStatement() {
         .replace(/^-+|-+$/g, '')
 
     const rows: Array<Array<string | number>> = [
+      ...buildExportBusinessHeaderLines(client, business ?? null, isConsolidatedView).map((line) => [line]),
       [formatFinancialStatementPageTitle(statementType)],
-      [`Client: ${client?.name || '—'}`],
-      [`Business: ${business?.name || '—'}`],
       [`FY: ${fy?.label || '—'}`],
       [],
     ]
@@ -3663,6 +3703,33 @@ function FinancialStatement() {
       ['Particular', 'Note', currentFyLabel, previousFyLabel],
       computed.profitAndLoss.map((line) => [line.label, line.noteNo || '', num(line.current), num(line.previous)]),
     )
+
+    if (noteSubRowsMap) {
+      const noteRows: Array<Array<string | number>> = []
+      for (const field of NOTE_FIELDS) {
+        const subs = noteSubRowsMap[field.key] ?? []
+        for (const sub of subs) {
+          if (sub.kind === 'header') {
+            continue
+          }
+          const change = calcValueChange(sub.current, sub.previous)
+          const pct = calcPercentChange(sub.current, sub.previous)
+          noteRows.push([
+            field.noteNo,
+            sub.label,
+            num(sub.current),
+            num(sub.previous),
+            num(change),
+            pct === null ? '' : `${pct.toFixed(1)}%`,
+          ])
+        }
+      }
+      pushSection(
+        notesLabel,
+        ['Note', 'Particulars', notesCurrentColumnLabel, notesPreviousColumnLabel, 'Change', '% Change'],
+        noteRows,
+      )
+    }
 
     const csv = `\uFEFF${rows.map((row) => row.map(csvEscape).join(',')).join('\n')}`
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -3986,21 +4053,19 @@ function FinancialStatement() {
             {profitLossLabel} (19–24).
           </p>
 
-          {!printAll && (
-            <div className="fs-print-notes-stationery fs-print-only" aria-hidden="true">
-              <FsPrintBusinessHeader
-                client={client}
-                business={business ?? null}
-                isConsolidated={isConsolidatedView}
-              />
-              <div className="fs-print-notes-report-block">
-                <p className="fs-print-notes-report-line">{notesLabel}</p>
-                {notesPrintPeriod && (
-                  <p className="fs-print-notes-period-line">{notesPrintPeriod}</p>
-                )}
-              </div>
+          <div className="fs-print-notes-stationery fs-print-only" aria-hidden="true">
+            <FsPrintBusinessHeader
+              client={client}
+              business={business ?? null}
+              isConsolidated={isConsolidatedView}
+            />
+            <div className="fs-print-notes-report-block">
+              <p className="fs-print-notes-report-line">{notesLabel}</p>
+              {notesPrintPeriod && (
+                <p className="fs-print-notes-period-line">{notesPrintPeriod}</p>
+              )}
             </div>
-          )}
+          </div>
 
           <div className="table-wrap notes-table-wrap">
             <table className="data-table notes-table">
@@ -4013,23 +4078,6 @@ function FinancialStatement() {
                 <col className="notes-variance-col notes-pct-col" />
               </colgroup>
               <thead>
-                {printAll && (
-                  <tr className="fs-print-notes-banner-row fs-print-only" aria-hidden="true">
-                    <th colSpan={notesPrintColSpan} className="fs-print-notes-banner-cell">
-                      <FsPrintBusinessHeader
-                        client={client}
-                        business={business ?? null}
-                        isConsolidated={isConsolidatedView}
-                      />
-                      <div className="fs-print-notes-report-block">
-                        <p className="fs-print-notes-report-line">{notesLabel}</p>
-                        {notesPrintPeriod && (
-                          <p className="fs-print-notes-period-line">{notesPrintPeriod}</p>
-                        )}
-                      </div>
-                    </th>
-                  </tr>
-                )}
                 {!printAll && (
                   <tr className="fs-print-notes-head-spacer fs-print-only" aria-hidden="true">
                     <th colSpan={notesPrintColSpan} className="fs-print-notes-head-spacer-cell" />

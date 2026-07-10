@@ -167,18 +167,35 @@
     display: none !important;
   }
 
-  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-print-notes-stationery {
+  .fs-page.fs-print-notes-section .fs-print-notes-stationery {
     display: block !important;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
     width: 100%;
     box-sizing: border-box;
     padding: 0 0 4mm;
     background: #fff;
-    z-index: 2;
     text-align: center;
+  }
+
+  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-print-notes-stationery {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2;
+  }
+
+  .fs-page.fs-print-notes-section.fs-print-all .fs-print-notes-stationery {
+    position: static;
+    margin: 0 0 3mm;
+  }
+
+  .fs-print-notes-stationery .fs-print-header-center,
+  .fs-print-notes-stationery .fs-print-header-business {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .fs-print-notes-report-block {
@@ -201,6 +218,7 @@
     letter-spacing: 0.03em;
     line-height: 1.2;
     text-transform: uppercase;
+    white-space: normal !important;
   }
 
   .fs-print-notes-stationery .fs-print-proprietorship,
@@ -209,6 +227,7 @@
     font-size: 7pt !important;
     font-weight: 500 !important;
     line-height: 1.2;
+    white-space: normal !important;
   }
 
   .fs-print-notes-stationery .fs-print-location,
@@ -217,6 +236,7 @@
     font-size: 6pt !important;
     font-weight: 400 !important;
     line-height: 1.25;
+    white-space: normal !important;
   }
 
   .fs-print-notes-report-line {
