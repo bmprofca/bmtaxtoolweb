@@ -146,7 +146,7 @@ import {
 import { buildEffectiveNotes, getNoteCalcMap } from '../utils/noteCalculator'
 import { normalizeGstReco } from '../utils/gstDefaults'
 import { getGstTaxableSalesTotal, isGstLinkedRevenueSub } from '../utils/gstCalculator'
-import { applyGstSalesLinkToRevenue } from '../utils/gstRevenueLink'
+import { applyGstSalesLinkToRevenue, withGstSalesLinkOnNoteSubAmounts } from '../utils/gstRevenueLink'
 import {
   applyClosingStockLink,
   applyOpeningStockLink,
@@ -1509,6 +1509,14 @@ function FinancialStatement() {
 
   const deferredNoteSubAmounts = useDeferredValue(fsData?.noteSubAmounts)
 
+  const noteSubAmountsForCalc = useMemo(() => {
+    const base = deferredNoteSubAmounts ?? fsData?.noteSubAmounts
+    if (!base) {
+      return null
+    }
+    return withGstSalesLinkOnNoteSubAmounts(base, fsData?.gstReco)
+  }, [deferredNoteSubAmounts, fsData?.noteSubAmounts, fsData?.gstReco])
+
   const computedLoans = useMemo(() => {
     if (!fsData || !fy) {
       return []
@@ -1603,7 +1611,7 @@ function FinancialStatement() {
     return {
       notes: merged,
       noteBreakdowns: fsData.noteBreakdowns,
-      noteSubAmounts: deferredNoteSubAmounts ?? fsData.noteSubAmounts,
+      noteSubAmounts: noteSubAmountsForCalc ?? fsData.noteSubAmounts,
       previousYearSubAmounts,
       depreciationSchedule: fsData.depreciationSchedule,
       previousYearDepreciation: fsData.previousYearDepreciation,
@@ -1631,6 +1639,7 @@ function FinancialStatement() {
     previousYearSubAmounts,
     previousYearCashAdjustment,
     deferredNoteSubAmounts,
+    noteSubAmountsForCalc,
     loanCalcPayload,
     previousYearComputedLoans,
     plAppropriationTotal,
@@ -1644,7 +1653,7 @@ function FinancialStatement() {
     }
     return buildFsDerivedState({
       noteCalcContext,
-      noteSubAmounts: deferredNoteSubAmounts ?? fsData.noteSubAmounts,
+      noteSubAmounts: noteSubAmountsForCalc ?? fsData.noteSubAmounts,
       previousYearSubAmounts,
       depreciationSchedule: fsData.depreciationSchedule,
       previousYearDepreciation: fsData.previousYearDepreciation,
@@ -1670,6 +1679,7 @@ function FinancialStatement() {
     fsData,
     fy,
     deferredNoteSubAmounts,
+    noteSubAmountsForCalc,
     previousYearSubAmounts,
     previousYearCashAdjustment,
     loanCalcPayload,
@@ -2327,6 +2337,10 @@ function FinancialStatement() {
       isGstLinkedRevenueSub(sub.id)
 
     if (!sub.editable || gstSalesLinked) {
+      const linkedGoodsAmount =
+        gstSalesLinked && sub.id === 'sales-goods' && fsData?.gstReco
+          ? getGstTaxableSalesTotal(fsData.gstReco)
+          : sub.current
       const scheduleHint =
         currentYearReadOnlyHint(noteKey, sub.id, sub.kind) ??
         (gstSalesLinked
@@ -2340,10 +2354,10 @@ function FinancialStatement() {
             className={`note-sub-auto fs-screen-only${sub.isAuto ? ' is-auto-calc' : ''}`}
             title={scheduleHint}
           >
-            {sub.current ? formatSubAmount(sub.current, sub.kind) : '—'}
+            {linkedGoodsAmount ? formatSubAmount(linkedGoodsAmount, sub.kind) : '—'}
           </div>
           <span className="note-amount-print fs-print-only">
-            {sub.current ? formatSubAmount(sub.current, sub.kind) : '—'}
+            {linkedGoodsAmount ? formatSubAmount(linkedGoodsAmount, sub.kind) : '—'}
           </span>
         </>
       )
@@ -2981,52 +2995,6 @@ function FinancialStatement() {
             </td>
           </tr>
         )}
-        {noteKey === 'revenueFromOperations' && fsData?.gstReco.linkSalesToRevenueNote && (() => {
-          const goodsRow = subRows.find((row) => row.id === 'sales-goods')
-          const servicesRow = subRows.find((row) => row.id === 'sales-services')
-          const current = getGstTaxableSalesTotal(fsData.gstReco)
-          const previous = (goodsRow?.previous ?? 0) + (servicesRow?.previous ?? 0)
-          const change = calcValueChange(current, previous)
-          const pct = calcPercentChange(current, previous)
-
-          return (
-            <tr key={`${noteKey}-gst-reco-ref`} className="notes-sub-row notes-gst-ref-row is-auto-row">
-              <td className="notes-sno-col" />
-              <td className="notes-particular-col notes-sub-label notes-gst-ref-label">
-                <span>As per GST Reco</span>
-                <button
-                  type="button"
-                  className="gst-note-link-btn notes-gst-ref-link-btn"
-                  onClick={navigateToGstReco}
-                >
-                  View GST Reco
-                </button>
-              </td>
-              <td className="notes-amount-col notes-curr-col">
-                <div className="note-sub-auto is-auto-calc" title="Taxable sales from GST Reco">
-                  {current ? formatAmount(current) : '—'}
-                </div>
-              </td>
-              <td className="notes-amount-col notes-prev-col">
-                <div className="note-prev-ref" title={`${previousFyLabel} — reference only`}>
-                  {previous ? formatAmount(previous) : '—'}
-                </div>
-              </td>
-              {!hideVariance && (
-                <>
-                  <td className={`notes-variance-col notes-change-col ${varianceClass(change)}`}>
-                    <div className="note-variance-value">{formatChangeAmount(change)}</div>
-                  </td>
-                  <td
-                    className={`notes-variance-col notes-pct-col ${pct !== null ? varianceClass(change) : 'variance-flat'}`}
-                  >
-                    <div className="note-variance-value">{formatPercentChange(pct)}</div>
-                  </td>
-                </>
-              )}
-            </tr>
-          )
-        })()}
         {subRows
           .filter(
             (sub) =>
@@ -3036,7 +3004,7 @@ function FinancialStatement() {
           if (
             noteKey === 'revenueFromOperations' &&
             fsData?.gstReco.linkSalesToRevenueNote &&
-            isGstLinkedRevenueSub(sub.id)
+            sub.id === 'sales-services'
           ) {
             return null
           }
@@ -5860,7 +5828,10 @@ function FinancialStatement() {
         <GstRecoTab
           gstReco={fsData.gstReco}
           fyLabel={currentFyLabel}
-          salesFromBooks={fsData.notes.revenueFromOperations.current}
+          salesFromBooks={
+            effectiveNotes?.revenueFromOperations.current ??
+            fsData.notes.revenueFromOperations.current
+          }
           onOpenRevenueNote={() => navigateToNote('revenueFromOperations')}
           onChange={updateGstReco}
         />

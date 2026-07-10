@@ -29,3 +29,14 @@ export function applyGstSalesLinkToRevenue(
     },
   }
 }
+
+/** Overlay GST taxable sales onto note sub-amounts whenever the link is active. */
+export function withGstSalesLinkOnNoteSubAmounts(
+  noteSubAmounts: NoteSubAmounts,
+  gstReco: GstRecoStatement | undefined,
+): NoteSubAmounts {
+  if (!gstReco?.linkSalesToRevenueNote) {
+    return noteSubAmounts
+  }
+  return applyGstSalesLinkToRevenue(noteSubAmounts, gstReco)
+}
