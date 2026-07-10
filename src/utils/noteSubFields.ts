@@ -359,9 +359,11 @@ function resolveEntryStored(
     }
     const priorAmount =
       ctx.previousYearSubAmounts?.[rule.sourceNoteKey]?.[rule.sourceSubId]?.current
-    if (priorAmount !== undefined) {
-      stored = { ...stored, current: priorAmount }
+    // Only auto-fill opening lines when prior-year closing has a non-zero value.
+    if (priorAmount === undefined || priorAmount === 0) {
+      continue
     }
+    stored = { ...stored, current: priorAmount }
   }
 
   if (isLedgerSubId(def.id) && stored.current === 0 && stored.previous === 0) {

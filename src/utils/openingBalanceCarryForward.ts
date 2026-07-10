@@ -368,8 +368,13 @@ function applyNoteOpeningCarryForward(
     if (amount === undefined) {
       continue
     }
-    if (amount === 0 && rule.targetSubId !== 'opening-stock' && rule.targetSubId !== 'opening-balance') {
-      continue
+    if (amount === 0) {
+      if (rule.targetSubId === 'opening-stock') {
+        continue
+      }
+      if (rule.targetSubId !== 'opening-balance') {
+        continue
+      }
     }
 
     const existing = next[rule.targetNoteKey]?.[rule.targetSubId] ?? { current: 0, previous: 0 }

@@ -30,9 +30,6 @@ export interface ProfitLossBuildInput {
   notes: FsNotes
   depCurrent: number
   depPrevious: number
-  loanInterestCurrent: number
-  loanInterestPrevious: number
-  hasLoans: boolean
   plAppropriationTotal: NoteValue
 }
 
@@ -47,15 +44,7 @@ export const NOTE_SUB_PL_REFS: Record<string, string> = {
 }
 
 export function buildProfitLossLines(input: ProfitLossBuildInput): StatementLine[] {
-  const {
-    notes,
-    depCurrent,
-    depPrevious,
-    loanInterestCurrent,
-    loanInterestPrevious,
-    hasLoans,
-    plAppropriationTotal,
-  } = input
+  const { notes, depCurrent, depPrevious, plAppropriationTotal } = input
 
   const totalIncomeCurrent = notes.revenueFromOperations.current + notes.otherIncome.current
   const totalIncomePrevious = notes.revenueFromOperations.previous + notes.otherIncome.previous
@@ -120,15 +109,6 @@ export function buildProfitLossLines(input: ProfitLossBuildInput): StatementLine
       noteNo: '24',
       noteKey: 'financeCost',
     }),
-    ...(hasLoans
-      ? [
-          line('Loan Interest (from schedule)', loanInterestCurrent, loanInterestPrevious, {
-            isSubLine: true,
-            noteNo: '24',
-            noteKey: 'financeCost',
-          }),
-        ]
-      : []),
     line('Depreciation (from schedule)', depCurrent, depPrevious, {
       noteNo: '9',
       noteKey: 'depreciationAmortization',

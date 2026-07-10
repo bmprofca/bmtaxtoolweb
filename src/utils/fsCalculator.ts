@@ -57,9 +57,6 @@ export function computeStatements(
     notes,
     depCurrent,
     depPrevious,
-    loanInterestCurrent,
-    loanInterestPrevious,
-    hasLoans,
     plAppropriationTotal,
   })
 

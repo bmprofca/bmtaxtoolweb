@@ -14,11 +14,11 @@ export function isOpeningStockLinkedSub(noteKey: keyof FsNotes, subId: string) {
   return noteKey === CLOSING_STOCK_SOURCE_NOTE && subId === OPENING_STOCK_SUB
 }
 
-/** Prior-year Note 21 closing stock is available for the opening-stock link. */
+/** Prior-year Note 21 closing stock is set — opening stock links only when that value is non-zero. */
 export function isOpeningStockLinkedFromPriorYear(
   previousYearSubAmounts: NoteSubAmounts | null | undefined,
 ): boolean {
-  return previousYearSubAmounts?.[CLOSING_STOCK_SOURCE_NOTE]?.[CLOSING_STOCK_SOURCE_SUB] !== undefined
+  return priorYearClosingStockAmount(previousYearSubAmounts) !== 0
 }
 
 export function priorYearClosingStockAmount(
