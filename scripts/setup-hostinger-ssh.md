@@ -16,10 +16,18 @@ Repo **bmprofca/bmtaxtoolweb** → Settings → Secrets → Actions:
 
 | Secret | Value |
 |--------|--------|
-| `DEPLOY_SSH_HOST` | `194.164.150.33` |
+| `DEPLOY_SSH_HOST` | `191.96.159.222` |
 | `DEPLOY_SSH_USER` | `u278432002` |
 | `DEPLOY_SSH_KEY` | Contents of `~/.ssh/id_ed25519` (private key) |
-| `DEPLOY_SSH_PORT` | `22` |
+| `DEPLOY_SSH_PORT` | `65002` |
+
+Connection from Mac (hPanel SSH details):
+
+```bash
+ssh -p 65002 u278432002@191.96.159.222
+```
+
+Or use the alias after `~/.ssh/config` is set: `ssh hostinger-bmtax`
 
 ## 3. Deploy
 
