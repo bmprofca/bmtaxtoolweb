@@ -227,8 +227,10 @@ input.fs-readonly-input {
 /* Keep cross-tab navigation links usable in locked mode (view-only). */
 .fs-page--edit-locked .panel .notes-gst-open-btn,
 .fs-page--edit-locked .panel .gst-note-link-btn,
+.fs-page--edit-locked .panel .gst-note-nav-btn,
 .fs-page--consolidated-readonly .panel .notes-gst-open-btn,
-.fs-page--consolidated-readonly .panel .gst-note-link-btn {
+.fs-page--consolidated-readonly .panel .gst-note-link-btn,
+.fs-page--consolidated-readonly .panel .gst-note-nav-btn {
   display: inline-flex !important;
   pointer-events: auto !important;
 }

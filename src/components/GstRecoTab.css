@@ -102,6 +102,18 @@
   font-weight: 500;
 }
 
+.gst-books-hint--linked {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+}
+
+.gst-note-nav-btn {
+  margin-left: 0.15rem;
+  font-size: 0.78rem;
+}
+
 .gst-note-link-btn {
   border: none;
   background: none;

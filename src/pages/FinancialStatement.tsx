@@ -1,4 +1,4 @@
-import { Fragment, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import FsContextBar from '../components/FsContextBar'
@@ -591,6 +591,7 @@ function FinancialStatement() {
   const [quickEntryNoteKey, setQuickEntryNoteKey] = useState<keyof FsNotes>('capitalAccount')
   const [quickEntryNoteSearch, setQuickEntryNoteSearch] = useState('')
   const [quickEntryNoteMenuOpen, setQuickEntryNoteMenuOpen] = useState(false)
+  const pendingScrollTargetRef = useRef<string | null>(null)
 
   useEffect(() => {
     fetchCaSettings()
@@ -631,8 +632,47 @@ function FinancialStatement() {
       return
     }
 
-    const timer = window.setTimeout(() => setHighlightedNote(null), 2500)
-    return () => window.clearTimeout(timer)
+    const targetId =
+      pendingScrollTargetRef.current ??
+      (highlightedNote.noteSubId
+        ? `note-sub-${highlightedNote.noteKey}-${highlightedNote.noteSubId}`
+        : `note-row-${highlightedNote.noteKey}`)
+
+    let cancelled = false
+    let frame = 0
+    const scrollToTarget = () => {
+      if (cancelled) {
+        return
+      }
+      const element = document.getElementById(targetId)
+      if (element) {
+        pendingScrollTargetRef.current = null
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        return
+      }
+      if (frame++ < 50) {
+        requestAnimationFrame(scrollToTarget)
+      }
+    }
+
+    requestAnimationFrame(scrollToTarget)
+    const fallbackTimer = window.setTimeout(() => {
+      if (cancelled) {
+        return
+      }
+      const element = document.getElementById(targetId)
+      if (element) {
+        pendingScrollTargetRef.current = null
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 250)
+
+    const highlightTimer = window.setTimeout(() => setHighlightedNote(null), 2500)
+    return () => {
+      cancelled = true
+      window.clearTimeout(fallbackTimer)
+      window.clearTimeout(highlightTimer)
+    }
   }, [activeTab, highlightedNote])
 
   useEffect(() => {
@@ -640,8 +680,30 @@ function FinancialStatement() {
       return
     }
 
-    const timer = window.setTimeout(() => setHighlightedBsRow(null), 2500)
-    return () => window.clearTimeout(timer)
+    const targetId = pendingScrollTargetRef.current ?? highlightedBsRow
+    let cancelled = false
+    let frame = 0
+    const scrollToTarget = () => {
+      if (cancelled) {
+        return
+      }
+      const element = document.getElementById(targetId)
+      if (element) {
+        pendingScrollTargetRef.current = null
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        return
+      }
+      if (frame++ < 50) {
+        requestAnimationFrame(scrollToTarget)
+      }
+    }
+
+    requestAnimationFrame(scrollToTarget)
+    const highlightTimer = window.setTimeout(() => setHighlightedBsRow(null), 2500)
+    return () => {
+      cancelled = true
+      window.clearTimeout(highlightTimer)
+    }
   }, [activeTab, highlightedBsRow])
 
   useEffect(() => {
@@ -649,8 +711,30 @@ function FinancialStatement() {
       return
     }
 
-    const timer = window.setTimeout(() => setHighlightedPlRow(null), 2500)
-    return () => window.clearTimeout(timer)
+    const targetId = pendingScrollTargetRef.current ?? highlightedPlRow
+    let cancelled = false
+    let frame = 0
+    const scrollToTarget = () => {
+      if (cancelled) {
+        return
+      }
+      const element = document.getElementById(targetId)
+      if (element) {
+        pendingScrollTargetRef.current = null
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        return
+      }
+      if (frame++ < 50) {
+        requestAnimationFrame(scrollToTarget)
+      }
+    }
+
+    requestAnimationFrame(scrollToTarget)
+    const highlightTimer = window.setTimeout(() => setHighlightedPlRow(null), 2500)
+    return () => {
+      cancelled = true
+      window.clearTimeout(highlightTimer)
+    }
   }, [activeTab, highlightedPlRow])
 
   const switchFsTab = (tab: FsTab, options?: { scrollToTop?: boolean }) => {
@@ -662,41 +746,27 @@ function FinancialStatement() {
     }
   }
 
-  const scrollToFsElement = (elementId: string) => {
-    const attempt = (retriesLeft: number) => {
-      const element = document.getElementById(elementId)
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        return
-      }
-      if (retriesLeft > 0) {
-        requestAnimationFrame(() => attempt(retriesLeft - 1))
-      }
-    }
-    requestAnimationFrame(() => attempt(8))
-  }
-
   const navigateToNote = (noteKey: keyof FsNotes, noteSubId?: string) => {
     const targetId = noteSubId
       ? `note-sub-${noteKey}-${noteSubId}`
       : `note-row-${noteKey}`
+    pendingScrollTargetRef.current = targetId
     setHighlightedNote({ noteKey, noteSubId })
     switchFsTab('notes', { scrollToTop: false })
-    scrollToFsElement(targetId)
   }
 
   const navigateToBalanceSheet = (noteKey: keyof FsNotes, noteSubId?: string) => {
     const targetId = balanceSheetRowId(noteKey, noteSubId)
+    pendingScrollTargetRef.current = targetId
     setHighlightedBsRow(targetId)
     switchFsTab('balance-sheet', { scrollToTop: false })
-    scrollToFsElement(targetId)
   }
 
   const navigateToProfitLoss = (noteKey: keyof FsNotes, noteSubId?: string) => {
     const targetId = profitLossRowId(noteKey, noteSubId)
+    pendingScrollTargetRef.current = targetId
     setHighlightedPlRow(targetId)
     switchFsTab('profit-loss', { scrollToTop: false })
-    scrollToFsElement(targetId)
   }
 
   const navigateToGstReco = () => {
@@ -1371,6 +1441,7 @@ function FinancialStatement() {
       ? activeTab
       : (fsVisibleTabs[0]?.[0] ?? 'notes')
   }, [fsVisibleTabs, activeTab])
+  const displayTab = resolvedActiveTab
   const printableTabSet = useMemo(
     () => new Set(fsVisibleTabs.filter(([tab]) => tab !== 'final-info').map(([tab]) => tab)),
     [fsVisibleTabs],
@@ -1430,7 +1501,11 @@ function FinancialStatement() {
     Boolean(printAllSelectedTabs && printAllSelectedTabs.size > 0)
 
   const isTabMounted = (tab: FsTab) =>
-    printAll || resolvedActiveTab === tab || Boolean(printAllSelectedTabs?.has(tab))
+    printAll ||
+    displayTab === tab ||
+    activeTab === tab ||
+    tab === 'notes' ||
+    Boolean(printAllSelectedTabs?.has(tab))
 
   const deferredNoteSubAmounts = useDeferredValue(fsData?.noteSubAmounts)
 
@@ -3916,7 +3991,7 @@ function FinancialStatement() {
           : 'other'
 
   const tabPanelClass = (tab: FsTab) =>
-    `panel fs-tab-panel${resolvedActiveTab === tab ? ' is-active' : ''}${printTabExtraClass(tab)}`
+    `panel fs-tab-panel${displayTab === tab ? ' is-active' : ''}${printTabExtraClass(tab)}`
 
   const isFsReadOnly = isConsolidatedView || isFsFinalLocked
   const canAddDepreciationRow =
@@ -4561,7 +4636,7 @@ function FinancialStatement() {
           <button
             key={tab}
             type="button"
-            className={resolvedActiveTab === tab ? 'tab active' : 'tab'}
+            className={displayTab === tab ? 'tab active' : 'tab'}
             onClick={() => switchFsTab(tab)}
           >
             {label}
