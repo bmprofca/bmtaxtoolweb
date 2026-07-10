@@ -772,3 +772,19 @@ export function sumOpeningByType(loans: LoanRecord[], loanType: 'long-term' | 's
     .filter((loan) => loan.loanType === loanType)
     .reduce((total, loan) => total + (Number(loan.openingBalance) || 0), 0)
 }
+
+export function unionLoansForComparative(
+  currentLoans: LoanRecord[],
+  previousLoans: LoanRecord[] | null | undefined,
+): LoanRecord[] {
+  if (!previousLoans?.length) {
+    return currentLoans
+  }
+  const byId = new Map(currentLoans.map((loan) => [loan.id, loan]))
+  for (const loan of previousLoans) {
+    if (!byId.has(loan.id)) {
+      byId.set(loan.id, loan)
+    }
+  }
+  return Array.from(byId.values())
+}

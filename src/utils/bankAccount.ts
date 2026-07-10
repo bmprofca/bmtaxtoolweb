@@ -239,11 +239,22 @@ export function buildBankShortTermBorrowingBalances(
   previousAccounts: BankAccountRecord[] = [],
 ) {
   const balances = new Map<string, NoteValue>()
+  const currentIds = new Set(accounts.map((account) => account.id))
 
   for (const account of getShortTermBorrowingBankAccounts(accounts)) {
     balances.set(bankShortTermSubId(account.id), {
       current: getDebitClosingAmount(account.closingBalance),
       previous: findPreviousBankDebitBalance(account, previousAccounts),
+    })
+  }
+
+  for (const account of getShortTermBorrowingBankAccounts(previousAccounts)) {
+    if (currentIds.has(account.id)) {
+      continue
+    }
+    balances.set(bankShortTermSubId(account.id), {
+      current: 0,
+      previous: getDebitClosingAmount(account.closingBalance),
     })
   }
 
@@ -269,16 +280,43 @@ export function findPreviousBankCreditBalance(
   return 0
 }
 
+export function unionBankAccountsForComparative(
+  currentAccounts: BankAccountRecord[],
+  previousAccounts: BankAccountRecord[] = [],
+): BankAccountRecord[] {
+  if (!previousAccounts.length) {
+    return currentAccounts
+  }
+  const byId = new Map(currentAccounts.map((account) => [account.id, account]))
+  for (const account of previousAccounts) {
+    if (!byId.has(account.id)) {
+      byId.set(account.id, account)
+    }
+  }
+  return Array.from(byId.values())
+}
+
 export function buildBankCashAtBankBalances(
   accounts: BankAccountRecord[],
   previousAccounts: BankAccountRecord[] = [],
 ) {
   const balances = new Map<string, NoteValue>()
+  const currentIds = new Set(accounts.map((account) => account.id))
 
   for (const account of getCashAtBankAccounts(accounts)) {
     balances.set(bankAccountSubId(account.id), {
       current: getCreditClosingAmount(account.closingBalance),
       previous: findPreviousBankCreditBalance(account, previousAccounts),
+    })
+  }
+
+  for (const account of getCashAtBankAccounts(previousAccounts)) {
+    if (currentIds.has(account.id)) {
+      continue
+    }
+    balances.set(bankAccountSubId(account.id), {
+      current: 0,
+      previous: getCreditClosingAmount(account.closingBalance),
     })
   }
 

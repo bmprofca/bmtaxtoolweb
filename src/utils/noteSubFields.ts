@@ -1439,6 +1439,21 @@ export function buildSubResolveContext(
     loanInterests.set(`interest-${loan.id}`, { current: loan.interestForYear, previous: previousInterest })
   }
 
+  const currentLoanIds = new Set(computedLoans.map((loan) => loan.id))
+  for (const loan of previousYearComputedLoans) {
+    if (currentLoanIds.has(loan.id)) {
+      continue
+    }
+    loanClosings.set(`loan-${loan.id}`, {
+      current: 0,
+      previous: loan.closingBalance,
+    })
+    loanInterests.set(`interest-${loan.id}`, {
+      current: 0,
+      previous: loan.interestForYear,
+    })
+  }
+
   const revenueRows = resolveNoteSubRows('revenueFromOperations', {
     noteSubAmounts,
     previousYearSubAmounts,

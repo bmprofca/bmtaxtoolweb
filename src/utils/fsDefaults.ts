@@ -290,6 +290,24 @@ export function createEmptyCashAdjustment(): CashAdjustment {
   }
 }
 
+/** Prior FY current cash adjustment becomes the comparative previous column when viewing the next FY. */
+export function buildComparativeCashAdjustment(
+  currentYear: Partial<CashAdjustment> | null | undefined,
+  priorYear: Partial<CashAdjustment> | null | undefined,
+): CashAdjustment {
+  const current = {
+    current: Number(currentYear?.current) || 0,
+    previous: Number(currentYear?.previous) || 0,
+  }
+  if (!priorYear) {
+    return current
+  }
+  return {
+    current: current.current,
+    previous: Number(priorYear.current) || 0,
+  }
+}
+
 export function normalizePreviousYearDepreciation(
   value: number | PreviousYearDepreciationSummary | undefined,
 ): PreviousYearDepreciationSummary {

@@ -50,7 +50,13 @@ import {
   formatStatementAmount,
   varianceClass,
 } from '../utils/fsCalculator'
-import { buildFsDerivedState, fsDataFingerprint } from '../utils/fsEngine'
+import {
+  buildFsDerivedState,
+  fsDataFingerprint,
+  mergeComparativeDerivedState,
+  type FsDerivedState,
+} from '../utils/fsEngine'
+import { resolveYearDisplaySnapshot, type YearDisplaySnapshotChain } from '../utils/yearDisplaySnapshot'
 import { buildExportBusinessHeaderHtml, buildExportBusinessHeaderLines } from '../utils/printExportHeader'
 import { buildBalanceSheetLines, balanceSheetRowId, isBalanceSheetNoteNo, NOTE_SUB_BALANCE_SHEET_REFS } from '../utils/balanceSheetBuilder'
 import { isProfitLossNoteNo, profitLossRowId, NOTE_SUB_PL_REFS } from '../utils/plBuilder'
@@ -59,6 +65,7 @@ import {
   NOTE_FIELDS,
   NOTE_GROUP_ORDER,
   createEmptyUdinDetails,
+  buildComparativeCashAdjustment,
   migrateNoteBreakdowns,
   migrateNotes,
   notesWithPreviousFromPriorFy,
@@ -548,6 +555,8 @@ function FinancialStatement() {
   > | null>(null)
   const [previousYearLoans, setPreviousYearLoans] = useState<LoanRecord[] | null>(null)
   const [previousYearBankAccounts, setPreviousYearBankAccounts] = useState<BankAccountRecord[]>([])
+  const [previousYearCashAdjustment, setPreviousYearCashAdjustment] = useState<CashAdjustment | null>(null)
+  const [previousYearDerived, setPreviousYearDerived] = useState<FsDerivedState | null>(null)
   const [loanModalOpen, setLoanModalOpen] = useState(false)
   const [editingLoan, setEditingLoan] = useState<LoanRecord | null>(null)
   const [bankModalOpen, setBankModalOpen] = useState(false)
@@ -827,12 +836,35 @@ function FinancialStatement() {
       setDepreciationHistory(loadedDepreciationHistory)
       const fs = fsFetched ?? createEmptyFsData(clientId, fyId, businessId)
 
+      const snapshotChain: YearDisplaySnapshotChain = {
+        financialYears: clientData.financialYears || [],
+        ledgers: loadedLedgers,
+        fetchFs: async (targetFyId, targetFy) => {
+          const targetFyMeta = clientData.financialYears?.find((item) => item.id === targetFyId)
+          return fetchFsForYear(
+            targetFyId,
+            targetFyMeta ||
+              ({
+                endYear: targetFy.endYear,
+                closedBusinessIds: targetFy.closedBusinessIds,
+              } as typeof fyMeta),
+          )
+        },
+        displayCache: new Map(),
+        preparedCache: new Map(),
+        rawFsCache: new Map(),
+      }
+      if (priorFy && priorFsFetched) {
+        snapshotChain.rawFsCache.set(priorFy.id, priorFsFetched)
+      }
+
       let priorNotes: FsNotes | null = null
       let priorSubAmounts: NoteSubAmounts | null = null
       let priorLoans: LoanRecord[] | null = null
       let priorBankAccounts: BankAccountRecord[] = []
       let priorFsPrepared: FinancialStatementData | null = null
       let priorPlAppropriationAmounts: Record<string, NoteSubCell> | null = null
+      let previousYearDerivedSnapshot: FsDerivedState | null = null
       if (priorFy && priorFsFetched) {
         try {
           const priorFs = priorFsFetched
@@ -949,9 +981,15 @@ function FinancialStatement() {
               [],
               priorCapitalLines,
               loadedLedgers,
+              null,
+              {
+                current: Number(priorFs.cashAdjustment?.current) || 0,
+                previous: Number(priorFs.cashAdjustment?.previous) || 0,
+              },
             ),
           )
           priorSubAmounts = priorSub
+          previousYearDerivedSnapshot = await resolveYearDisplaySnapshot(priorFy.id, snapshotChain)
           priorFsPrepared = {
             ...priorFs,
             notes: priorNotes,
@@ -977,15 +1015,21 @@ function FinancialStatement() {
           priorBankAccounts = []
           priorFsPrepared = null
           priorPlAppropriationAmounts = null
+          previousYearDerivedSnapshot = null
           setPreviousYearPlAppropriationAmounts(null)
         }
       } else {
         setPreviousYearPlAppropriationAmounts(null)
+        setPreviousYearDerived(null)
       }
+      setPreviousYearDerived(previousYearDerivedSnapshot)
       setPreviousYearNotes(priorNotes)
       setPreviousYearSubAmounts(priorSubAmounts)
       setPreviousYearLoans(priorLoans)
       setPreviousYearBankAccounts(priorBankAccounts)
+      setPreviousYearCashAdjustment(
+        priorFsFetched ? normalizeCashAdjustment(priorFsFetched.cashAdjustment) : null,
+      )
       const fyStart = fyMeta?.startYear ?? new Date().getFullYear()
       const fyEnd = fyMeta?.endYear ?? fyStart + 1
       let loans = normalizeLoans(fs.loans, fs.repaymentSchedule, fyStart, fyEnd)
@@ -1408,6 +1452,10 @@ function FinancialStatement() {
       return null
     }
     const merged = notesWithPreviousFromPriorFy(fsData.notes, previousYearNotes)
+    const comparativeCashAdjustment = buildComparativeCashAdjustment(
+      fsData.cashAdjustment,
+      previousYearCashAdjustment,
+    )
     return {
       notes: merged,
       noteBreakdowns: fsData.noteBreakdowns,
@@ -1429,13 +1477,14 @@ function FinancialStatement() {
       plAppropriationTotal,
       bankAccounts: fsData.bankAccounts,
       previousYearBankAccounts,
-      cashAdjustment: normalizeCashAdjustment(fsData.cashAdjustment),
+      cashAdjustment: comparativeCashAdjustment,
     }
   }, [
     fsData,
     fy,
     previousYearNotes,
     previousYearSubAmounts,
+    previousYearCashAdjustment,
     deferredNoteSubAmounts,
     loanCalcPayload,
     previousYearComputedLoans,
@@ -1466,7 +1515,7 @@ function FinancialStatement() {
       capitalAccountLines: fsData.capitalAccountLines ?? [],
       ledgers,
       openingBalanceLocks,
-      cashAdjustment: normalizeCashAdjustment(fsData.cashAdjustment),
+      cashAdjustment: buildComparativeCashAdjustment(fsData.cashAdjustment, previousYearCashAdjustment),
       fyStartYear: fy.startYear,
       fyEndYear: fy.endYear,
     })
@@ -1476,6 +1525,7 @@ function FinancialStatement() {
     fy,
     deferredNoteSubAmounts,
     previousYearSubAmounts,
+    previousYearCashAdjustment,
     loanCalcPayload,
     previousYearComputedLoans,
     plAppropriationTotal,
@@ -1484,9 +1534,16 @@ function FinancialStatement() {
     openingBalanceLocks,
   ])
 
-  const effectiveNotes = fsDerived?.effectiveNotes ?? null
-  const computed = fsDerived?.computed ?? null
-  const noteSubRowsMap = fsDerived?.noteSubRowsMap ?? null
+  const displayDerived = useMemo(() => {
+    if (!fsDerived) {
+      return null
+    }
+    return mergeComparativeDerivedState(fsDerived, previousYearDerived)
+  }, [fsDerived, previousYearDerived])
+
+  const effectiveNotes = displayDerived?.effectiveNotes ?? null
+  const computed = displayDerived?.computed ?? null
+  const noteSubRowsMap = displayDerived?.noteSubRowsMap ?? null
 
   const noteCalcMap = useMemo(() => {
     if (!noteCalcContext || !effectiveNotes) {
@@ -2481,9 +2538,16 @@ function FinancialStatement() {
     const isCapitalNote = noteKey === 'capitalAccount'
     const isMultiLineNote = isManualNoteLineKey(noteKey)
     const hasAdminLines = (fsData?.administrativeExpenseLines?.length ?? 0) > 0
-    const hasLongTermLoans = fsData?.loans.some((loan) => loan.loanType === 'long-term') ?? false
-    const hasShortTermLoans = fsData?.loans.some((loan) => loan.loanType === 'short-term') ?? false
+    const hasLongTermLoans =
+      (fsData?.loans.some((loan) => loan.loanType === 'long-term') ?? false) ||
+      (previousYearLoans?.some((loan) => loan.loanType === 'long-term') ?? false)
+    const hasShortTermLoans =
+      (fsData?.loans.some((loan) => loan.loanType === 'short-term') ?? false) ||
+      (previousYearLoans?.some((loan) => loan.loanType === 'short-term') ?? false)
     const hasManualStLines = (fsData?.otherShortTermBorrowingLines?.length ?? 0) > 0
+    const hasPriorNoteSubData = subRows.some(
+      (sub) => sub.kind !== 'header' && sub.previous !== 0,
+    )
     const hasManualNoteLines = (fsData?.manualNoteLines ?? []).some((line) => line.noteKey === noteKey)
     const hasCapitalLines = (fsData?.capitalAccountLines?.length ?? 0) > 0
 
@@ -2530,7 +2594,7 @@ function FinancialStatement() {
 
     return (
       <>
-        {isLongTermNote && !hasLongTermLoans && (
+        {isLongTermNote && !hasLongTermLoans && !hasPriorNoteSubData && (
           <tr className="notes-lt-empty-row">
             <td className="notes-sno-col" />
             <td className="notes-particular-col notes-lt-empty-hint" colSpan={trailingColSpan}>
@@ -2547,7 +2611,7 @@ function FinancialStatement() {
             </td>
           </tr>
         )}
-        {isShortTermNote && !hasShortTermLoans && !hasManualStLines && (
+        {isShortTermNote && !hasShortTermLoans && !hasManualStLines && !hasPriorNoteSubData && (
           <tr className="notes-st-empty-row">
             <td className="notes-sno-col" />
             <td className="notes-particular-col notes-st-empty-hint" colSpan={trailingColSpan}>
@@ -2557,7 +2621,7 @@ function FinancialStatement() {
             </td>
           </tr>
         )}
-        {isAdminNote && !hasAdminLines && (
+        {isAdminNote && !hasAdminLines && !hasPriorNoteSubData && (
           <tr className="notes-admin-empty-row">
             <td className="notes-sno-col" />
             <td className="notes-particular-col notes-admin-empty-hint" colSpan={trailingColSpan}>
@@ -2566,7 +2630,7 @@ function FinancialStatement() {
             </td>
           </tr>
         )}
-        {isMultiLineNote && !hasManualNoteLines && (
+        {isMultiLineNote && !hasManualNoteLines && !hasPriorNoteSubData && (
           <tr className="notes-manual-empty-row">
             <td className="notes-sno-col" />
             <td className="notes-particular-col notes-manual-empty-hint" colSpan={trailingColSpan}>
@@ -2575,7 +2639,7 @@ function FinancialStatement() {
             </td>
           </tr>
         )}
-        {isCapitalNote && !hasCapitalLines && (
+        {isCapitalNote && !hasCapitalLines && !hasPriorNoteSubData && (
           <tr className="notes-capital-empty-row">
             <td className="notes-sno-col" />
             <td className="notes-particular-col notes-capital-empty-hint" colSpan={trailingColSpan}>
