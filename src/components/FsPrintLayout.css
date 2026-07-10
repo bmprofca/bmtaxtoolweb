@@ -153,6 +153,29 @@
     display: none !important;
   }
 
+  /* Print All: fixed client header at top center on every page (same as single Notes print) */
+  .fs-print-fixed-client-header {
+    display: none !important;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-fixed-client-header {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    z-index: 3;
+    box-sizing: border-box;
+    padding: 0 0 3mm;
+    background: #fff;
+    text-align: center !important;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-fixed-client-header .fs-print-header-business {
+    margin-bottom: 0;
+  }
+
   .fs-print-notes-stationery,
   .fs-print-notes-stationery *,
   .fs-print-notes-banner-cell,
@@ -167,26 +190,126 @@
     display: none !important;
   }
 
-  .fs-page.fs-print-notes-section .fs-print-notes-stationery {
+  /* Notes print: full-width centered client header outside the table (repeats on every page) */
+  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-tab-panel[data-fs-tab='notes'] > .fs-print-section-stationery,
+  .fs-page.fs-print-notes-only .fs-tab-panel[data-fs-tab='notes'] > .fs-print-section-stationery {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    z-index: 2;
+    box-sizing: border-box;
+    padding: 0 0 4mm;
+    background: #fff;
+    text-align: center !important;
+  }
+
+  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-tab-panel[data-fs-tab='notes'] .fs-print-notes-banner-row,
+  .fs-page.fs-print-notes-only .fs-tab-panel[data-fs-tab='notes'] .fs-print-notes-banner-row {
+    display: none !important;
+  }
+
+  /* Print All: section title blocks for non-table sections (GST, UDIN) */
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='gst-reco'] > .fs-print-section-stationery,
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='udin-details'] > .fs-print-section-stationery {
+    display: block !important;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 0 3mm;
+    margin: 0 0 2mm;
+    background: #fff;
+    text-align: center !important;
+    position: static;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-tab-panel[data-fs-tab='gst-reco'],
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-tab-panel[data-fs-tab='udin-details'] {
+    padding-top: 24mm !important;
+  }
+
+  /* Full-width layout table escapes narrow first-column squeeze in repeating thead banners */
+  .fs-print-banner-layout {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    border: none !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+  }
+
+  .fs-print-banner-layout-cell {
+    width: 100% !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    text-align: center !important;
+    vertical-align: bottom !important;
+    background: #fff !important;
+  }
+
+  .fs-print-client-header,
+  .fs-print-client-header .fs-print-header-business,
+  .fs-print-client-header .fs-print-header-center,
+  .fs-print-client-header .fs-print-business-name,
+  .fs-print-client-header .fs-print-proprietorship,
+  .fs-print-client-header .fs-print-location,
+  .fs-print-client-header .fs-print-notes-report-line,
+  .fs-print-client-header .fs-print-notes-period-line,
+  .fs-print-notes-banner-row .fs-print-client-header,
+  .fs-print-notes-banner-row .fs-print-client-header * {
+    text-align: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  /* Print-all / repeating headers: centered section title below fixed client header */
+  .fs-print-notes-banner-surface {
+    display: block;
+    width: 100vw;
+    max-width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    padding: 0 15mm 2mm;
+    box-sizing: border-box;
+    text-align: center !important;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-banner-surface {
+    padding-top: 0;
+  }
+
+  .fs-print-notes-banner-surface .fs-print-header-business {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+
+  /* Repeating client header for other sections uses table thead banner rows in print */
+  .fs-print-section-stationery {
+    display: none !important;
+  }
+
+  .fs-tab-panel[data-fs-tab='udin-details'] > .fs-print-section-stationery {
     display: block !important;
     width: 100%;
     box-sizing: border-box;
     padding: 0 0 4mm;
     background: #fff;
     text-align: center;
-  }
-
-  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-print-notes-stationery {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 2;
-  }
-
-  .fs-page.fs-print-notes-section.fs-print-all .fs-print-notes-stationery {
     position: static;
     margin: 0 0 3mm;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='udin-details'] > .fs-print-section-stationery {
+    margin-top: 0;
   }
 
   .fs-print-notes-stationery .fs-print-header-center,
@@ -204,14 +327,16 @@
   }
 
   .fs-print-notes-stationery .fs-print-header-business,
-  .fs-print-notes-banner-cell .fs-print-header-business {
+  .fs-print-notes-banner-cell .fs-print-header-business,
+  .fs-print-notes-banner-surface .fs-print-header-business {
     margin-bottom: 0;
     width: 100%;
     max-width: 100%;
   }
 
   .fs-print-notes-stationery .fs-print-business-name,
-  .fs-print-notes-banner-cell .fs-print-business-name {
+  .fs-print-notes-banner-cell .fs-print-business-name,
+  .fs-print-notes-banner-surface .fs-print-business-name {
     margin: 0;
     font-size: 10pt !important;
     font-weight: 700 !important;
@@ -222,7 +347,8 @@
   }
 
   .fs-print-notes-stationery .fs-print-proprietorship,
-  .fs-print-notes-banner-cell .fs-print-proprietorship {
+  .fs-print-notes-banner-cell .fs-print-proprietorship,
+  .fs-print-notes-banner-surface .fs-print-proprietorship {
     margin: 0.6mm 0 0;
     font-size: 7pt !important;
     font-weight: 500 !important;
@@ -231,12 +357,19 @@
   }
 
   .fs-print-notes-stationery .fs-print-location,
-  .fs-print-notes-banner-cell .fs-print-location {
+  .fs-print-notes-banner-cell .fs-print-location,
+  .fs-print-notes-banner-surface .fs-print-location {
     margin: 0.5mm 0 0;
     font-size: 6pt !important;
     font-weight: 400 !important;
     line-height: 1.25;
     white-space: normal !important;
+  }
+
+  .fs-print-notes-report-line,
+  .fs-print-notes-period-line,
+  .fs-print-notes-report-block {
+    text-align: center !important;
   }
 
   .fs-print-notes-report-line {
@@ -267,10 +400,14 @@
   }
 
   .fs-print-body.fs-print-statement-format .notes-table .fs-print-notes-banner-cell,
+  .fs-print-body.fs-print-statement-format .statement-table .fs-print-notes-banner-cell,
+  .fs-print-body.fs-print-statement-format .schedule-table .fs-print-notes-banner-cell,
+  .fs-print-body.fs-print-statement-format .bank-account-table .fs-print-notes-banner-cell,
+  .fs-print-body.fs-print-statement-format .pl-appropriation-table .fs-print-notes-banner-cell,
   .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .notes-table .fs-print-notes-banner-cell {
     border: none !important;
     border-bottom: none !important;
-    padding: 0 0 2.5mm !important;
+    padding: 0 !important;
     text-align: center !important;
     font-weight: 400 !important;
     background: #fff !important;
@@ -280,22 +417,21 @@
     line-height: normal !important;
     font-size: inherit !important;
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: none !important;
   }
 
-  .fs-page.fs-print-notes-section .fs-print-body .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th,
-  .fs-page.fs-print-all .fs-print-body .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th {
-    border-top: 0.5px solid #000 !important;
-    background: #eef2f7 !important;
-    color: #000 !important;
-    font-weight: 700 !important;
-    print-color-adjust: exact !important;
-    -webkit-print-color-adjust: exact !important;
-    vertical-align: bottom !important;
+  .fs-print-notes-banner-row th.fs-print-notes-banner-cell {
+    text-align: center !important;
   }
 
-  /* Notes-only print: borderless spacer clears fixed stationery; header row carries top border */
-  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .fs-print-notes-head-spacer-cell {
+  .fs-page.fs-print-notes-section:not(.fs-print-all)
+    .fs-print-body.fs-print-statement-format
+    .fs-tab-panel[data-fs-tab='notes']
+    .fs-print-notes-head-spacer-cell,
+  .fs-page.fs-print-notes-only
+    .fs-print-body.fs-print-statement-format
+    .fs-tab-panel[data-fs-tab='notes']
+    .fs-print-notes-head-spacer-cell {
     height: 32mm;
     padding: 0 !important;
     margin: 0 !important;
@@ -305,13 +441,22 @@
     font-size: 0 !important;
   }
 
-  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th {
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-head-spacer-cell {
+    height: 26mm;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    background: #fff !important;
+    line-height: 0 !important;
+    font-size: 0 !important;
+  }
+
+  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th {
     padding: 3pt 4pt !important;
   }
 
-  /* Print-all notes: space between business banner and column headers */
-  .fs-page.fs-print-all.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .fs-print-notes-banner-cell {
-    padding-bottom: 5mm !important;
+  .fs-page.fs-print-all.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .fs-print-notes-banner-surface {
+    padding-bottom: 2mm;
   }
 
   .fs-page.fs-print-all.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th {
@@ -342,7 +487,6 @@
     font-size: 6pt;
     font-weight: 400;
     line-height: 1.2;
-    word-break: break-word;
   }
 
   .fs-print-report-title {
@@ -736,6 +880,18 @@
     font-weight: 600 !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+
+  .fs-page.fs-print-all .fs-tab-panel::before {
+    display: none !important;
+  }
+
+  .notes-table thead,
+  .statement-table thead,
+  .schedule-table thead,
+  .bank-account-table thead,
+  .pl-appropriation-table thead {
+    display: table-header-group;
   }
 
   .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='notes']::before {
@@ -2059,13 +2215,12 @@
     outline: none !important;
   }
 
-  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table th.fs-print-notes-banner-cell {
-    border: none !important;
-    box-shadow: none !important;
-    outline: none !important;
-  }
-
-  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table th.fs-print-notes-head-spacer-cell {
+  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table th.fs-print-notes-banner-cell,
+  .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table th.fs-print-notes-head-spacer-cell,
+  .fs-print-body.fs-print-statement-format .statement-table th.fs-print-notes-banner-cell,
+  .fs-print-body.fs-print-statement-format .schedule-table th.fs-print-notes-banner-cell,
+  .fs-print-body.fs-print-statement-format .bank-account-table th.fs-print-notes-banner-cell,
+  .fs-print-body.fs-print-statement-format .pl-appropriation-table th.fs-print-notes-banner-cell {
     border: none !important;
     box-shadow: none !important;
     outline: none !important;

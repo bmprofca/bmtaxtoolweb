@@ -14,6 +14,7 @@ import type { BankAccountRecord } from '../types/bankAccount'
 import type { OpeningBalanceLocks } from './openingBalanceCarryForward'
 import { NOTE_OPENING_CARRY_RULES } from './openingBalanceCarryForward'
 import { isNoteSubCurrentYearReadOnly } from './noteSubEditability'
+import { migrateCapitalAccountSubAmounts } from './capitalAccountLineConfig'
 import {
   bankAccountSubId,
   bankShortTermSubId,
@@ -871,7 +872,7 @@ export function normalizeNoteSubAmounts(
       if (fromStore) {
         result[noteKey]![sub.id] = {
           current: Number(fromStore.current) || 0,
-          previous: 0,
+          previous: Number(fromStore.previous) || 0,
         }
         continue
       }
@@ -885,6 +886,36 @@ export function normalizeNoteSubAmounts(
   }
 
   return result
+}
+
+/** Merge stored subs with all defined note sub-lines so save payloads are complete. */
+export function buildCompleteNoteSubAmounts(
+  raw: NoteSubAmounts | undefined,
+  noteBreakdowns: NoteBreakdowns | undefined,
+  loans: LoanRecord[],
+  administrativeExpenseLines: AdministrativeExpenseLine[],
+  otherShortTermBorrowingLines: OtherShortTermBorrowingLine[],
+  manualNoteLines: ManualNoteLine[],
+  bankAccounts: BankAccountRecord[],
+  capitalAccountLines: CapitalAccountLine[],
+  ledgers: LedgerRecord[],
+): NoteSubAmounts {
+  let subs = normalizeNoteSubAmounts(
+    raw,
+    noteBreakdowns,
+    loans,
+    administrativeExpenseLines,
+    otherShortTermBorrowingLines,
+    manualNoteLines,
+    bankAccounts,
+    capitalAccountLines,
+    ledgers,
+  )
+  subs = migrateAdminExpenseSubAmounts(administrativeExpenseLines, subs)
+  subs = migrateOtherShortTermSubAmounts(otherShortTermBorrowingLines, subs)
+  subs = migrateManualNoteLineSubAmounts(manualNoteLines, subs)
+  subs = migrateCapitalAccountSubAmounts(capitalAccountLines, subs)
+  return subs
 }
 
 interface SubResolveContext {

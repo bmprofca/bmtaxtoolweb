@@ -32,7 +32,7 @@ function FsPrintBusinessHeader({ client, business, isConsolidated }: FsPrintBusi
   const entityName = isConsolidated ? client.name : business?.name || client.name
 
   return (
-    <div className="fs-print-header-center fs-print-header-business">
+    <div className="fs-print-header-center fs-print-header-business fs-print-client-header">
       <h1 className="fs-print-business-name">{entityName}</h1>
 
       {!isConsolidated && isProprietorship && (

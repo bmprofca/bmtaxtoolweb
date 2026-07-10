@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import FsContextBar from '../components/FsContextBar'
 import FsPrintLayout from '../components/FsPrintLayout'
-import FsPrintBusinessHeader from '../components/FsPrintBusinessHeader'
+import FsPrintSectionStationery from '../components/FsPrintSectionStationery'
+import FsPrintTableBannerRow, { FsPrintHeadSpacerRow } from '../components/FsPrintTableBannerRow'
 import '../components/FsPrintLayout.css'
 import GstRecoTab from '../components/GstRecoTab'
 import BankAccountModal from '../components/BankAccountModal'
@@ -13,6 +14,7 @@ import { fetchCaSettings, normalizeCaSettings } from '../api/caSettings'
 import type { CaProfile } from '../types/caProfile'
 import { EMPTY_CA_PROFILE, isActiveCaProfile } from '../types/caProfile'
 import { fetchClient } from '../api/client'
+import { updateGlobalFinancialYearStatementType } from '../api/fySettings'
 import {
   fetchDepreciationHistory,
   fetchFsData,
@@ -122,6 +124,7 @@ import {
   normalizeManualNoteLines,
   normalizeNoteSubAmounts,
   normalizeOtherShortTermBorrowingLines,
+  buildCompleteNoteSubAmounts,
   type ResolvedSubRow,
 } from '../utils/noteSubFields'
 import { buildEffectiveNotes, getNoteCalcMap } from '../utils/noteCalculator'
@@ -180,6 +183,7 @@ import {
   applyOpeningBalanceCarryForward,
   applyDepreciationScheduleCarryForward,
   applyPriorDepClosingToRow,
+  buildOpeningBalanceLocksForLoadedYear,
   buildPriorYearClosingSnapshot,
   buildPriorDepClosingsByLedgerId,
   hasPriorYearDepreciationData,
@@ -307,6 +311,8 @@ function StatementTable({
   onNoteNavigate,
   highlightedRowId,
   wrapperClassName,
+  printBanner,
+  printHeadSpacer,
 }: {
   title: string
   lines: StatementLine[]
@@ -319,6 +325,8 @@ function StatementTable({
   onNoteNavigate?: (noteKey: keyof FsNotes, noteSubId?: string) => void
   highlightedRowId?: string | null
   wrapperClassName?: string
+  printBanner?: ReactNode
+  printHeadSpacer?: ReactNode
 }) {
   const formatValue = useStatementAmountFormat ? formatStatementAmount : formatAmount
 
@@ -405,6 +413,8 @@ function StatementTable({
             </colgroup>
           )}
           <thead>
+            {printHeadSpacer}
+            {printBanner}
             <tr className="statement-head-row">
               <th className="statement-particular-col">Particulars</th>
               {showNoteColumn && <th className="statement-note-col">Note</th>}
@@ -745,17 +755,6 @@ function FinancialStatement() {
 
       const loadedLedgers = normalizeLedgers(ledgerData.ledgers)
       setLedgers(loadedLedgers)
-      let loadedDepreciationHistory: AssetDepreciationHistoryRow[] = []
-      if (!isConsolidatedView) {
-        try {
-          const { history } = await fetchDepreciationHistory(clientId, businessId)
-          loadedDepreciationHistory = history
-          setDepreciationHistory(history)
-        } catch {
-          loadedDepreciationHistory = []
-          setDepreciationHistory([])
-        }
-      }
       const fyMeta = clientData.financialYears?.find((item) => item.id === fyId)
 
       if (!fyMeta) {
@@ -782,43 +781,61 @@ function FinancialStatement() {
         }
       }
 
-      const fetchBusinessFs = (targetBusinessId: string) =>
-        fetchFsData(clientId, fyId, targetBusinessId)
+      const priorFy = findPreviousFinancialYear(clientData.financialYears || [], fyId)
+      const priorFyMeta = priorFy
+        ? clientData.financialYears?.find((item) => item.id === priorFy.id)
+        : undefined
 
-      let fs: FinancialStatementData
-      try {
-        fs = isConsolidatedView
-          ? await loadConsolidatedFsData(
+      const fetchFsForYear = async (
+        targetFyId: string,
+        targetFyMeta: typeof fyMeta,
+      ): Promise<FinancialStatementData | null> => {
+        try {
+          if (isConsolidatedView) {
+            return await loadConsolidatedFsData(
               clientId,
-              fyId,
+              targetFyId,
               clientData.businesses,
-              fyMeta || { endYear: new Date().getFullYear(), closedBusinessIds: [] },
-              fetchBusinessFs,
+              targetFyMeta || { endYear: new Date().getFullYear(), closedBusinessIds: [] },
+              (targetBusinessId) => fetchFsData(clientId, targetFyId, targetBusinessId),
             )
-          : await fetchBusinessFs(businessId)
-      } catch {
-        fs = createEmptyFsData(clientId, fyId, businessId)
+          }
+          return await fetchFsData(clientId, targetFyId, businessId)
+        } catch {
+          return null
+        }
       }
 
-      const priorFy = findPreviousFinancialYear(clientData.financialYears || [], fyId)
+      const [loadedDepreciationHistory, fsFetched, priorFsFetched] = await Promise.all([
+        !isConsolidatedView
+          ? fetchDepreciationHistory(clientId, businessId)
+              .then((result) => result.history)
+              .catch(() => [] as AssetDepreciationHistoryRow[])
+          : Promise.resolve([] as AssetDepreciationHistoryRow[]),
+        fetchFsForYear(fyId, fyMeta),
+        priorFy
+          ? fetchFsForYear(
+              priorFy.id,
+              priorFyMeta || {
+                endYear: priorFy.endYear,
+                closedBusinessIds: priorFy.closedBusinessIds,
+              } as typeof fyMeta,
+            )
+          : Promise.resolve(null),
+      ])
+
+      setDepreciationHistory(loadedDepreciationHistory)
+      const fs = fsFetched ?? createEmptyFsData(clientId, fyId, businessId)
+
       let priorNotes: FsNotes | null = null
       let priorSubAmounts: NoteSubAmounts | null = null
       let priorLoans: LoanRecord[] | null = null
       let priorBankAccounts: BankAccountRecord[] = []
       let priorFsPrepared: FinancialStatementData | null = null
       let priorPlAppropriationAmounts: Record<string, NoteSubCell> | null = null
-      if (priorFy) {
+      if (priorFy && priorFsFetched) {
         try {
-          const priorFyMeta = clientData.financialYears?.find((item) => item.id === priorFy.id)
-          const priorFs = isConsolidatedView
-            ? await loadConsolidatedFsData(
-                clientId,
-                priorFy.id,
-                clientData.businesses,
-                priorFyMeta || { endYear: priorFy.endYear, closedBusinessIds: priorFy.closedBusinessIds },
-                (targetBusinessId) => fetchFsData(clientId, priorFy.id, targetBusinessId),
-              )
-            : await fetchFsData(clientId, priorFy.id, businessId)
+          const priorFs = priorFsFetched
           priorBankAccounts = normalizeBankAccounts(priorFs.bankAccounts)
           const priorFyStart = priorFyMeta?.startYear ?? new Date().getFullYear()
           const priorFyEnd = priorFyMeta?.endYear ?? priorFyStart + 1
@@ -1041,6 +1058,8 @@ function FinancialStatement() {
         finalizationInfo: normalizeFinalizationInfo(fs.finalizationInfo),
       })
 
+      const isSavedYear = Boolean(fs.savedAt)
+
       if (!isConsolidatedView && priorFy && priorFsPrepared) {
         const businessForCarry = clientData.businesses.find((item) => item.id === businessId)
         const priorFyMeta = clientData.financialYears?.find((item) => item.id === priorFy.id)
@@ -1066,91 +1085,107 @@ function FinancialStatement() {
         )
         setPriorDepClosingsByLedgerId(priorClosings)
 
-        const depLocks: OpeningBalanceLocks = {
-          noteSubs: new Set(),
-          loanIds: new Set(),
-          bankIds: new Set(),
-          depRowIds: new Set(),
-          adminExpenseLineIds: new Set(),
-          manualNoteLineIds: new Set(),
-          previousYearDepOpening: false,
-          previousYearDepLinked: false,
-        }
-
-        if (
-          businessForCarry &&
-          hasPriorYearDepreciationData(priorFsPrepared, priorFy.id, loadedDepreciationHistory)
-        ) {
-          const depCarry = applyDepreciationScheduleCarryForward({
-            schedule: carriedDepreciationSchedule,
-            priorSchedule: priorFsPrepared.depreciationSchedule ?? [],
+        if (isSavedYear) {
+          const hasPriorDep = Boolean(
+            businessForCarry &&
+              hasPriorYearDepreciationData(priorFsPrepared, priorFy.id, loadedDepreciationHistory),
+          )
+          nextOpeningLocks = buildOpeningBalanceLocksForLoadedYear({
             priorClosing,
-            previousYearDepreciation: carriedPreviousYearDepreciation,
-            priorFs: priorFsPrepared,
-            locks: depLocks,
-            priorFyId: priorFy.id,
-            depreciationHistory: loadedDepreciationHistory,
+            priorDepClosingsByLedgerId: priorClosings,
+            depreciationSchedule: carriedDepreciationSchedule,
+            administrativeExpenseLines,
+            manualNoteLines,
+            previousYearSubAmounts: priorSubAmounts,
+            hasPriorYearDepreciation: hasPriorDep,
           })
-          carriedDepreciationSchedule = depCarry.schedule
-          carriedPreviousYearDepreciation = depCarry.previousYearDepreciation
-          nextOpeningLocks = depLocks
-        }
-
-        if (businessForCarry) {
-          const carryResult = applyOpeningBalanceCarryForward({
-            business: businessForCarry,
-            priorFy,
-            priorFs: priorFsPrepared,
-            priorClosing,
-            current: {
-              noteSubAmounts,
-              loans,
-              bankAccounts,
-              depreciationSchedule: carriedDepreciationSchedule,
-              previousYearDepreciation: carriedPreviousYearDepreciation,
-              administrativeExpenseLines,
-              otherShortTermBorrowingLines,
-              manualNoteLines,
-              capitalAccountLines,
-            },
-          })
-          noteSubAmounts = carryResult.data.noteSubAmounts
-          noteSubAmounts = applyOpeningStockLink(noteSubAmounts, priorSubAmounts)
-          noteSubAmounts = applyClosingStockLink(noteSubAmounts)
-          loans = carryResult.data.loans
-          bankAccounts = carryResult.data.bankAccounts
-          if (carryResult.loansCarriedForward) {
-            try {
-              loans = (await saveLoans(clientId, fyId, businessId, loans)).loans
-            } catch {
-              // Loan carry-forward remains in memory; user can save manually.
-            }
+        } else {
+          const depLocks: OpeningBalanceLocks = {
+            noteSubs: new Set(),
+            loanIds: new Set(),
+            bankIds: new Set(),
+            depRowIds: new Set(),
+            adminExpenseLineIds: new Set(),
+            manualNoteLineIds: new Set(),
+            previousYearDepOpening: false,
+            previousYearDepLinked: false,
           }
-          carriedDepreciationSchedule = carryResult.data.depreciationSchedule
-          carriedPreviousYearDepreciation = carryResult.data.previousYearDepreciation
-          administrativeExpenseLines =
-            carryResult.data.administrativeExpenseLines ?? administrativeExpenseLines
-          otherShortTermBorrowingLines =
-            carryResult.data.otherShortTermBorrowingLines ?? otherShortTermBorrowingLines
-          manualNoteLines = carryResult.data.manualNoteLines ?? manualNoteLines
-          capitalAccountLines = carryResult.data.capitalAccountLines ?? capitalAccountLines
-          nextOpeningLocks = carryResult.locks
-            ? {
-                ...carryResult.locks,
-                depRowIds: new Set([
-                  ...carryResult.locks.depRowIds,
-                  ...depLocks.depRowIds,
-                ]),
-                previousYearDepOpening:
-                  nextOpeningLocks?.previousYearDepOpening ||
-                  carryResult.locks.previousYearDepOpening ||
-                  false,
-                previousYearDepLinked:
-                  nextOpeningLocks?.previousYearDepLinked ||
-                  carryResult.locks.previousYearDepLinked ||
-                  false,
+
+          if (
+            businessForCarry &&
+            hasPriorYearDepreciationData(priorFsPrepared, priorFy.id, loadedDepreciationHistory)
+          ) {
+            const depCarry = applyDepreciationScheduleCarryForward({
+              schedule: carriedDepreciationSchedule,
+              priorSchedule: priorFsPrepared.depreciationSchedule ?? [],
+              priorClosing,
+              previousYearDepreciation: carriedPreviousYearDepreciation,
+              priorFs: priorFsPrepared,
+              locks: depLocks,
+              priorFyId: priorFy.id,
+              depreciationHistory: loadedDepreciationHistory,
+            })
+            carriedDepreciationSchedule = depCarry.schedule
+            carriedPreviousYearDepreciation = depCarry.previousYearDepreciation
+            nextOpeningLocks = depLocks
+          }
+
+          if (businessForCarry) {
+            const carryResult = applyOpeningBalanceCarryForward({
+              business: businessForCarry,
+              priorFy,
+              priorFs: priorFsPrepared,
+              priorClosing,
+              current: {
+                noteSubAmounts,
+                loans,
+                bankAccounts,
+                depreciationSchedule: carriedDepreciationSchedule,
+                previousYearDepreciation: carriedPreviousYearDepreciation,
+                administrativeExpenseLines,
+                otherShortTermBorrowingLines,
+                manualNoteLines,
+                capitalAccountLines,
+              },
+            })
+            noteSubAmounts = carryResult.data.noteSubAmounts
+            noteSubAmounts = applyOpeningStockLink(noteSubAmounts, priorSubAmounts)
+            noteSubAmounts = applyClosingStockLink(noteSubAmounts)
+            loans = carryResult.data.loans
+            bankAccounts = carryResult.data.bankAccounts
+            if (carryResult.loansCarriedForward) {
+              try {
+                loans = (await saveLoans(clientId, fyId, businessId, loans)).loans
+              } catch {
+                // Loan carry-forward remains in memory; user can save manually.
               }
-            : nextOpeningLocks
+            }
+            carriedDepreciationSchedule = carryResult.data.depreciationSchedule
+            carriedPreviousYearDepreciation = carryResult.data.previousYearDepreciation
+            administrativeExpenseLines =
+              carryResult.data.administrativeExpenseLines ?? administrativeExpenseLines
+            otherShortTermBorrowingLines =
+              carryResult.data.otherShortTermBorrowingLines ?? otherShortTermBorrowingLines
+            manualNoteLines = carryResult.data.manualNoteLines ?? manualNoteLines
+            capitalAccountLines = carryResult.data.capitalAccountLines ?? capitalAccountLines
+            nextOpeningLocks = carryResult.locks
+              ? {
+                  ...carryResult.locks,
+                  depRowIds: new Set([
+                    ...carryResult.locks.depRowIds,
+                    ...depLocks.depRowIds,
+                  ]),
+                  previousYearDepOpening:
+                    nextOpeningLocks?.previousYearDepOpening ||
+                    carryResult.locks.previousYearDepOpening ||
+                    false,
+                  previousYearDepLinked:
+                    nextOpeningLocks?.previousYearDepLinked ||
+                    carryResult.locks.previousYearDepLinked ||
+                    false,
+                }
+              : nextOpeningLocks
+          }
         }
       } else {
         setPriorDepClosingsByLedgerId(new Map())
@@ -1191,7 +1226,7 @@ function FinancialStatement() {
         )
       }
 
-      if (priorSubAmounts) {
+      if (priorSubAmounts && !isSavedYear) {
         noteSubAmounts = applyOpeningStockLink(noteSubAmounts, priorSubAmounts)
       }
       noteSubAmounts = applyClosingStockLink(noteSubAmounts)
@@ -1229,7 +1264,8 @@ function FinancialStatement() {
   }
 
   useEffect(() => {
-    load()
+    setLoading(true)
+    void load()
   }, [clientId, fyId, businessId])
 
   const fy = client?.financialYears?.find((item) => item.id === fyId)
@@ -3134,9 +3170,50 @@ function FinancialStatement() {
         ? filterActiveDepreciationSchedule(workingData.depreciationSchedule)
         : filterScheduleToBusinessAssets(workingData.depreciationSchedule, businessAssetLedgerIds)
 
+      const adminLinesForSave = normalizeAdministrativeExpenseLines(
+        workingData.administrativeExpenseLines,
+        workingData.noteSubAmounts,
+      )
+      const otherStLinesForSave = normalizeOtherShortTermBorrowingLines(
+        workingData.otherShortTermBorrowingLines,
+        workingData.noteSubAmounts,
+      )
+      const manualLinesForSave = normalizeManualNoteLines(
+        workingData.manualNoteLines,
+        workingData.noteSubAmounts,
+      )
+      const capitalLinesForSave = normalizeCapitalAccountLines(
+        workingData.capitalAccountLines,
+        workingData.noteSubAmounts,
+      )
+      const bankAccountsForSave = normalizeBankAccounts(workingData.bankAccounts)
+      const gstRecoForSave = normalizeGstReco(workingData.gstReco)
+      let noteSubAmountsForSave = buildCompleteNoteSubAmounts(
+        workingData.noteSubAmounts,
+        migrateNoteBreakdowns(workingData.noteBreakdowns),
+        workingData.loans,
+        adminLinesForSave,
+        otherStLinesForSave,
+        manualLinesForSave,
+        bankAccountsForSave,
+        capitalLinesForSave,
+        ledgers,
+      )
+      if (gstRecoForSave.linkSalesToRevenueNote) {
+        noteSubAmountsForSave = applyGstSalesLinkToRevenue(noteSubAmountsForSave, gstRecoForSave)
+      }
+      noteSubAmountsForSave = applyClosingStockLink(noteSubAmountsForSave)
+
       const payload: FinancialStatementData = {
         ...workingData,
         notes: notesForSave,
+        noteSubAmounts: noteSubAmountsForSave,
+        administrativeExpenseLines: adminLinesForSave,
+        otherShortTermBorrowingLines: otherStLinesForSave,
+        manualNoteLines: manualLinesForSave,
+        capitalAccountLines: capitalLinesForSave,
+        bankAccounts: bankAccountsForSave,
+        gstReco: gstRecoForSave,
         depreciationSchedule: prunedDepreciationSchedule,
         statementSnapshot,
         finalizationInfo: nextFinalization,
@@ -3224,6 +3301,33 @@ function FinancialStatement() {
       return false
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleStatementTypeChange = async (nextType: string) => {
+    if (!fy || isFsReadOnly || isConsolidatedView) {
+      return
+    }
+
+    if (isDirty) {
+      const saveFirst = await confirmProceed({
+        title: 'Unsaved changes',
+        message: 'Save your note changes before changing the statement type?',
+        confirmButtonText: 'Save and continue',
+      })
+      if (!saveFirst) {
+        return
+      }
+      const saved = await handleSave({ skipConfirm: true })
+      if (!saved) {
+        return
+      }
+    }
+
+    await updateGlobalFinancialYearStatementType(fy.id, nextType)
+    const updated = await reloadClient()
+    if (updated) {
+      setClient(updated)
     }
   }
 
@@ -3348,17 +3452,116 @@ function FinancialStatement() {
     ? printableTabsInPrintOrder.filter((tab) => printAllSelectedTabs.has(tab))
     : printableTabsInPrintOrder
   const firstPrintableTabInAll = selectedPrintTabsInOrder[0]
-  const hidePrintHeader = !printAll && resolvedActiveTab === 'notes'
-  const hidePrintBusinessHeader =
-    hidePrintHeader || (printAll && firstPrintableTabInAll === 'notes')
+  const hidePrintHeader = printAll || (!printAll && resolvedActiveTab === 'notes')
   const notesPrintColSpan = 6
-  const notesPrintPeriod = fy ? formatPrintReportPeriod('notes', fy) : ''
   const isNotesPrintOutput =
     (!printAll && resolvedActiveTab === 'notes') ||
     (printAll && Boolean(printAllSelectedTabs?.has('notes')))
 
+  const isNotesOnlyPrintAll =
+    printAll &&
+    Boolean(printAllSelectedTabs?.has('notes')) &&
+    selectedPrintTabsInOrder.length === 1 &&
+    selectedPrintTabsInOrder[0] === 'notes'
+
   const tabLabelFor = (tab: FsTab) =>
     visibleTabs.find(([visibleTab]) => visibleTab === tab)?.[1] ?? printTitleForTab(tab)
+
+  const printReportKindForTab = (
+    tab: FsTab,
+  ): 'balance-sheet' | 'profit-loss' | 'notes' | 'other' => {
+    if (tab === 'balance-sheet') {
+      return 'balance-sheet'
+    }
+    if (tab === 'profit-loss') {
+      return 'profit-loss'
+    }
+    if (tab === 'notes') {
+      return 'notes'
+    }
+    return 'other'
+  }
+
+  const isTabSelectedForPrint = (tab: FsTab) =>
+    printableTabSet.has(tab) &&
+    tabHasPrintContent(tab) &&
+    (!printAllSelectedTabs || printAllSelectedTabs.has(tab))
+
+  const showClientDetailsInSectionHeader = (tab: FsTab) => {
+    if (!printAll) {
+      return true
+    }
+    if (isNotesOnlyPrintAll && tab === 'notes') {
+      return true
+    }
+    return false
+  }
+
+  const shouldRenderSectionStationery = (tab: FsTab) => {
+    if (printAll) {
+      if (isNotesOnlyPrintAll && tab === 'notes') {
+        return isTabSelectedForPrint(tab)
+      }
+      if (tab === 'gst-reco' || tab === 'udin-details') {
+        return isTabSelectedForPrint(tab)
+      }
+      return false
+    }
+    return tab === 'notes' && resolvedActiveTab === 'notes'
+  }
+
+  const shouldRenderPrintTableBanner = (tab: FsTab) => {
+    if (!printAll || isNotesOnlyPrintAll) {
+      return false
+    }
+    if (tab === 'gst-reco' || tab === 'udin-details') {
+      return false
+    }
+    return isTabSelectedForPrint(tab)
+  }
+
+  const shouldRenderPrintHeadSpacer = (tab: FsTab) =>
+    shouldRenderSectionStationery(tab) || shouldRenderPrintTableBanner(tab)
+
+  const renderPrintHeadSpacer = (tab: FsTab, colSpan: number) => {
+    if (!shouldRenderPrintHeadSpacer(tab)) {
+      return null
+    }
+    return <FsPrintHeadSpacerRow colSpan={colSpan} />
+  }
+
+  const renderPrintTableBanner = (tab: FsTab, colSpan: number) => {
+    if (!shouldRenderPrintTableBanner(tab) || !fy) {
+      return null
+    }
+    return (
+      <FsPrintTableBannerRow
+        colSpan={colSpan}
+        client={client}
+        business={business ?? null}
+        isConsolidated={isConsolidatedView}
+        title={printTitleForTab(tab)}
+        period={formatPrintReportPeriod(printReportKindForTab(tab), fy)}
+        showClientDetails={showClientDetailsInSectionHeader(tab)}
+      />
+    )
+  }
+
+  const renderPrintSectionStationery = (tab: FsTab) => {
+    if (!shouldRenderSectionStationery(tab) || !fy) {
+      return null
+    }
+    return (
+      <FsPrintSectionStationery
+        client={client}
+        business={business ?? null}
+        isConsolidated={isConsolidatedView}
+        title={printTitleForTab(tab)}
+        period={formatPrintReportPeriod(printReportKindForTab(tab), fy)}
+        showClientDetails={showClientDetailsInSectionHeader(tab)}
+      />
+    )
+  }
 
   const printTabExtraClass = (tab: FsTab) => {
     if (!printAll) {
@@ -3870,7 +4073,7 @@ function FinancialStatement() {
 
   return (
     <div
-      className={`fs-page${isConsolidatedView ? ' fs-page--consolidated-readonly' : ''}${isFsFinalLocked ? ' fs-page--edit-locked' : ''}${printAll ? ' fs-print-all' : ''}${printComparison ? ' fs-print-with-comparison' : ''}${isNotesPrintOutput ? ' fs-print-notes-section' : ''}${!printAll && resolvedActiveTab === 'profit-loss' ? ' fs-print-report-profit-loss' : ''} fs-page--cash-adjust-banner`}
+      className={`fs-page${isConsolidatedView ? ' fs-page--consolidated-readonly' : ''}${isFsFinalLocked ? ' fs-page--edit-locked' : ''}${printAll ? ' fs-print-all' : ''}${printComparison ? ' fs-print-with-comparison' : ''}${isNotesPrintOutput ? ' fs-print-notes-section' : ''}${isNotesOnlyPrintAll ? ' fs-print-notes-only' : ''}${!printAll && resolvedActiveTab === 'profit-loss' ? ' fs-print-report-profit-loss' : ''} fs-page--cash-adjust-banner`}
     >
       <FsPrintLayout
         documentTitle={formatFinancialStatementPageTitle(statementType)}
@@ -3885,7 +4088,6 @@ function FinancialStatement() {
         activeTabLabel={printTitleForTab(resolvedActiveTab)}
         reportKind={printReportKind}
         printAll={printAll}
-        hideBusinessHeader={hidePrintBusinessHeader}
         hidePrintHeader={hidePrintHeader}
       />
 
@@ -4002,11 +4204,7 @@ function FinancialStatement() {
           activeTab={resolvedActiveTab}
           readOnly={isFsReadOnly}
           onQuickEntry={openQuickEntry}
-          onClientUpdated={async () => {
-            const updated = await reloadClient()
-            await load()
-            return updated
-          }}
+          onStatementTypeChange={handleStatementTypeChange}
         />
       </div>
 
@@ -4060,19 +4258,7 @@ function FinancialStatement() {
             {profitLossLabel} (19–24).
           </p>
 
-          <div className="fs-print-notes-stationery fs-print-only" aria-hidden="true">
-            <FsPrintBusinessHeader
-              client={client}
-              business={business ?? null}
-              isConsolidated={isConsolidatedView}
-            />
-            <div className="fs-print-notes-report-block">
-              <p className="fs-print-notes-report-line">{notesLabel}</p>
-              {notesPrintPeriod && (
-                <p className="fs-print-notes-period-line">{notesPrintPeriod}</p>
-              )}
-            </div>
-          </div>
+          {renderPrintSectionStationery('notes')}
 
           <div className="table-wrap notes-table-wrap">
             <table className="data-table notes-table">
@@ -4085,11 +4271,8 @@ function FinancialStatement() {
                 <col className="notes-variance-col notes-pct-col" />
               </colgroup>
               <thead>
-                {!printAll && (
-                  <tr className="fs-print-notes-head-spacer fs-print-only" aria-hidden="true">
-                    <th colSpan={notesPrintColSpan} className="fs-print-notes-head-spacer-cell" />
-                  </tr>
-                )}
+                {renderPrintHeadSpacer('notes', notesPrintColSpan)}
+                {renderPrintTableBanner('notes', notesPrintColSpan)}
                 <tr className="notes-head-row">
                   <th className="notes-sno-col">Note</th>
                   <th className="notes-particular-col">Particulars</th>
@@ -4191,6 +4374,7 @@ function FinancialStatement() {
             Layout per balance sheet format. Click any <strong>Note</strong> number to open the matching note for
             entry.
           </p>
+          {renderPrintSectionStationery('balance-sheet')}
           <div className="fs-balance-sheet-print-body">
           <StatementTable
             title={`${balanceSheetLabel} — Sources of Funds — ${balanceSheetCurrentLabel}`}
@@ -4202,6 +4386,8 @@ function FinancialStatement() {
             useStatementAmountFormat
             onNoteNavigate={navigateToNote}
             highlightedRowId={highlightedBsRow}
+            printHeadSpacer={renderPrintHeadSpacer('balance-sheet', 6)}
+            printBanner={renderPrintTableBanner('balance-sheet', 6)}
           />
           <StatementTable
             title={`${balanceSheetLabel} — Application of Funds — ${balanceSheetCurrentLabel}`}
@@ -4213,6 +4399,8 @@ function FinancialStatement() {
             useStatementAmountFormat
             onNoteNavigate={navigateToNote}
             highlightedRowId={highlightedBsRow}
+            printHeadSpacer={renderPrintHeadSpacer('balance-sheet', 6)}
+            printBanner={renderPrintTableBanner('balance-sheet', 6)}
           />
           </div>
         </section>
@@ -4227,6 +4415,7 @@ function FinancialStatement() {
           <p className="hint">
             Click any <strong>Note</strong> number to open the matching note for entry.
           </p>
+          {renderPrintSectionStationery('profit-loss')}
           <div className="fs-profit-loss-print-body">
           <StatementTable
             title={`${profitLossLabel} — ${profitLossCurrentLabel}`}
@@ -4237,6 +4426,8 @@ function FinancialStatement() {
             useStatementAmountFormat
             onNoteNavigate={navigateToNote}
             highlightedRowId={highlightedPlRow}
+            printHeadSpacer={renderPrintHeadSpacer('profit-loss', 6)}
+            printBanner={renderPrintTableBanner('profit-loss', 6)}
           />
 
           <div
@@ -4285,6 +4476,8 @@ function FinancialStatement() {
                   <col className="pl-col-pct" />
                 </colgroup>
                 <thead>
+                  {renderPrintHeadSpacer('profit-loss', 5)}
+                  {renderPrintTableBanner('profit-loss', 5)}
                   <tr className="pl-appr-head-row">
                     <th className="pl-appr-particular-col">Particular</th>
                     <th className="pl-appr-amount-col pl-appr-curr-col">
@@ -4421,6 +4614,7 @@ function FinancialStatement() {
           data-fs-tab="depreciation"
           data-print-title={printTitleForTab('depreciation')}
         >
+          {renderPrintSectionStationery('depreciation')}
           <div className="panel-header-row">
             <h2>Depreciation Schedule (Income Tax Act)</h2>
           </div>
@@ -4441,6 +4635,8 @@ function FinancialStatement() {
             <div className="table-wrap dep-schedule-wrap fs-print-section-block">
               <table className="data-table schedule-table dep-schedule-table">
                 <thead>
+                  {renderPrintHeadSpacer('depreciation', isFsReadOnly ? 8 : 9)}
+                  {renderPrintTableBanner('depreciation', isFsReadOnly ? 8 : 9)}
                   <tr>
                     <th>Asset</th>
                     <th>Rate %</th>
@@ -4772,6 +4968,7 @@ function FinancialStatement() {
           data-fs-tab="repayment"
           data-print-title={printTitleForTab('repayment')}
         >
+          {renderPrintSectionStationery('repayment')}
           <div className="panel-header-row">
             <h2>Loan Repayment Schedule</h2>
             <button type="button" className="secondary-btn" onClick={openAddLoan}>
@@ -4875,6 +5072,8 @@ function FinancialStatement() {
                           <div className="table-wrap loan-emi-table-wrap">
                             <table className="data-table schedule-table loan-emi-table">
                               <thead>
+                                {renderPrintHeadSpacer('repayment', 7)}
+                                {renderPrintTableBanner('repayment', 7)}
                                 <tr>
                                   <th>S.No</th>
                                   <th>Month</th>
@@ -4936,6 +5135,7 @@ function FinancialStatement() {
           data-fs-tab="bank-account"
           data-print-title={printTitleForTab('bank-account')}
         >
+          {renderPrintSectionStationery('bank-account')}
           <div className="panel-header-row">
             <h2>Bank Accounts</h2>
             <button type="button" className="secondary-btn" onClick={openAddBank}>
@@ -4971,6 +5171,8 @@ function FinancialStatement() {
                   <col className="bank-col-closing" />
                 </colgroup>
                 <thead>
+                  {renderPrintHeadSpacer('bank-account', 11)}
+                  {renderPrintTableBanner('bank-account', 11)}
                   <tr>
                     <th className="bank-col-name">Bank Name</th>
                     <th className="bank-col-number">A/c No.</th>
@@ -5254,6 +5456,7 @@ function FinancialStatement() {
           data-fs-tab="gst-reco"
           data-print-title={printTitleForTab('gst-reco')}
         >
+        {renderPrintSectionStationery('gst-reco')}
         <GstRecoTab
           gstReco={fsData.gstReco}
           fyLabel={currentFyLabel}
@@ -5269,6 +5472,7 @@ function FinancialStatement() {
           data-fs-tab="udin-details"
           data-print-title={printTitleForTab('udin-details')}
         >
+          {renderPrintSectionStationery('udin-details')}
           <h2>UDIN Details</h2>
           <p className="hint">
             Select an active CA profile and enter UDIN details for this financial statement print.

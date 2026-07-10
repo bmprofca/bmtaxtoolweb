@@ -12,6 +12,7 @@ import type {
 } from '../types/fs'
 import type { LoanRecord } from '../types/loan'
 import { manualNoteLineSubId } from './manualNoteLineConfig'
+import { isOpeningStockLinkedFromPriorYear } from './closingStockLink'
 import type { LedgerRecord } from '../types/ledger'
 import type { FinancialYear } from '../types'
 import { recalcDepreciationRow, sumDepreciationSchedule, getDepreciationClosingWdv, isPlaceholderDepreciationRow, resolveEffectiveClosingWdv } from './depreciation'
@@ -920,6 +921,58 @@ export function applyPriorDepClosingToRow(
     ...row,
     openingWdv: row.openingWdv !== 0 ? row.openingWdv : priorWdv,
   })
+}
+
+/** Set opening-balance locks for a saved year without mutating stored note amounts. */
+export function buildOpeningBalanceLocksForLoadedYear(params: {
+  priorClosing: PriorClosingSnapshot
+  priorDepClosingsByLedgerId: Map<string, number>
+  depreciationSchedule: DepreciationRow[]
+  administrativeExpenseLines: AdministrativeExpenseLine[]
+  manualNoteLines: ManualNoteLine[]
+  previousYearSubAmounts: NoteSubAmounts | null
+  hasPriorYearDepreciation: boolean
+}): OpeningBalanceLocks {
+  const locks: OpeningBalanceLocks = {
+    noteSubs: new Set(),
+    loanIds: new Set(),
+    bankIds: new Set(),
+    depRowIds: new Set(),
+    adminExpenseLineIds: new Set(),
+    manualNoteLineIds: new Set(),
+    previousYearDepOpening: false,
+    previousYearDepLinked: false,
+  }
+
+  if (isOpeningStockLinkedFromPriorYear(params.previousYearSubAmounts)) {
+    locks.noteSubs.add(noteSubLockKey('costOfGoodsSold', 'opening-stock'))
+  }
+  const priorCapitalClosing =
+    params.previousYearSubAmounts?.capitalAccount?.['capital-closing']?.current ?? 0
+  if (priorCapitalClosing !== 0) {
+    locks.noteSubs.add(noteSubLockKey('capitalAccount', 'opening-balance'))
+  }
+
+  carryAdministrativeExpenseLines(
+    params.administrativeExpenseLines,
+    params.priorClosing,
+    locks,
+  )
+  carryManualNoteLines(params.manualNoteLines, params.priorClosing, locks)
+
+  for (const row of params.depreciationSchedule) {
+    if (row.ledgerId && params.priorDepClosingsByLedgerId.has(row.ledgerId)) {
+      locks.depRowIds.add(row.id)
+    }
+  }
+
+  if (params.hasPriorYearDepreciation) {
+    locks.previousYearDepOpening = true
+    locks.previousYearDepLinked = true
+  }
+
+  sanitizeNoteSubLocks(locks)
+  return locks
 }
 
 export function applyOpeningBalanceCarryForward(params: {

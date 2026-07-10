@@ -94,6 +94,12 @@ function FsPrintLayout({
 
   return (
     <>
+      {printAll && (
+        <div className="fs-print-fixed-client-header fs-print-client-header fs-print-only" aria-hidden="true">
+          <FsPrintBusinessHeader client={client} business={business} isConsolidated={isConsolidated} />
+        </div>
+      )}
+
       {!hidePrintHeader && (
         <header className="fs-print-header fs-print-only" aria-hidden="true">
           {!hideBusinessHeader && (

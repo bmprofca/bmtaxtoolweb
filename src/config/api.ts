@@ -65,7 +65,7 @@ export function formatApiFetchError(error: unknown, action = 'reach the API serv
         typeof window !== 'undefined' && isLocalHostname(window.location.hostname)
 
       if (onLocalHost || import.meta.env.DEV) {
-        return `Could not ${action}. Start the API with \`npm run dev\` from the project root and open http://localhost:5173 (local API: http://localhost:3001).`
+        return `Could not ${action}. From the Balancesheet folder run \`npm run dev\` (starts API + web), then open http://localhost:5173 (API: http://localhost:3001).`
       }
 
       const apiHint = API_BASE.startsWith('http')

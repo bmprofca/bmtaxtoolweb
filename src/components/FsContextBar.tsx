@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { updateGlobalFinancialYearStatementType } from '../api/fySettings'
 import type { Client, FinancialYear } from '../types'
 import {
   FINANCIAL_STATEMENT_TYPES,
@@ -16,7 +15,7 @@ interface FsContextBarProps {
   activeTab: string
   readOnly?: boolean
   onQuickEntry?: () => void
-  onClientUpdated: () => Promise<Client | null>
+  onStatementTypeChange: (nextType: string) => Promise<void>
 }
 
 function FsContextBar({
@@ -27,7 +26,7 @@ function FsContextBar({
   activeTab,
   readOnly = false,
   onQuickEntry,
-  onClientUpdated,
+  onStatementTypeChange,
 }: FsContextBarProps) {
   const [savingStatementType, setSavingStatementType] = useState(false)
   const statementType = normalizeStatementType(currentFy.statementType)
@@ -39,8 +38,7 @@ function FsContextBar({
 
     try {
       setSavingStatementType(true)
-      await updateGlobalFinancialYearStatementType(currentFy.id, nextType)
-      await onClientUpdated()
+      await onStatementTypeChange(nextType)
     } finally {
       setSavingStatementType(false)
     }
