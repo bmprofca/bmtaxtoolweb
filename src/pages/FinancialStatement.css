@@ -226,7 +226,9 @@ input.fs-readonly-input {
 
 /* Keep cross-tab navigation links usable in locked mode (view-only). */
 .fs-page--edit-locked .panel .notes-gst-open-btn,
-.fs-page--edit-locked .panel .gst-note-link-btn {
+.fs-page--edit-locked .panel .gst-note-link-btn,
+.fs-page--consolidated-readonly .panel .notes-gst-open-btn,
+.fs-page--consolidated-readonly .panel .gst-note-link-btn {
   display: inline-flex !important;
   pointer-events: auto !important;
 }
@@ -2020,6 +2022,17 @@ input.fs-readonly-input {
   font-style: italic;
   color: #047857;
   font-weight: 600;
+}
+
+.notes-gst-ref-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.notes-gst-ref-link-btn {
+  font-size: 0.78rem;
 }
 
 .notes-gst-ref-row .note-sub-auto {

@@ -204,7 +204,14 @@ function GstRecoTab({ gstReco, fyLabel, salesFromBooks, onOpenRevenueNote, onCha
           {onOpenRevenueNote && (
             <>
               {' '}
-              <button type="button" className="gst-note-link-btn" onClick={onOpenRevenueNote}>
+              <button
+                type="button"
+                className="gst-note-link-btn"
+                onClick={(event) => {
+                  event.preventDefault()
+                  onOpenRevenueNote?.()
+                }}
+              >
                 View Note 19
               </button>
             </>

@@ -631,14 +631,6 @@ function FinancialStatement() {
       return
     }
 
-    const targetId = highlightedNote.noteSubId
-      ? `note-sub-${highlightedNote.noteKey}-${highlightedNote.noteSubId}`
-      : `note-row-${highlightedNote.noteKey}`
-
-    requestAnimationFrame(() => {
-      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    })
-
     const timer = window.setTimeout(() => setHighlightedNote(null), 2500)
     return () => window.clearTimeout(timer)
   }, [activeTab, highlightedNote])
@@ -647,10 +639,6 @@ function FinancialStatement() {
     if (activeTab !== 'balance-sheet' || !highlightedBsRow) {
       return
     }
-
-    requestAnimationFrame(() => {
-      document.getElementById(highlightedBsRow)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    })
 
     const timer = window.setTimeout(() => setHighlightedBsRow(null), 2500)
     return () => window.clearTimeout(timer)
@@ -661,34 +649,54 @@ function FinancialStatement() {
       return
     }
 
-    requestAnimationFrame(() => {
-      document.getElementById(highlightedPlRow)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    })
-
     const timer = window.setTimeout(() => setHighlightedPlRow(null), 2500)
     return () => window.clearTimeout(timer)
   }, [activeTab, highlightedPlRow])
 
-  const switchFsTab = (tab: FsTab) => {
+  const switchFsTab = (tab: FsTab, options?: { scrollToTop?: boolean }) => {
     setActiveTab(tab)
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    })
+    if (options?.scrollToTop !== false) {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      })
+    }
+  }
+
+  const scrollToFsElement = (elementId: string) => {
+    const attempt = (retriesLeft: number) => {
+      const element = document.getElementById(elementId)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        return
+      }
+      if (retriesLeft > 0) {
+        requestAnimationFrame(() => attempt(retriesLeft - 1))
+      }
+    }
+    requestAnimationFrame(() => attempt(8))
   }
 
   const navigateToNote = (noteKey: keyof FsNotes, noteSubId?: string) => {
+    const targetId = noteSubId
+      ? `note-sub-${noteKey}-${noteSubId}`
+      : `note-row-${noteKey}`
     setHighlightedNote({ noteKey, noteSubId })
-    switchFsTab('notes')
+    switchFsTab('notes', { scrollToTop: false })
+    scrollToFsElement(targetId)
   }
 
   const navigateToBalanceSheet = (noteKey: keyof FsNotes, noteSubId?: string) => {
-    setHighlightedBsRow(balanceSheetRowId(noteKey, noteSubId))
-    switchFsTab('balance-sheet')
+    const targetId = balanceSheetRowId(noteKey, noteSubId)
+    setHighlightedBsRow(targetId)
+    switchFsTab('balance-sheet', { scrollToTop: false })
+    scrollToFsElement(targetId)
   }
 
   const navigateToProfitLoss = (noteKey: keyof FsNotes, noteSubId?: string) => {
-    setHighlightedPlRow(profitLossRowId(noteKey, noteSubId))
-    switchFsTab('profit-loss')
+    const targetId = profitLossRowId(noteKey, noteSubId)
+    setHighlightedPlRow(targetId)
+    switchFsTab('profit-loss', { scrollToTop: false })
+    scrollToFsElement(targetId)
   }
 
   const navigateToGstReco = () => {
@@ -2445,21 +2453,32 @@ function FinancialStatement() {
       }
 
       const linked = Boolean(fsData?.gstReco.linkSalesToRevenueNote)
+      const taxableSales = linked ? getGstTaxableSalesTotal(fsData!.gstReco) : 0
 
       return (
         <div className="notes-revenue-header">
           <span className="notes-revenue-title">{field.label}</span>
           <div className={`notes-gst-link-bar${linked ? ' is-linked' : ''}`}>
-            <label className="notes-gst-link-chip" title="Link taxable sales from GST Reco to this note">
-              <input
-                type="checkbox"
-                className="notes-gst-link-checkbox"
-                checked={linked}
-                onChange={(event) => toggleGstSalesLink(event.target.checked)}
-                aria-label="Link GST Reco sales to this note"
-              />
-            </label>
-            <span className="notes-gst-link-divider" aria-hidden="true" />
+            {linked && (
+              <span
+                className="notes-gst-linked-badge"
+                title={`Taxable sales (${formatAmount(taxableSales)}) from GST Reco`}
+              >
+                Linked
+              </span>
+            )}
+            {!isFsReadOnly && (
+              <label className="notes-gst-link-chip" title="Link taxable sales from GST Reco to this note">
+                <input
+                  type="checkbox"
+                  className="notes-gst-link-checkbox"
+                  checked={linked}
+                  onChange={(event) => toggleGstSalesLink(event.target.checked)}
+                  aria-label="Link GST Reco sales to this note"
+                />
+              </label>
+            )}
+            {linked && !isFsReadOnly && <span className="notes-gst-link-divider" aria-hidden="true" />}
             <button
               type="button"
               className="notes-gst-open-btn"
@@ -2899,7 +2918,14 @@ function FinancialStatement() {
             <tr key={`${noteKey}-gst-reco-ref`} className="notes-sub-row notes-gst-ref-row is-auto-row">
               <td className="notes-sno-col" />
               <td className="notes-particular-col notes-sub-label notes-gst-ref-label">
-                As per GST Reco
+                <span>As per GST Reco</span>
+                <button
+                  type="button"
+                  className="gst-note-link-btn notes-gst-ref-link-btn"
+                  onClick={navigateToGstReco}
+                >
+                  View GST Reco
+                </button>
               </td>
               <td className="notes-amount-col notes-curr-col">
                 <div className="note-sub-auto is-auto-calc" title="Taxable sales from GST Reco">
