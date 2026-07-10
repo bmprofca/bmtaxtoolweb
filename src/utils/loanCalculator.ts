@@ -510,7 +510,9 @@ export function computeLoanForFinancialYear(
   input: LoanFormInput & { id?: string },
   fyStartYear: number,
   fyEndYear: number,
+  options: { retainSchedule?: boolean } = {},
 ): Loan {
+  const retainSchedule = options.retainSchedule !== false
   const resolvedEmiStartDate = resolveEmiStartDate(input, fyStartYear)
   const fullSchedule = computeFullLoanSchedule(input, fyStartYear)
 
@@ -562,7 +564,7 @@ export function computeLoanForFinancialYear(
     interestForYear: adjusted.interestForYear,
     principalRepaid: adjusted.principalRepaid,
     closingBalance: adjusted.closingBalance,
-    monthlySchedule: fullSchedule,
+    monthlySchedule: retainSchedule ? fullSchedule : [],
     scheduleClosingBalance: adjusted.scheduleClosingBalance,
     closingAdjustmentPrincipalApplied: adjusted.principalAdjustment,
     closingAdjustmentInterestApplied: adjusted.interestAdjustment,
@@ -756,8 +758,13 @@ export function normalizeLoans(
   return []
 }
 
-export function recomputeLoansForFy(loans: LoanRecord[], fyStartYear: number, fyEndYear: number) {
-  return loans.map((loan) => computeLoanForFinancialYear(loan, fyStartYear, fyEndYear))
+export function recomputeLoansForFy(
+  loans: LoanRecord[],
+  fyStartYear: number,
+  fyEndYear: number,
+  options: { retainSchedule?: boolean } = {},
+) {
+  return loans.map((loan) => computeLoanForFinancialYear(loan, fyStartYear, fyEndYear, options))
 }
 
 export function sumOpeningByType(loans: LoanRecord[], loanType: 'long-term' | 'short-term') {

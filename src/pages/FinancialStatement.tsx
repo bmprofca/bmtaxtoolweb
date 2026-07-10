@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import FsContextBar from '../components/FsContextBar'
@@ -48,6 +48,7 @@ import {
   formatStatementAmount,
   varianceClass,
 } from '../utils/fsCalculator'
+import { buildFsDerivedState, fsDataFingerprint } from '../utils/fsEngine'
 import { buildBalanceSheetLines, balanceSheetRowId, isBalanceSheetNoteNo, NOTE_SUB_BALANCE_SHEET_REFS } from '../utils/balanceSheetBuilder'
 import { isProfitLossNoteNo, profitLossRowId, NOTE_SUB_PL_REFS } from '../utils/plBuilder'
 import {
@@ -120,7 +121,6 @@ import {
   normalizeManualNoteLines,
   normalizeNoteSubAmounts,
   normalizeOtherShortTermBorrowingLines,
-  resolveNoteSubRows,
   type ResolvedSubRow,
 } from '../utils/noteSubFields'
 import { buildEffectiveNotes, getNoteCalcMap } from '../utils/noteCalculator'
@@ -285,11 +285,6 @@ function formatDateTime(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function fsDataFingerprint(data: FinancialStatementData): string {
-  const { updatedAt, savedAt, clientId, fyId, businessId, ...payload } = data
-  return JSON.stringify(payload)
 }
 
 function formatSubAmount(value: number, kind: ResolvedSubRow['kind']) {
@@ -1272,12 +1267,24 @@ function FinancialStatement() {
   const notesPreviousColumnLabel = profitLossPreviousColumnLabel
   const profitLossCurrentLabel = fy ? formatProfitLossColumnLabel(fy.endYear) : 'Current'
 
+  const retainLoanSchedules =
+    activeTab === 'repayment' ||
+    printAll ||
+    Boolean(printAllSelectedTabs && printAllSelectedTabs.size > 0)
+
+  const isTabMounted = (tab: FsTab) =>
+    printAll || activeTab === tab || Boolean(printAllSelectedTabs?.has(tab))
+
+  const deferredNoteSubAmounts = useDeferredValue(fsData?.noteSubAmounts)
+
   const computedLoans = useMemo(() => {
     if (!fsData || !fy) {
       return []
     }
-    return recomputeLoansForFy(fsData.loans, fy.startYear, fy.endYear)
-  }, [fsData, fy])
+    return recomputeLoansForFy(fsData.loans, fy.startYear, fy.endYear, {
+      retainSchedule: retainLoanSchedules,
+    })
+  }, [fsData?.loans, fy, retainLoanSchedules])
 
   const loanCalcPayload = useMemo(
     () =>
@@ -1360,7 +1367,7 @@ function FinancialStatement() {
     return {
       notes: merged,
       noteBreakdowns: fsData.noteBreakdowns,
-      noteSubAmounts: fsData.noteSubAmounts,
+      noteSubAmounts: deferredNoteSubAmounts ?? fsData.noteSubAmounts,
       previousYearSubAmounts,
       depreciationSchedule: fsData.depreciationSchedule,
       previousYearDepreciation: fsData.previousYearDepreciation,
@@ -1385,6 +1392,7 @@ function FinancialStatement() {
     fy,
     previousYearNotes,
     previousYearSubAmounts,
+    deferredNoteSubAmounts,
     loanCalcPayload,
     previousYearComputedLoans,
     plAppropriationTotal,
@@ -1392,62 +1400,37 @@ function FinancialStatement() {
     ledgers,
   ])
 
-  const effectiveNotes = useMemo(() => {
-    if (!noteCalcContext) {
+  const fsDerived = useMemo(() => {
+    if (!noteCalcContext || !fsData || !fy) {
       return null
     }
-    return buildEffectiveNotes(noteCalcContext)
-  }, [noteCalcContext])
-
-  const computed = useMemo(() => {
-    if (!fsData || !fy || !effectiveNotes) {
-      return null
-    }
-    return computeStatements(
-      effectiveNotes,
-      fsData.depreciationSchedule,
-      fsData.loans,
-      fy.startYear,
-      fy.endYear,
-      fsData.previousYearDepreciation,
-      plAppropriationTotal,
-    )
-  }, [fsData, fy, effectiveNotes, plAppropriationTotal])
-
-  const noteCalcMap = useMemo(() => {
-    if (!noteCalcContext || !effectiveNotes) {
-      return null
-    }
-    return getNoteCalcMap(noteCalcContext, effectiveNotes)
-  }, [noteCalcContext, effectiveNotes])
-
-  const subResolveContext = useMemo(() => {
-    if (!fsData || !computed) {
-      return null
-    }
-    return buildSubResolveContext(
-      fsData.noteSubAmounts,
+    return buildFsDerivedState({
+      noteCalcContext,
+      noteSubAmounts: deferredNoteSubAmounts ?? fsData.noteSubAmounts,
       previousYearSubAmounts,
-      computed,
-      fsData.depreciationSchedule,
-      fsData.previousYearDepreciation,
-      fsData.loans,
-      loanCalcPayload,
-      fsData.administrativeExpenseLines ?? [],
+      depreciationSchedule: fsData.depreciationSchedule,
+      previousYearDepreciation: fsData.previousYearDepreciation,
+      loans: fsData.loans,
+      computedLoans: loanCalcPayload,
+      administrativeExpenseLines: fsData.administrativeExpenseLines ?? [],
       previousYearComputedLoans,
-      fsData.otherShortTermBorrowingLines ?? [],
-      fsData.manualNoteLines ?? [],
+      otherShortTermBorrowingLines: fsData.otherShortTermBorrowingLines ?? [],
+      manualNoteLines: fsData.manualNoteLines ?? [],
       plAppropriationTotal,
-      fsData.bankAccounts,
+      bankAccounts: fsData.bankAccounts,
       previousYearBankAccounts,
-      fsData.capitalAccountLines ?? [],
+      capitalAccountLines: fsData.capitalAccountLines ?? [],
       ledgers,
       openingBalanceLocks,
-      normalizeCashAdjustment(fsData.cashAdjustment),
-    )
+      cashAdjustment: normalizeCashAdjustment(fsData.cashAdjustment),
+      fyStartYear: fy.startYear,
+      fyEndYear: fy.endYear,
+    })
   }, [
+    noteCalcContext,
     fsData,
-    computed,
+    fy,
+    deferredNoteSubAmounts,
     previousYearSubAmounts,
     loanCalcPayload,
     previousYearComputedLoans,
@@ -1457,16 +1440,16 @@ function FinancialStatement() {
     openingBalanceLocks,
   ])
 
-  const noteSubRowsMap = useMemo(() => {
-    if (!subResolveContext) {
+  const effectiveNotes = fsDerived?.effectiveNotes ?? null
+  const computed = fsDerived?.computed ?? null
+  const noteSubRowsMap = fsDerived?.noteSubRowsMap ?? null
+
+  const noteCalcMap = useMemo(() => {
+    if (!noteCalcContext || !effectiveNotes) {
       return null
     }
-    const map = {} as Record<keyof FsNotes, ResolvedSubRow[]>
-    for (const field of NOTE_FIELDS) {
-      map[field.key] = resolveNoteSubRows(field.key, subResolveContext)
-    }
-    return map
-  }, [subResolveContext])
+    return getNoteCalcMap(noteCalcContext, effectiveNotes)
+  }, [noteCalcContext, effectiveNotes])
 
   const balanceSheetLines = useMemo(() => {
     if (!effectiveNotes || !noteSubRowsMap) {
@@ -1511,10 +1494,12 @@ function FinancialStatement() {
     return totals[totals.length - 1] ?? null
   }, [applicationOfFundsLines])
 
-  const consolidatedCashFlow = useMemo(
-    () => mergeCashFlowByYear(computedLoans),
-    [computedLoans],
-  )
+  const consolidatedCashFlow = useMemo(() => {
+    if (!retainLoanSchedules) {
+      return []
+    }
+    return mergeCashFlowByYear(computedLoans)
+  }, [computedLoans, retainLoanSchedules])
 
   const updateSubNote = (noteKey: keyof FsNotes, subId: string, value: string) => {
     if (!fsData) {
@@ -3988,7 +3973,7 @@ function FinancialStatement() {
       </div>
 
       <div className="fs-print-body fs-print-statement-format">
-      {printableTabSet.has('notes') && (
+      {isTabMounted('notes') && printableTabSet.has('notes') && (
         <section
           className={tabPanelClass('notes')}
           data-fs-tab="notes"
@@ -4141,7 +4126,7 @@ function FinancialStatement() {
         </section>
       )}
 
-      {printableTabSet.has('balance-sheet') && fy && (
+      {isTabMounted('balance-sheet') && printableTabSet.has('balance-sheet') && fy && (
         <section
           className={tabPanelClass('balance-sheet')}
           data-fs-tab="balance-sheet"
@@ -4178,7 +4163,7 @@ function FinancialStatement() {
         </section>
       )}
 
-      {printableTabSet.has('profit-loss') && fy && (
+      {isTabMounted('profit-loss') && printableTabSet.has('profit-loss') && fy && (
         <section
           className={tabPanelClass('profit-loss')}
           data-fs-tab="profit-loss"
@@ -4375,7 +4360,7 @@ function FinancialStatement() {
         </section>
       )}
 
-      {printableTabSet.has('depreciation') && (
+      {isTabMounted('depreciation') && printableTabSet.has('depreciation') && (
         <section
           className={tabPanelClass('depreciation')}
           data-fs-tab="depreciation"
@@ -4726,7 +4711,7 @@ function FinancialStatement() {
         </section>
       )}
 
-      {printableTabSet.has('repayment') && (
+      {isTabMounted('repayment') && printableTabSet.has('repayment') && (
         <section
           className={tabPanelClass('repayment')}
           data-fs-tab="repayment"
@@ -4890,7 +4875,7 @@ function FinancialStatement() {
         </section>
       )}
 
-      {printableTabSet.has('bank-account') && (
+      {isTabMounted('bank-account') && printableTabSet.has('bank-account') && (
         <section
           className={tabPanelClass('bank-account')}
           data-fs-tab="bank-account"
@@ -5208,7 +5193,7 @@ function FinancialStatement() {
         </section>
       )}
 
-      {printableTabSet.has('gst-reco') && (
+      {isTabMounted('gst-reco') && printableTabSet.has('gst-reco') && (
         <div
           className={`fs-tab-panel${resolvedActiveTab === 'gst-reco' ? ' is-active' : ''}${printTabExtraClass('gst-reco')}`}
           data-fs-tab="gst-reco"
@@ -5223,7 +5208,7 @@ function FinancialStatement() {
         />
         </div>
       )}
-      {printableTabSet.has('udin-details') && (
+      {isTabMounted('udin-details') && printableTabSet.has('udin-details') && (
         <section
           className={tabPanelClass('udin-details')}
           data-fs-tab="udin-details"
