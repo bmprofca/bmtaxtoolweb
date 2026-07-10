@@ -121,6 +121,15 @@ import {
   type CapitalAccountLineSign,
 } from '../utils/capitalAccountLineConfig'
 import {
+  cogsExtraLineSubId,
+  getCogsExtraLineTypes,
+  isCogsExtraDynamicLine,
+  migrateCogsExtraSubAmounts,
+  normalizeCogsExtraLineSign,
+  normalizeCogsExtraLines,
+  type CogsExtraLineSign,
+} from '../utils/cogsExtraLineConfig'
+import {
   buildSubResolveContext,
   enrichPreviousYearSubAmountsWithClosings,
   isCapitalAccountDynamicLine,
@@ -618,12 +627,6 @@ function FinancialStatement() {
   }, [tabFromNavigation, clientId, fyId, businessId])
 
   useEffect(() => {
-    if (isConsolidatedView && !CONSOLIDATED_REPORT_TABS.includes(activeTab)) {
-      setActiveTab('balance-sheet')
-    }
-  }, [isConsolidatedView, activeTab])
-
-  useEffect(() => {
     if (activeTab !== 'notes' || !highlightedNote) {
       return
     }
@@ -666,19 +669,30 @@ function FinancialStatement() {
     return () => window.clearTimeout(timer)
   }, [activeTab, highlightedPlRow])
 
+  const switchFsTab = (tab: FsTab) => {
+    setActiveTab(tab)
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    })
+  }
+
   const navigateToNote = (noteKey: keyof FsNotes, noteSubId?: string) => {
     setHighlightedNote({ noteKey, noteSubId })
-    setActiveTab('notes')
+    switchFsTab('notes')
   }
 
   const navigateToBalanceSheet = (noteKey: keyof FsNotes, noteSubId?: string) => {
     setHighlightedBsRow(balanceSheetRowId(noteKey, noteSubId))
-    setActiveTab('balance-sheet')
+    switchFsTab('balance-sheet')
   }
 
   const navigateToProfitLoss = (noteKey: keyof FsNotes, noteSubId?: string) => {
     setHighlightedPlRow(profitLossRowId(noteKey, noteSubId))
-    setActiveTab('profit-loss')
+    switchFsTab('profit-loss')
+  }
+
+  const navigateToGstReco = () => {
+    switchFsTab('gst-reco')
   }
 
   const renderNoteNumberLink = (
@@ -888,6 +902,7 @@ function FinancialStatement() {
             priorFs.capitalAccountLines,
             priorFs.noteSubAmounts,
           )
+          const priorCogsExtraLines = normalizeCogsExtraLines(priorFs.cogsExtraLines)
           const priorPlLines = normalizePlAppropriationLines(priorFs.plAppropriationLines)
           priorPlAppropriationAmounts = migratePlAppropriationAmounts(
             priorPlLines,
@@ -903,12 +918,14 @@ function FinancialStatement() {
             priorManualLines,
             priorBankAccounts,
             priorCapitalLines,
+            priorCogsExtraLines,
             loadedLedgers,
           )
           priorSub = migrateAdminExpenseSubAmounts(priorAdminLines, priorSub)
           priorSub = migrateOtherShortTermSubAmounts(priorOtherStLines, priorSub)
           priorSub = migrateManualNoteLineSubAmounts(priorManualLines, priorSub)
           priorSub = migrateCapitalAccountSubAmounts(priorCapitalLines, priorSub)
+          priorSub = migrateCogsExtraSubAmounts(priorCogsExtraLines, priorSub)
           const priorComputedLoansPayload = recomputeLoansForFy(
             priorLoans,
             priorFyStart,
@@ -938,6 +955,7 @@ function FinancialStatement() {
             otherShortTermBorrowingLines: priorOtherStLines,
             manualNoteLines: priorManualLines,
             capitalAccountLines: priorCapitalLines,
+            cogsExtraLines: priorCogsExtraLines,
             ledgers: loadedLedgers,
             plAppropriationTotal: priorPlAppropriationAmounts
               ? sumPlAppropriation(priorPlLines, priorPlAppropriationAmounts, null)
@@ -980,6 +998,7 @@ function FinancialStatement() {
               priorBankAccounts,
               [],
               priorCapitalLines,
+              priorCogsExtraLines,
               loadedLedgers,
               null,
               {
@@ -999,6 +1018,7 @@ function FinancialStatement() {
             otherShortTermBorrowingLines: priorOtherStLines,
             manualNoteLines: priorManualLines,
             capitalAccountLines: priorCapitalLines,
+            cogsExtraLines: priorCogsExtraLines,
             plAppropriationLines: priorPlLines,
             plAppropriationAmounts: priorPlAppropriationAmounts,
             depreciationSchedule: normalizeDepreciationSchedule(priorFs.depreciationSchedule || []),
@@ -1046,6 +1066,7 @@ function FinancialStatement() {
         fs.capitalAccountLines,
         fs.noteSubAmounts,
       )
+      let cogsExtraLines = normalizeCogsExtraLines(fs.cogsExtraLines)
       const plAppropriationLines = normalizePlAppropriationLines(fs.plAppropriationLines)
       const plAppropriationAmounts = migratePlAppropriationAmounts(
         plAppropriationLines,
@@ -1061,12 +1082,14 @@ function FinancialStatement() {
         manualNoteLines,
         bankAccounts,
         capitalAccountLines,
+        cogsExtraLines,
         loadedLedgers,
       )
       noteSubAmounts = migrateAdminExpenseSubAmounts(administrativeExpenseLines, noteSubAmounts)
       noteSubAmounts = migrateOtherShortTermSubAmounts(otherShortTermBorrowingLines, noteSubAmounts)
       noteSubAmounts = migrateManualNoteLineSubAmounts(manualNoteLines, noteSubAmounts)
       noteSubAmounts = migrateCapitalAccountSubAmounts(capitalAccountLines, noteSubAmounts)
+      noteSubAmounts = migrateCogsExtraSubAmounts(cogsExtraLines, noteSubAmounts)
 
       const gstReco = normalizeGstReco(fs.gstReco)
       if (gstReco.linkSalesToRevenueNote) {
@@ -1090,6 +1113,7 @@ function FinancialStatement() {
         otherShortTermBorrowingLines,
         manualNoteLines,
         capitalAccountLines,
+        cogsExtraLines,
         plAppropriationLines,
         plAppropriationAmounts,
         depreciationSchedule: carriedDepreciationSchedule,
@@ -1190,6 +1214,7 @@ function FinancialStatement() {
                 otherShortTermBorrowingLines,
                 manualNoteLines,
                 capitalAccountLines,
+                cogsExtraLines,
               },
             })
             noteSubAmounts = carryResult.data.noteSubAmounts
@@ -1212,6 +1237,7 @@ function FinancialStatement() {
               carryResult.data.otherShortTermBorrowingLines ?? otherShortTermBorrowingLines
             manualNoteLines = carryResult.data.manualNoteLines ?? manualNoteLines
             capitalAccountLines = carryResult.data.capitalAccountLines ?? capitalAccountLines
+            cogsExtraLines = carryResult.data.cogsExtraLines ?? cogsExtraLines
             nextOpeningLocks = carryResult.locks
               ? {
                   ...carryResult.locks,
@@ -1284,6 +1310,7 @@ function FinancialStatement() {
         otherShortTermBorrowingLines,
         manualNoteLines,
         capitalAccountLines,
+        cogsExtraLines,
         plAppropriationLines,
         plAppropriationAmounts,
         depreciationSchedule: carriedDepreciationSchedule,
@@ -1313,6 +1340,40 @@ function FinancialStatement() {
   }, [clientId, fyId, businessId])
 
   const fy = client?.financialYears?.find((item) => item.id === fyId)
+  const udinEnabled = normalizeUdinDetails(fsData?.udinDetails).enabled
+  const fsVisibleTabs = useMemo((): Array<[FsTab, string]> => {
+    if (!fy) {
+      return [['notes', 'Notes']]
+    }
+    const statementType = normalizeStatementType(fy.statementType)
+    const baseTabs = isConsolidatedView
+      ? buildFsTabOptions(statementType).filter(([tab]) => CONSOLIDATED_REPORT_TABS.includes(tab))
+      : buildFsTabOptions(statementType)
+    const tabs: Array<[FsTab, string]> = [...baseTabs]
+    if (!isConsolidatedView) {
+      tabs.push(['final-info', 'Final Info'])
+    }
+    if (!isConsolidatedView && udinEnabled) {
+      tabs.push(['udin-details', 'UDIN Details'])
+    }
+    return tabs
+  }, [fy, isConsolidatedView, udinEnabled])
+  const resolvedActiveTab = useMemo((): FsTab => {
+    return fsVisibleTabs.some(([tab]) => tab === activeTab)
+      ? activeTab
+      : (fsVisibleTabs[0]?.[0] ?? 'notes')
+  }, [fsVisibleTabs, activeTab])
+  const printableTabSet = useMemo(
+    () => new Set(fsVisibleTabs.filter(([tab]) => tab !== 'final-info').map(([tab]) => tab)),
+    [fsVisibleTabs],
+  )
+
+  useEffect(() => {
+    if (isConsolidatedView && !CONSOLIDATED_REPORT_TABS.includes(resolvedActiveTab)) {
+      setActiveTab('balance-sheet')
+    }
+  }, [isConsolidatedView, resolvedActiveTab])
+
   const business = isConsolidatedView
     ? {
         id: CONSOLIDATED_BUSINESS_ID,
@@ -1356,12 +1417,12 @@ function FinancialStatement() {
   const profitLossCurrentLabel = fy ? formatProfitLossColumnLabel(fy.endYear) : 'Current'
 
   const retainLoanSchedules =
-    activeTab === 'repayment' ||
+    resolvedActiveTab === 'repayment' ||
     printAll ||
     Boolean(printAllSelectedTabs && printAllSelectedTabs.size > 0)
 
   const isTabMounted = (tab: FsTab) =>
-    printAll || activeTab === tab || Boolean(printAllSelectedTabs?.has(tab))
+    printAll || resolvedActiveTab === tab || Boolean(printAllSelectedTabs?.has(tab))
 
   const deferredNoteSubAmounts = useDeferredValue(fsData?.noteSubAmounts)
 
@@ -1473,6 +1534,7 @@ function FinancialStatement() {
       otherShortTermBorrowingLines: fsData.otherShortTermBorrowingLines ?? [],
       manualNoteLines: fsData.manualNoteLines ?? [],
       capitalAccountLines: fsData.capitalAccountLines ?? [],
+      cogsExtraLines: fsData.cogsExtraLines ?? [],
       ledgers,
       plAppropriationTotal,
       bankAccounts: fsData.bankAccounts,
@@ -1513,6 +1575,7 @@ function FinancialStatement() {
       bankAccounts: fsData.bankAccounts,
       previousYearBankAccounts,
       capitalAccountLines: fsData.capitalAccountLines ?? [],
+      cogsExtraLines: fsData.cogsExtraLines ?? [],
       ledgers,
       openingBalanceLocks,
       cashAdjustment: buildComparativeCashAdjustment(fsData.cashAdjustment, previousYearCashAdjustment),
@@ -2031,6 +2094,93 @@ function FinancialStatement() {
     setSaveMessage('')
   }
 
+  const defaultCogsLedgerId = (sign: CogsExtraLineSign) => {
+    const groupLedgers = getLedgersForGroup(ledgers, 'costOfGoodsSold').filter(
+      (ledger) => normalizeLedgerSign(ledger.sign) === sign,
+    )
+    return groupLedgers[0]?.id ?? (sign === 'add' ? 'direct-expenses' : 'others-less')
+  }
+
+  const addCogsExtraLine = () => {
+    if (!fsData) {
+      return
+    }
+
+    const lineId = Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+    const sign = 'add' as const
+    const typeId = defaultCogsLedgerId(sign)
+    const subId = cogsExtraLineSubId(lineId)
+
+    setFsData({
+      ...fsData,
+      cogsExtraLines: [...(fsData.cogsExtraLines ?? []), { id: lineId, sign, typeId }],
+      noteSubAmounts: {
+        ...fsData.noteSubAmounts,
+        costOfGoodsSold: {
+          ...fsData.noteSubAmounts.costOfGoodsSold,
+          [subId]: { current: 0, previous: 0 },
+        },
+      },
+    })
+    setSaveMessage('')
+  }
+
+  const updateCogsExtraLineSign = (lineId: string, sign: string) => {
+    if (!fsData) {
+      return
+    }
+
+    const normalizedSign = normalizeCogsExtraLineSign(sign)
+
+    setFsData({
+      ...fsData,
+      cogsExtraLines: (fsData.cogsExtraLines ?? []).map((line) =>
+        line.id === lineId
+          ? {
+              ...line,
+              sign: normalizedSign,
+              typeId: defaultCogsLedgerId(normalizedSign),
+            }
+          : line,
+      ),
+    })
+    setSaveMessage('')
+  }
+
+  const updateCogsExtraLineType = (lineId: string, typeId: string) => {
+    if (!fsData) {
+      return
+    }
+
+    setFsData({
+      ...fsData,
+      cogsExtraLines: (fsData.cogsExtraLines ?? []).map((line) =>
+        line.id === lineId ? { ...line, typeId } : line,
+      ),
+    })
+    setSaveMessage('')
+  }
+
+  const removeCogsExtraLine = (lineId: string) => {
+    if (!fsData) {
+      return
+    }
+
+    const subId = cogsExtraLineSubId(lineId)
+    const cogsSubs = { ...(fsData.noteSubAmounts.costOfGoodsSold ?? {}) }
+    delete cogsSubs[subId]
+
+    setFsData({
+      ...fsData,
+      cogsExtraLines: (fsData.cogsExtraLines ?? []).filter((line) => line.id !== lineId),
+      noteSubAmounts: {
+        ...fsData.noteSubAmounts,
+        costOfGoodsSold: cogsSubs,
+      },
+    })
+    setSaveMessage('')
+  }
+
   const renderLedgerSelectOptions = (
     group: keyof FsNotes,
     sign?: CapitalAccountLineSign,
@@ -2056,7 +2206,7 @@ function FinancialStatement() {
   const renderSubPreviousRef = (sub: ResolvedSubRow, noteKey?: keyof FsNotes) => (
     <>
       <div
-        className={`note-prev-ref fs-screen-only${noteKey && (isAdminExpenseLine(noteKey, sub) || isManualShortTermLine(noteKey, sub) || isManualFinanceInterestLine(noteKey, sub) || isManualNoteLine(noteKey, sub) || isCapitalAccountDynamicLine(noteKey, sub)) ? ' notes-admin-prev-ref' : ''}`}
+        className={`note-prev-ref fs-screen-only${noteKey && (isAdminExpenseLine(noteKey, sub) || isManualShortTermLine(noteKey, sub) || isManualFinanceInterestLine(noteKey, sub) || isManualNoteLine(noteKey, sub) || isCapitalAccountDynamicLine(noteKey, sub) || isCogsExtraDynamicLine(noteKey, sub)) ? ' notes-admin-prev-ref' : ''}`}
         title={`${previousFyLabel} — reference only`}
       >
         {sub.previous ? formatSubAmount(sub.previous, sub.kind) : '—'}
@@ -2173,7 +2323,7 @@ function FinancialStatement() {
           <button
             type="button"
             className="notes-gst-open-btn"
-            onClick={() => setActiveTab('repayment')}
+            onClick={() => switchFsTab('repayment')}
             title="Open Loan Repayment Schedule"
           >
             Repayment Schedule
@@ -2254,6 +2404,23 @@ function FinancialStatement() {
       )
     }
 
+    if (field.key === 'costOfGoodsSold') {
+      return (
+        <div className="notes-main-label-row">
+          <span>{field.label}</span>
+          <button
+            type="button"
+            className="notes-add-round-btn notes-add-round-btn-cogs"
+            onClick={addCogsExtraLine}
+            title="Add COGS line (Add or Less)"
+            aria-label="Add COGS line"
+          >
+            +
+          </button>
+        </div>
+      )
+    }
+
     if (isManualNoteLineKey(field.key)) {
       const manualKey = field.key
       return (
@@ -2273,6 +2440,10 @@ function FinancialStatement() {
     }
 
     if (field.key === 'revenueFromOperations') {
+      if (isConsolidatedView) {
+        return field.label
+      }
+
       const linked = Boolean(fsData?.gstReco.linkSalesToRevenueNote)
 
       return (
@@ -2292,7 +2463,10 @@ function FinancialStatement() {
             <button
               type="button"
               className="notes-gst-open-btn"
-              onClick={() => setActiveTab('gst-reco')}
+              onClick={(event) => {
+                event.stopPropagation()
+                navigateToGstReco()
+              }}
               title="Open GST Reco sheet"
             >
               GST Reco
@@ -2474,6 +2648,57 @@ function FinancialStatement() {
     )
   }
 
+  const renderCogsExtraLineLabel = (sub: ResolvedSubRow) => {
+    const lineId = sub.id.replace('cogs-line-', '')
+    const line = fsData?.cogsExtraLines?.find((item) => item.id === lineId)
+    const sign = normalizeCogsExtraLineSign(line?.sign)
+    const typeId = line?.typeId ?? defaultCogsLedgerId(sign)
+    const groupLedgers = getLedgersForGroup(ledgers, 'costOfGoodsSold').filter(
+      (ledger) => normalizeLedgerSign(ledger.sign) === sign,
+    )
+
+    return (
+      <div className="notes-admin-field notes-cogs-field">
+        <span className="notes-admin-field-marker notes-cogs-marker" aria-hidden="true" />
+        <div className="notes-admin-select-wrap notes-cogs-sign-wrap">
+          <select
+            className="notes-admin-category-select notes-cogs-sign-select"
+            value={sign}
+            title={sign === 'add' ? 'Add value' : 'Less value'}
+            onChange={(event) => updateCogsExtraLineSign(lineId, event.target.value)}
+          >
+            <option value="add">Add</option>
+            <option value="less">Less</option>
+          </select>
+        </div>
+        <div className="notes-admin-select-wrap">
+          <select
+            className="notes-admin-category-select"
+            value={typeId}
+            onChange={(event) => updateCogsExtraLineType(lineId, event.target.value)}
+          >
+            {groupLedgers.length > 0
+              ? renderLedgerSelectOptions('costOfGoodsSold', sign)
+              : getCogsExtraLineTypes(sign).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+          </select>
+        </div>
+        <button
+          type="button"
+          className="notes-admin-remove-btn"
+          onClick={() => removeCogsExtraLine(lineId)}
+          title="Remove line"
+          aria-label="Remove line"
+        >
+          ×
+        </button>
+      </div>
+    )
+  }
+
   const isFinanceInterestLine = (noteKey: keyof FsNotes, sub: ResolvedSubRow) =>
     noteKey === 'financeCost' && sub.kind === 'auto' && sub.id.startsWith('interest-')
 
@@ -2502,7 +2727,7 @@ function FinancialStatement() {
           <button
             type="button"
             className="notes-repayment-link-btn"
-            onClick={() => setActiveTab('repayment')}
+            onClick={() => switchFsTab('repayment')}
             title="Open Loan Repayment Schedule"
           >
             {sub.label}
@@ -2536,6 +2761,7 @@ function FinancialStatement() {
     const isLongTermNote = noteKey === 'longTermBorrowings'
     const isShortTermNote = noteKey === 'shortTermBorrowings'
     const isCapitalNote = noteKey === 'capitalAccount'
+    const isCogsNote = noteKey === 'costOfGoodsSold'
     const isMultiLineNote = isManualNoteLineKey(noteKey)
     const hasAdminLines = (fsData?.administrativeExpenseLines?.length ?? 0) > 0
     const hasLongTermLoans =
@@ -2550,6 +2776,7 @@ function FinancialStatement() {
     )
     const hasManualNoteLines = (fsData?.manualNoteLines ?? []).some((line) => line.noteKey === noteKey)
     const hasCapitalLines = (fsData?.capitalAccountLines?.length ?? 0) > 0
+    const hasCogsExtraLines = (fsData?.cogsExtraLines?.length ?? 0) > 0
 
     const renderSubLabel = (sub: ResolvedSubRow) => {
       if (isAdminExpenseLine(noteKey, sub)) {
@@ -2563,7 +2790,7 @@ function FinancialStatement() {
           <button
             type="button"
             className="notes-repayment-link-btn"
-            onClick={() => setActiveTab('repayment')}
+            onClick={() => switchFsTab('repayment')}
             title="Open Loan Repayment Schedule"
           >
             {sub.label}
@@ -2575,6 +2802,9 @@ function FinancialStatement() {
       }
       if (isCapitalAccountDynamicLine(noteKey, sub)) {
         return renderCapitalAccountLineLabel(sub)
+      }
+      if (isCogsExtraDynamicLine(noteKey, sub)) {
+        return renderCogsExtraLineLabel(sub)
       }
       if (isMultiLineNote && isManualNoteLine(noteKey, sub)) {
         return renderManualNoteLineLabel(noteKey, sub)
@@ -2648,6 +2878,15 @@ function FinancialStatement() {
             </td>
           </tr>
         )}
+        {isCogsNote && !hasCogsExtraLines && !hasPriorNoteSubData && (
+          <tr className="notes-cogs-empty-row">
+            <td className="notes-sno-col" />
+            <td className="notes-particular-col notes-cogs-empty-hint" colSpan={trailingColSpan}>
+              Click <span className="notes-admin-empty-plus">+</span> to add extra COGS lines (add
+              ledgers in <strong>Ledger</strong> under Cost of Goods Sold for dropdown options)
+            </td>
+          </tr>
+        )}
         {noteKey === 'revenueFromOperations' && fsData?.gstReco.linkSalesToRevenueNote && (() => {
           const goodsRow = subRows.find((row) => row.id === 'sales-goods')
           const servicesRow = subRows.find((row) => row.id === 'sales-services')
@@ -2709,6 +2948,7 @@ function FinancialStatement() {
           const isManualStLine = isManualShortTermLine(noteKey, sub)
           const isManualLine = isManualNoteLine(noteKey, sub)
           const isCapitalLine = isCapitalAccountDynamicLine(noteKey, sub)
+          const isCogsLine = isCogsExtraDynamicLine(noteKey, sub)
           const isSectionHeader =
             (isFinanceNote || isShortTermNote || isLongTermNote) && sub.kind === 'header'
           const isFinanceInterest = isFinanceInterestRow(noteKey, sub)
@@ -2720,6 +2960,7 @@ function FinancialStatement() {
             isManualStLine ? 'notes-st-manual-row' : '',
             isManualLine ? 'notes-manual-line-row' : '',
             isCapitalLine ? 'notes-capital-line-row' : '',
+            isCogsLine ? 'notes-cogs-line-row' : '',
             isAdminNote && sub.id === 'admin-total' ? 'notes-admin-total-row' : '',
             isShortTermNote && sub.id === 'short-term-total' ? 'notes-st-total-row' : '',
             isLongTermNote && sub.id === 'long-term-total' ? 'notes-lt-total-row' : '',
@@ -3250,6 +3491,7 @@ function FinancialStatement() {
         workingData.capitalAccountLines,
         workingData.noteSubAmounts,
       )
+      const cogsExtraLinesForSave = normalizeCogsExtraLines(workingData.cogsExtraLines)
       const bankAccountsForSave = normalizeBankAccounts(workingData.bankAccounts)
       const gstRecoForSave = normalizeGstReco(workingData.gstReco)
       let noteSubAmountsForSave = buildCompleteNoteSubAmounts(
@@ -3261,6 +3503,7 @@ function FinancialStatement() {
         manualLinesForSave,
         bankAccountsForSave,
         capitalLinesForSave,
+        cogsExtraLinesForSave,
         ledgers,
       )
       if (gstRecoForSave.linkSalesToRevenueNote) {
@@ -3276,6 +3519,7 @@ function FinancialStatement() {
         otherShortTermBorrowingLines: otherStLinesForSave,
         manualNoteLines: manualLinesForSave,
         capitalAccountLines: capitalLinesForSave,
+        cogsExtraLines: cogsExtraLinesForSave,
         bankAccounts: bankAccountsForSave,
         gstReco: gstRecoForSave,
         depreciationSchedule: prunedDepreciationSchedule,
@@ -3297,6 +3541,7 @@ function FinancialStatement() {
         saved.capitalAccountLines,
         saved.noteSubAmounts,
       )
+      const savedCogsExtraLines = normalizeCogsExtraLines(saved.cogsExtraLines)
       const savedPlLines = normalizePlAppropriationLines(saved.plAppropriationLines)
       const savedPlAmounts = migratePlAppropriationAmounts(
         savedPlLines,
@@ -3311,12 +3556,14 @@ function FinancialStatement() {
         savedManualLines,
         normalizeBankAccounts(saved.bankAccounts),
         savedCapitalLines,
+        savedCogsExtraLines,
         ledgers,
       )
       savedSubAmounts = migrateAdminExpenseSubAmounts(savedAdminLines, savedSubAmounts)
       savedSubAmounts = migrateOtherShortTermSubAmounts(savedOtherStLines, savedSubAmounts)
       savedSubAmounts = migrateManualNoteLineSubAmounts(savedManualLines, savedSubAmounts)
       savedSubAmounts = migrateCapitalAccountSubAmounts(savedCapitalLines, savedSubAmounts)
+      savedSubAmounts = migrateCogsExtraSubAmounts(savedCogsExtraLines, savedSubAmounts)
       savedSubAmounts = applyOpeningStockLink(savedSubAmounts, previousYearSubAmounts)
       savedSubAmounts = applyClosingStockLink(savedSubAmounts)
 
@@ -3329,6 +3576,7 @@ function FinancialStatement() {
         otherShortTermBorrowingLines: savedOtherStLines,
         manualNoteLines: savedManualLines,
         capitalAccountLines: savedCapitalLines,
+        cogsExtraLines: savedCogsExtraLines,
         plAppropriationLines: savedPlLines,
         plAppropriationAmounts: savedPlAmounts,
         depreciationSchedule: normalizeDepreciationSchedule(saved.depreciationSchedule || []),
@@ -3468,20 +3716,7 @@ function FinancialStatement() {
   const balanceSheetLabel = formatBalanceSheetReportTitle(statementType)
   const profitLossLabel = formatProfitLossReportTitle(statementType)
   const notesLabel = formatNotesReportTitle(statementType)
-  const baseTabs = isConsolidatedView
-    ? buildFsTabOptions(statementType).filter(([tab]) => CONSOLIDATED_REPORT_TABS.includes(tab))
-    : buildFsTabOptions(statementType)
-  const visibleTabs: Array<[FsTab, string]> = [...baseTabs]
-  if (!isConsolidatedView) {
-    visibleTabs.push(['final-info', 'Final Info'])
-  }
-  if (!isConsolidatedView && udinDetails.enabled) {
-    visibleTabs.push(['udin-details', 'UDIN Details'])
-  }
-  const resolvedActiveTab = visibleTabs.some(([tab]) => tab === activeTab)
-    ? activeTab
-    : (visibleTabs[0]?.[0] ?? 'notes')
-  const printableTabSet = new Set(visibleTabs.filter(([tab]) => tab !== 'final-info').map(([tab]) => tab))
+  const visibleTabs = fsVisibleTabs
 
   const printTitleForTab = (tab: FsTab) => formatFsTabPrintTitle(tab, statementType)
 
@@ -4196,7 +4431,7 @@ function FinancialStatement() {
                         : udinDetails.caProfileId,
                   })
                   if (!enabled && resolvedActiveTab === 'udin-details') {
-                    setActiveTab('gst-reco')
+                    switchFsTab('gst-reco')
                   }
                 }}
                 disabled={isFsReadOnly}
@@ -4301,7 +4536,7 @@ function FinancialStatement() {
             key={tab}
             type="button"
             className={resolvedActiveTab === tab ? 'tab active' : 'tab'}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => switchFsTab(tab)}
           >
             {label}
           </button>
@@ -4367,7 +4602,7 @@ function FinancialStatement() {
                     <tbody key={field.key} className="fs-print-note-block">
                       <tr
                         id={`note-row-${field.key}`}
-                        className={`notes-main-row notes-main-row-header${field.key === 'longTermBorrowings' ? ' notes-main-row-lt' : ''}${field.key === 'otherAdministrativeExpenses' ? ' notes-main-row-admin' : ''}${field.key === 'shortTermBorrowings' ? ' notes-main-row-st' : ''}${field.key === 'financeCost' ? ' notes-main-row-finance' : ''}${field.key === 'capitalAccount' ? ' notes-main-row-capital' : ''}${field.key === 'revenueFromOperations' ? ' notes-main-row-revenue' : ''}${isManualNoteLineKey(field.key) ? ' notes-main-row-manual' : ''}${
+                        className={`notes-main-row notes-main-row-header${field.key === 'longTermBorrowings' ? ' notes-main-row-lt' : ''}${field.key === 'otherAdministrativeExpenses' ? ' notes-main-row-admin' : ''}${field.key === 'shortTermBorrowings' ? ' notes-main-row-st' : ''}${field.key === 'financeCost' ? ' notes-main-row-finance' : ''}${field.key === 'capitalAccount' ? ' notes-main-row-capital' : ''}${field.key === 'costOfGoodsSold' ? ' notes-main-row-cogs' : ''}${field.key === 'revenueFromOperations' ? ' notes-main-row-revenue' : ''}${isManualNoteLineKey(field.key) ? ' notes-main-row-manual' : ''}${
                           highlightedNote?.noteKey === field.key && !highlightedNote.noteSubId
                             ? ' notes-row-highlight'
                             : ''
@@ -5515,8 +5750,8 @@ function FinancialStatement() {
       )}
 
       {isTabMounted('gst-reco') && printableTabSet.has('gst-reco') && (
-        <div
-          className={`fs-tab-panel${resolvedActiveTab === 'gst-reco' ? ' is-active' : ''}${printTabExtraClass('gst-reco')}`}
+        <section
+          className={tabPanelClass('gst-reco')}
           data-fs-tab="gst-reco"
           data-print-title={printTitleForTab('gst-reco')}
         >
@@ -5525,10 +5760,10 @@ function FinancialStatement() {
           gstReco={fsData.gstReco}
           fyLabel={currentFyLabel}
           salesFromBooks={fsData.notes.revenueFromOperations.current}
-          onOpenRevenueNote={() => setActiveTab('notes')}
+          onOpenRevenueNote={() => navigateToNote('revenueFromOperations')}
           onChange={updateGstReco}
         />
-        </div>
+        </section>
       )}
       {isTabMounted('udin-details') && printableTabSet.has('udin-details') && (
         <section

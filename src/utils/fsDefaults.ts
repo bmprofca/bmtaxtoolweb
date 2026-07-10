@@ -333,6 +333,7 @@ export function createEmptyFsData(
     otherShortTermBorrowingLines: [],
     manualNoteLines: [],
     capitalAccountLines: [],
+    cogsExtraLines: [],
     plAppropriationLines: [],
     plAppropriationAmounts: {},
     depreciationSchedule: [],

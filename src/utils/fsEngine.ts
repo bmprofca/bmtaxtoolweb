@@ -1,6 +1,7 @@
 import type {
   AdministrativeExpenseLine,
   CapitalAccountLine,
+  CogsExtraLine,
   ComputedStatements,
   DepreciationRow,
   FinancialStatementData,
@@ -52,6 +53,7 @@ export function buildFsDerivedState(params: {
   bankAccounts: BankAccountRecord[]
   previousYearBankAccounts: BankAccountRecord[]
   capitalAccountLines: CapitalAccountLine[]
+  cogsExtraLines: CogsExtraLine[]
   ledgers: LedgerRecord[]
   openingBalanceLocks: OpeningBalanceLocks | null
   cashAdjustment: NoteValue
@@ -85,6 +87,7 @@ export function buildFsDerivedState(params: {
     params.bankAccounts,
     params.previousYearBankAccounts,
     params.capitalAccountLines,
+    params.cogsExtraLines,
     params.ledgers,
     params.openingBalanceLocks,
     params.cashAdjustment,
@@ -241,6 +244,7 @@ export function fsDataFingerprint(data: FinancialStatementData): string {
     otherShortTermBorrowingLines: data.otherShortTermBorrowingLines,
     manualNoteLines: data.manualNoteLines,
     capitalAccountLines: data.capitalAccountLines,
+    cogsExtraLines: data.cogsExtraLines,
     plAppropriationLines: data.plAppropriationLines,
     plAppropriationAmounts: data.plAppropriationAmounts,
     cashAdjustment: data.cashAdjustment,

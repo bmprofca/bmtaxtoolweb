@@ -1,6 +1,7 @@
 import type {
   AdministrativeExpenseLine,
   CapitalAccountLine,
+  CogsExtraLine,
   DepreciationRow,
   FsNotes,
   ManualNoteLine,
@@ -38,6 +39,7 @@ export interface NoteCalcContext {
   otherShortTermBorrowingLines: OtherShortTermBorrowingLine[]
   manualNoteLines: ManualNoteLine[]
   capitalAccountLines: CapitalAccountLine[]
+  cogsExtraLines: CogsExtraLine[]
   ledgers: LedgerRecord[]
   plAppropriationTotal: NoteValue
   bankAccounts: BankAccountRecord[]
@@ -92,6 +94,7 @@ export function buildEffectiveNotes(ctx: NoteCalcContext): FsNotes {
     ctx.bankAccounts,
     ctx.previousYearBankAccounts,
     ctx.capitalAccountLines,
+    ctx.cogsExtraLines,
     ctx.ledgers,
     ctx.cashAdjustment,
   )
@@ -122,6 +125,7 @@ export function buildEffectiveNotes(ctx: NoteCalcContext): FsNotes {
     ctx.bankAccounts,
     ctx.previousYearBankAccounts,
     ctx.capitalAccountLines,
+    ctx.cogsExtraLines,
     ctx.ledgers,
     ctx.cashAdjustment,
   )

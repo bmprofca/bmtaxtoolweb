@@ -2,6 +2,7 @@ import type { FinancialYear } from '../types'
 import type {
   AdministrativeExpenseLine,
   CapitalAccountLine,
+  CogsExtraLine,
   CashAdjustment,
   DepreciationRow,
   FinancialStatementData,
@@ -34,6 +35,10 @@ import {
   migrateCapitalAccountSubAmounts,
   normalizeCapitalAccountLines,
 } from './capitalAccountLineConfig'
+import {
+  migrateCogsExtraSubAmounts,
+  normalizeCogsExtraLines,
+} from './cogsExtraLineConfig'
 import { normalizeLoans, recomputeLoansForFy } from './loanCalculator'
 import {
   migrateAdminExpenseSubAmounts,
@@ -62,6 +67,7 @@ export interface PreparedYearFs {
   otherShortTermBorrowingLines: OtherShortTermBorrowingLine[]
   manualNoteLines: ManualNoteLine[]
   capitalAccountLines: CapitalAccountLine[]
+  cogsExtraLines: CogsExtraLine[]
   plAppropriationLines: ReturnType<typeof normalizePlAppropriationLines>
   plAppropriationAmounts: Record<string, NoteSubCell>
   depreciationSchedule: DepreciationRow[]
@@ -115,6 +121,7 @@ export function prepareYearFsData(
     rawFs.capitalAccountLines,
     rawFs.noteSubAmounts,
   )
+  const cogsExtraLines = normalizeCogsExtraLines(rawFs.cogsExtraLines)
   const plAppropriationLines = normalizePlAppropriationLines(rawFs.plAppropriationLines)
   const plAppropriationAmounts = migratePlAppropriationAmounts(
     plAppropriationLines,
@@ -132,12 +139,14 @@ export function prepareYearFsData(
     manualNoteLines,
     bankAccounts,
     capitalAccountLines,
+    cogsExtraLines,
     ledgers,
   )
   noteSubAmounts = migrateAdminExpenseSubAmounts(administrativeExpenseLines, noteSubAmounts)
   noteSubAmounts = migrateOtherShortTermSubAmounts(otherShortTermBorrowingLines, noteSubAmounts)
   noteSubAmounts = migrateManualNoteLineSubAmounts(manualNoteLines, noteSubAmounts)
   noteSubAmounts = migrateCapitalAccountSubAmounts(capitalAccountLines, noteSubAmounts)
+  noteSubAmounts = migrateCogsExtraSubAmounts(cogsExtraLines, noteSubAmounts)
 
   const depreciationSchedule = normalizeDepreciationSchedule(rawFs.depreciationSchedule || [])
   const previousYearDepreciation = normalizePreviousYearDepreciation(rawFs.previousYearDepreciation)
@@ -159,6 +168,7 @@ export function prepareYearFsData(
     otherShortTermBorrowingLines,
     manualNoteLines,
     capitalAccountLines,
+    cogsExtraLines,
     plAppropriationLines,
     plAppropriationAmounts,
     depreciationSchedule,
@@ -205,6 +215,7 @@ function enrichPreparedYearSubAmounts(
     otherShortTermBorrowingLines: prepared.otherShortTermBorrowingLines,
     manualNoteLines: prepared.manualNoteLines,
     capitalAccountLines: prepared.capitalAccountLines,
+    cogsExtraLines: prepared.cogsExtraLines,
     ledgers,
     plAppropriationTotal: prepared.plAppropriationTotal,
     bankAccounts: prepared.bankAccounts,
@@ -239,6 +250,7 @@ function enrichPreparedYearSubAmounts(
       prepared.bankAccounts,
       [],
       prepared.capitalAccountLines,
+      prepared.cogsExtraLines,
       ledgers,
       null,
       prepared.cashAdjustment,
@@ -278,6 +290,7 @@ export function buildFsDerivedFromPrepared(
       otherShortTermBorrowingLines: prepared.otherShortTermBorrowingLines,
       manualNoteLines: prepared.manualNoteLines,
       capitalAccountLines: prepared.capitalAccountLines,
+      cogsExtraLines: prepared.cogsExtraLines,
       ledgers,
       plAppropriationTotal: prepared.plAppropriationTotal,
       bankAccounts: prepared.bankAccounts,
@@ -298,6 +311,7 @@ export function buildFsDerivedFromPrepared(
     bankAccounts: prepared.bankAccounts,
     previousYearBankAccounts: priorPrepared?.bankAccounts ?? [],
     capitalAccountLines: prepared.capitalAccountLines,
+    cogsExtraLines: prepared.cogsExtraLines,
     ledgers,
     openingBalanceLocks: null,
     cashAdjustment: comparativeCashAdjustment,

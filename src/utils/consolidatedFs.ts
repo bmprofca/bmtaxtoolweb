@@ -224,6 +224,7 @@ export function mergeFinancialStatementData(
     ),
     manualNoteLines: records.flatMap((record) => record.manualNoteLines || []),
     capitalAccountLines: records.flatMap((record) => record.capitalAccountLines || []),
+    cogsExtraLines: records.flatMap((record) => record.cogsExtraLines || []),
     plAppropriationLines: records.flatMap((record) => record.plAppropriationLines || []),
     plAppropriationAmounts: mergeAmountMap(
       records.map((record) => record.plAppropriationAmounts || {}),

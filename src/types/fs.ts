@@ -37,6 +37,12 @@ export interface CapitalAccountLine {
   typeId: string
 }
 
+export interface CogsExtraLine {
+  id: string
+  sign: 'add' | 'less'
+  typeId: string
+}
+
 export interface PlAppropriationLine {
   id: string
   categoryId: string
@@ -153,6 +159,7 @@ export interface NotesData {
   otherShortTermBorrowingLines: OtherShortTermBorrowingLine[]
   manualNoteLines: ManualNoteLine[]
   capitalAccountLines: CapitalAccountLine[]
+  cogsExtraLines: CogsExtraLine[]
   plAppropriationLines: PlAppropriationLine[]
   plAppropriationAmounts: Record<string, NoteSubCell>
   cashAdjustment: CashAdjustment
@@ -183,6 +190,7 @@ export interface FinancialStatementData {
   otherShortTermBorrowingLines: OtherShortTermBorrowingLine[]
   manualNoteLines: ManualNoteLine[]
   capitalAccountLines: CapitalAccountLine[]
+  cogsExtraLines: CogsExtraLine[]
   plAppropriationLines: PlAppropriationLine[]
   plAppropriationAmounts: Record<string, NoteSubCell>
   depreciationSchedule: DepreciationRow[]

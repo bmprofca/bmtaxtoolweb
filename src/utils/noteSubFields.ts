@@ -1,6 +1,7 @@
 import type {
   AdministrativeExpenseLine,
   CapitalAccountLine,
+  CogsExtraLine,
   ComputedStatements,
   FsNotes,
   ManualNoteLine,
@@ -43,6 +44,7 @@ import {
   type ManualNoteLineKey,
 } from './manualNoteLineConfig'
 import { capitalAccountLineSubId } from './capitalAccountLineConfig'
+import { cogsExtraLineSubId, migrateCogsExtraSubAmounts } from './cogsExtraLineConfig'
 import type { LedgerRecord } from '../types/ledger'
 import {
   formatLedgerRowLabel,
@@ -248,6 +250,29 @@ function getCapitalAccountLineSubRows(
   }))
 }
 
+function getCogsExtraLineSubRows(
+  lines: CogsExtraLine[],
+  ledgers: LedgerRecord[] = [],
+): NoteSubFieldDef[] {
+  return lines.map((line) => ({
+    id: cogsExtraLineSubId(line.id),
+    label: resolveLedgerLineLabel(ledgers, 'costOfGoodsSold', line.typeId, line.sign),
+    kind: line.sign === 'less' ? ('less' as const) : ('entry' as const),
+    sign: line.sign === 'less' ? (-1 as const) : undefined,
+  }))
+}
+
+function buildCogsFields(cogsExtraLines: CogsExtraLine[], ledgers: LedgerRecord[] = []) {
+  const fixedStart = NOTE_SUB_TEMPLATES.costOfGoodsSold.filter(
+    (row) => row.id === 'opening-stock' || row.id === 'add-purchase',
+  )
+  const dynamicRows = getCogsExtraLineSubRows(cogsExtraLines, ledgers)
+  const fixedEnd = NOTE_SUB_TEMPLATES.costOfGoodsSold.filter(
+    (row) => row.id !== 'opening-stock' && row.id !== 'add-purchase',
+  )
+  return [...fixedStart, ...dynamicRows, ...fixedEnd]
+}
+
 function buildCapitalAccountFields(
   capitalAccountLines: CapitalAccountLine[],
   ledgers: LedgerRecord[] = [],
@@ -329,6 +354,13 @@ function resolveLegacyLedgerAmount(
     if (subId.startsWith('capital-line-')) {
       const lineId = subId.replace('capital-line-', '')
       const line = ctx.capitalAccountLines.find((item) => item.id === lineId)
+      if (line?.typeId === ledgerId) {
+        return { current: amount.current, previous: amount.previous ?? previousFallback }
+      }
+    }
+    if (subId.startsWith('cogs-line-')) {
+      const lineId = subId.replace('cogs-line-', '')
+      const line = ctx.cogsExtraLines.find((item) => item.id === lineId)
       if (line?.typeId === ledgerId) {
         return { current: amount.current, previous: amount.previous ?? previousFallback }
       }
@@ -483,12 +515,17 @@ export function getSubFieldsForNote(
   manualNoteLines: ManualNoteLine[] = [],
   bankAccounts: BankAccountRecord[] = [],
   capitalAccountLines: CapitalAccountLine[] = [],
+  cogsExtraLines: CogsExtraLine[] = [],
   ledgers: LedgerRecord[] = [],
 ): NoteSubFieldDef[] {
   const base = [...NOTE_SUB_TEMPLATES[noteKey]]
 
   if (noteKey === 'capitalAccount') {
     return buildCapitalAccountFields(capitalAccountLines, ledgers)
+  }
+
+  if (noteKey === 'costOfGoodsSold') {
+    return buildCogsFields(cogsExtraLines, ledgers)
   }
 
   if (isManualNoteLineKey(noteKey)) {
@@ -583,6 +620,7 @@ export function createEmptyNoteSubAmounts(
   manualNoteLines: ManualNoteLine[] = [],
   bankAccounts: BankAccountRecord[] = [],
   capitalAccountLines: CapitalAccountLine[] = [],
+  cogsExtraLines: CogsExtraLine[] = [],
   ledgers: LedgerRecord[] = [],
 ): NoteSubAmounts {
   const result: NoteSubAmounts = {}
@@ -596,6 +634,7 @@ export function createEmptyNoteSubAmounts(
       manualNoteLines,
       bankAccounts,
       capitalAccountLines,
+      cogsExtraLines,
       ledgers,
     )) {
       if (sub.kind === 'entry' || sub.kind === 'less') {
@@ -838,6 +877,7 @@ export function normalizeNoteSubAmounts(
   manualNoteLines: ManualNoteLine[] = [],
   bankAccounts: BankAccountRecord[] = [],
   capitalAccountLines: CapitalAccountLine[] = [],
+  cogsExtraLines: CogsExtraLine[] = [],
   ledgers: LedgerRecord[] = [],
 ): NoteSubAmounts {
   const result = createEmptyNoteSubAmounts(
@@ -846,6 +886,7 @@ export function normalizeNoteSubAmounts(
     manualNoteLines,
     bankAccounts,
     capitalAccountLines,
+    cogsExtraLines,
     ledgers,
   )
 
@@ -862,6 +903,7 @@ export function normalizeNoteSubAmounts(
       manualNoteLines,
       bankAccounts,
       capitalAccountLines,
+      cogsExtraLines,
       ledgers,
     )) {
       if (sub.kind !== 'entry' && sub.kind !== 'less') {
@@ -898,6 +940,7 @@ export function buildCompleteNoteSubAmounts(
   manualNoteLines: ManualNoteLine[],
   bankAccounts: BankAccountRecord[],
   capitalAccountLines: CapitalAccountLine[],
+  cogsExtraLines: CogsExtraLine[],
   ledgers: LedgerRecord[],
 ): NoteSubAmounts {
   let subs = normalizeNoteSubAmounts(
@@ -909,12 +952,14 @@ export function buildCompleteNoteSubAmounts(
     manualNoteLines,
     bankAccounts,
     capitalAccountLines,
+    cogsExtraLines,
     ledgers,
   )
   subs = migrateAdminExpenseSubAmounts(administrativeExpenseLines, subs)
   subs = migrateOtherShortTermSubAmounts(otherShortTermBorrowingLines, subs)
   subs = migrateManualNoteLineSubAmounts(manualNoteLines, subs)
   subs = migrateCapitalAccountSubAmounts(capitalAccountLines, subs)
+  subs = migrateCogsExtraSubAmounts(cogsExtraLines, subs)
   return subs
 }
 
@@ -937,6 +982,7 @@ interface SubResolveContext {
   otherShortTermBorrowingLines: OtherShortTermBorrowingLine[]
   manualNoteLines: ManualNoteLine[]
   capitalAccountLines: CapitalAccountLine[]
+  cogsExtraLines: CogsExtraLine[]
   ledgers: LedgerRecord[]
   plAppropriationTotal: NoteValue
   balanceProfit: NoteValue
@@ -1010,45 +1056,39 @@ function calcCogs(resolved: Map<string, NoteValue>, defs: NoteSubFieldDef[]) {
   const opening = resolved.get('opening-stock') ?? emptyCell()
   const purchase = resolved.get('add-purchase') ?? emptyCell()
   const closing = resolved.get('less-closing-stock') ?? emptyCell()
-  const hasLegacy =
-    opening.current !== 0 ||
-    opening.previous !== 0 ||
-    purchase.current !== 0 ||
-    purchase.previous !== 0 ||
-    closing.current !== 0 ||
-    closing.previous !== 0
 
-  if (hasLegacy) {
-    return {
-      current: opening.current + purchase.current - closing.current,
-      previous: opening.previous + purchase.previous - closing.previous,
-    }
-  }
-
-  let addTotal = { current: 0, previous: 0 }
-  let lessTotal = { current: 0, previous: 0 }
+  let addTotal = opening.current + purchase.current
+  let lessTotal = closing.current
+  let addPrev = opening.previous + purchase.previous
+  let lessPrev = closing.previous
 
   for (const def of defs) {
-    if (!isLedgerSubId(def.id)) {
+    if (
+      def.id === 'opening-stock' ||
+      def.id === 'add-purchase' ||
+      def.id === 'less-closing-stock' ||
+      def.kind === 'total' ||
+      def.kind === 'auto' ||
+      def.kind === 'percent'
+    ) {
       continue
     }
-    const val = resolved.get(def.id) ?? emptyCell()
-    if (def.kind === 'less') {
-      lessTotal = {
-        current: lessTotal.current + val.current,
-        previous: lessTotal.previous + val.previous,
-      }
-    } else {
-      addTotal = {
-        current: addTotal.current + val.current,
-        previous: addTotal.previous + val.previous,
+
+    if (def.id.startsWith('cogs-line-') || isLedgerSubId(def.id)) {
+      const val = resolved.get(def.id) ?? emptyCell()
+      if (def.kind === 'less') {
+        lessTotal += val.current
+        lessPrev += val.previous
+      } else if (def.kind === 'entry') {
+        addTotal += val.current
+        addPrev += val.previous
       }
     }
   }
 
   return {
-    current: addTotal.current - lessTotal.current,
-    previous: addTotal.previous - lessTotal.previous,
+    current: addTotal - lessTotal,
+    previous: addPrev - lessPrev,
   }
 }
 
@@ -1101,6 +1141,7 @@ export function resolveNoteSubRows(
     ctx.manualNoteLines,
     ctx.bankAccounts,
     ctx.capitalAccountLines,
+    ctx.cogsExtraLines,
     ctx.ledgers,
   )
   const resolved = new Map<string, NoteValue>()
@@ -1390,6 +1431,7 @@ export function buildSubResolveContext(
   bankAccounts: BankAccountRecord[] = [],
   previousYearBankAccounts: BankAccountRecord[] = [],
   capitalAccountLines: CapitalAccountLine[] = [],
+  cogsExtraLines: CogsExtraLine[] = [],
   ledgers: LedgerRecord[] = [],
   openingBalanceLocks: OpeningBalanceLocks | null = null,
   cashAdjustment: NoteValue = { current: 0, previous: 0 },
@@ -1472,6 +1514,7 @@ export function buildSubResolveContext(
     otherShortTermBorrowingLines,
     manualNoteLines,
     capitalAccountLines,
+    cogsExtraLines,
     ledgers,
     plAppropriationTotal,
     balanceProfit: calcBalanceProfit(
@@ -1521,6 +1564,7 @@ export function buildSubResolveContext(
     otherShortTermBorrowingLines,
     manualNoteLines,
     capitalAccountLines,
+    cogsExtraLines,
     ledgers,
     plAppropriationTotal,
     balanceProfit,
@@ -1556,6 +1600,7 @@ export function buildNotesFromSubAmounts(
   bankAccounts: BankAccountRecord[] = [],
   previousYearBankAccounts: BankAccountRecord[] = [],
   capitalAccountLines: CapitalAccountLine[] = [],
+  cogsExtraLines: CogsExtraLine[] = [],
   ledgers: LedgerRecord[] = [],
   cashAdjustment: NoteValue = { current: 0, previous: 0 },
 ): FsNotes {
@@ -1576,6 +1621,7 @@ export function buildNotesFromSubAmounts(
     bankAccounts,
     previousYearBankAccounts,
     capitalAccountLines,
+    cogsExtraLines,
     ledgers,
     null,
     cashAdjustment,

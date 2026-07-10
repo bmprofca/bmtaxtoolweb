@@ -220,6 +220,7 @@ export function buildPriorYearClosingSnapshot(params: {
     otherShortTermBorrowingLines: fs.otherShortTermBorrowingLines ?? [],
     manualNoteLines: fs.manualNoteLines ?? [],
     capitalAccountLines: fs.capitalAccountLines ?? [],
+    cogsExtraLines: fs.cogsExtraLines ?? [],
     ledgers,
     plAppropriationTotal,
     bankAccounts: fs.bankAccounts,
@@ -257,6 +258,7 @@ export function buildPriorYearClosingSnapshot(params: {
     fs.bankAccounts,
     previousYearBankAccounts,
     fs.capitalAccountLines ?? [],
+    fs.cogsExtraLines ?? [],
     ledgers,
     null,
     {
@@ -991,6 +993,7 @@ export function applyOpeningBalanceCarryForward(params: {
     | 'otherShortTermBorrowingLines'
     | 'manualNoteLines'
     | 'capitalAccountLines'
+    | 'cogsExtraLines'
   >
 }): { data: typeof params.current; locks: OpeningBalanceLocks | null; loansCarriedForward: boolean } {
   const { business, priorFy, priorFs, priorClosing, current } = params
@@ -1030,6 +1033,10 @@ export function applyOpeningBalanceCarryForward(params: {
     current.capitalAccountLines ?? [],
     priorFs.capitalAccountLines ?? [],
   )
+  const cogsExtraLines = copyLinesIfEmpty(
+    current.cogsExtraLines ?? [],
+    priorFs.cogsExtraLines ?? [],
+  )
 
   let noteSubAmounts = applyNoteOpeningCarryForward(
     current.noteSubAmounts,
@@ -1065,6 +1072,7 @@ export function applyOpeningBalanceCarryForward(params: {
       otherShortTermBorrowingLines,
       manualNoteLines,
       capitalAccountLines,
+      cogsExtraLines,
     },
     locks,
     loansCarriedForward,
