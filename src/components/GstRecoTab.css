@@ -126,20 +126,66 @@
   cursor: pointer;
 }
 
-.gst-sales-link-toggle {
-  display: inline-flex;
-  align-items: center;
-  margin: 0;
-  padding: 0.2rem;
-  cursor: pointer;
+.gst-section-note-btn {
+  font-size: 0.78rem;
 }
 
-.gst-sales-link-toggle input {
-  width: 0.95rem;
-  height: 0.95rem;
+.gst-sales-db-info {
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #3b82f6;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.gst-sales-db-info-label {
+  font-weight: 600;
+  color: #1e40af;
+  white-space: nowrap;
+}
+
+.gst-sales-db-info-loading {
+  font-weight: 500;
+  color: #64748b;
+}
+
+.gst-sales-db-info-unsaved {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  white-space: nowrap;
+}
+
+.gst-sales-db-info-line {
   margin: 0;
-  accent-color: #2563eb;
-  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.4rem;
+  line-height: 1.45;
+}
+
+.gst-sales-db-info-muted {
+  color: #64748b;
+}
+
+.gst-sales-db-info-sep {
+  color: #cbd5e1;
+  user-select: none;
+}
+
+.gst-sales-db-info-meta {
+  color: #94a3b8;
+  white-space: nowrap;
 }
 
 .gst-reco-section {

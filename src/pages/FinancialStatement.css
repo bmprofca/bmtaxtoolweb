@@ -2033,6 +2033,15 @@ input.fs-readonly-input {
   gap: 0.5rem;
 }
 
+.notes-gst-sales-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #047857;
+}
+
 .notes-gst-ref-link-btn {
   font-size: 0.78rem;
 }

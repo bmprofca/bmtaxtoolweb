@@ -1,6 +1,5 @@
 import type { FsNotes, NoteSubAmounts } from '../types/fs'
 import { isClosingStockLinkedInventoriesSub, isOpeningStockLinkedFromPriorYear, isOpeningStockLinkedSub } from './closingStockLink'
-import { isGstLinkedRevenueSub } from './gstCalculator'
 import type { OpeningBalanceLocks } from './openingBalanceCarryForward'
 import { isNoteOpeningSubLocked } from './openingBalanceCarryForward'
 import type { NoteSubFieldDef } from './noteSubFields'
@@ -65,11 +64,7 @@ export function isNoteSubCurrentYearReadOnly(
     return true
   }
 
-  if (
-    options.linkGstSales &&
-    noteKey === 'revenueFromOperations' &&
-    isGstLinkedRevenueSub(def.id)
-  ) {
+  if (noteKey === 'revenueFromOperations' && def.id === 'gst-sales') {
     return true
   }
 
@@ -121,8 +116,8 @@ export function currentYearReadOnlyHint(
   ) {
     return 'Auto: Debit balance from Bank Account tab (CC / OD)'
   }
-  if (noteKey === 'revenueFromOperations' && isGstLinkedRevenueSub(subId)) {
-    return 'Auto: Taxable sales from GST Reco'
+  if (noteKey === 'revenueFromOperations' && subId === 'gst-sales') {
+    return 'Auto: Taxable sales from GST Reco (Sales + Amended sales)'
   }
   return undefined
 }

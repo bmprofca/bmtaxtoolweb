@@ -7,6 +7,7 @@ import FsPrintSectionStationery from '../components/FsPrintSectionStationery'
 import FsPrintTableBannerRow, { FsPrintHeadSpacerRow } from '../components/FsPrintTableBannerRow'
 import '../components/FsPrintLayout.css'
 import GstRecoTab from '../components/GstRecoTab'
+import FsPrintCaSignOff from '../components/FsPrintCaSignOff'
 import BankAccountModal from '../components/BankAccountModal'
 import LoanModal from '../components/LoanModal'
 import LoanCashFlowTable from '../components/LoanCashFlowTable'
@@ -145,8 +146,8 @@ import {
 } from '../utils/noteSubFields'
 import { buildEffectiveNotes, getNoteCalcMap } from '../utils/noteCalculator'
 import { normalizeGstReco } from '../utils/gstDefaults'
-import { getGstTaxableSalesTotal, isGstLinkedRevenueSub } from '../utils/gstCalculator'
-import { applyGstSalesLinkToRevenue, withGstSalesLinkOnNoteSubAmounts } from '../utils/gstRevenueLink'
+import { getGstTaxableSalesTotal } from '../utils/gstCalculator'
+import { applyGstSalesFromRecoToRevenue, withGstSalesOnNoteSubAmounts } from '../utils/gstRevenueLink'
 import {
   applyClosingStockLink,
   applyOpeningStockLink,
@@ -556,6 +557,9 @@ function FinancialStatement() {
   const [error, setError] = useState('')
   const [savedFingerprint, setSavedFingerprint] = useState<string | null>(null)
   const [saveMessage, setSaveMessage] = useState('')
+  const [gstRecoDbRefreshKey, setGstRecoDbRefreshKey] = useState(0)
+  const [lastSavedGstReco, setLastSavedGstReco] = useState<GstRecoStatement | null>(null)
+  const fsDataRef = useRef<FinancialStatementData | null>(null)
   const [previousYearNotes, setPreviousYearNotes] = useState<FsNotes | null>(null)
   const [previousYearSubAmounts, setPreviousYearSubAmounts] = useState<NoteSubAmounts | null>(null)
   const [previousYearPlAppropriationAmounts, setPreviousYearPlAppropriationAmounts] = useState<Record<
@@ -592,6 +596,10 @@ function FinancialStatement() {
   const [quickEntryNoteSearch, setQuickEntryNoteSearch] = useState('')
   const [quickEntryNoteMenuOpen, setQuickEntryNoteMenuOpen] = useState(false)
   const pendingScrollTargetRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    fsDataRef.current = fsData
+  }, [fsData])
 
   useEffect(() => {
     fetchCaSettings()
@@ -861,6 +869,7 @@ function FinancialStatement() {
       if (!fyMeta) {
         setClient(normalizedClient)
         setFsData(null)
+        setLastSavedGstReco(null)
         setError('This financial year is inactive or not available for financial statements.')
         return
       }
@@ -875,6 +884,7 @@ function FinancialStatement() {
             })),
           })
           setFsData(null)
+          setLastSavedGstReco(null)
           setError(
             'Consolidated statement is not applicable when only one business is active for this financial year.',
           )
@@ -1170,9 +1180,8 @@ function FinancialStatement() {
       noteSubAmounts = migrateCogsExtraSubAmounts(cogsExtraLines, noteSubAmounts)
 
       const gstReco = normalizeGstReco(fs.gstReco)
-      if (gstReco.linkSalesToRevenueNote) {
-        noteSubAmounts = applyGstSalesLinkToRevenue(noteSubAmounts, gstReco)
-      }
+      setLastSavedGstReco(gstReco)
+      noteSubAmounts = applyGstSalesFromRecoToRevenue(noteSubAmounts, gstReco)
       noteSubAmounts = applyClosingStockLink(noteSubAmounts)
 
       const migratedNotes = migrateNotes(fs.notes as Parameters<typeof migrateNotes>[0])
@@ -1514,7 +1523,7 @@ function FinancialStatement() {
     if (!base) {
       return null
     }
-    return withGstSalesLinkOnNoteSubAmounts(base, fsData?.gstReco)
+    return withGstSalesOnNoteSubAmounts(base, fsData?.gstReco)
   }, [deferredNoteSubAmounts, fsData?.noteSubAmounts, fsData?.gstReco])
 
   const computedLoans = useMemo(() => {
@@ -1778,9 +1787,8 @@ function FinancialStatement() {
     }
 
     if (
-      fsData.gstReco.linkSalesToRevenueNote &&
       noteKey === 'revenueFromOperations' &&
-      isGstLinkedRevenueSub(subId)
+      subId === 'gst-sales'
     ) {
       return
     }
@@ -2331,22 +2339,17 @@ function FinancialStatement() {
   }
 
   const renderSubCurrentCell = (noteKey: keyof FsNotes, sub: ResolvedSubRow) => {
-    const gstSalesLinked =
-      Boolean(fsData?.gstReco.linkSalesToRevenueNote) &&
-      noteKey === 'revenueFromOperations' &&
-      isGstLinkedRevenueSub(sub.id)
+    const isGstSalesRow = noteKey === 'revenueFromOperations' && sub.id === 'gst-sales'
 
-    if (!sub.editable || gstSalesLinked) {
-      const linkedGoodsAmount =
-        gstSalesLinked && sub.id === 'sales-goods' && fsData?.gstReco
+    if (!sub.editable || isGstSalesRow) {
+      const gstAmount =
+        isGstSalesRow && fsData?.gstReco
           ? getGstTaxableSalesTotal(fsData.gstReco)
           : sub.current
       const scheduleHint =
         currentYearReadOnlyHint(noteKey, sub.id, sub.kind) ??
-        (gstSalesLinked
-          ? sub.id === 'sales-goods'
-            ? 'Auto: Taxable sales from GST Reco (Sales + Amended sales)'
-            : 'Not used when GST Reco sales are linked'
+        (isGstSalesRow
+          ? 'Auto: Taxable sales from GST Reco (Sales + Amended sales)'
           : undefined)
       return (
         <>
@@ -2354,10 +2357,10 @@ function FinancialStatement() {
             className={`note-sub-auto fs-screen-only${sub.isAuto ? ' is-auto-calc' : ''}`}
             title={scheduleHint}
           >
-            {linkedGoodsAmount ? formatSubAmount(linkedGoodsAmount, sub.kind) : '—'}
+            {gstAmount ? formatSubAmount(gstAmount, sub.kind) : '—'}
           </div>
           <span className="note-amount-print fs-print-only">
-            {linkedGoodsAmount ? formatSubAmount(linkedGoodsAmount, sub.kind) : '—'}
+            {gstAmount ? formatSubAmount(gstAmount, sub.kind) : '—'}
           </span>
         </>
       )
@@ -2541,33 +2544,20 @@ function FinancialStatement() {
         return field.label
       }
 
-      const linked = Boolean(fsData?.gstReco.linkSalesToRevenueNote)
-      const taxableSales = linked ? getGstTaxableSalesTotal(fsData!.gstReco) : 0
+      const gstTaxableSales = getGstTaxableSalesTotal(fsData!.gstReco)
 
       return (
         <div className="notes-revenue-header">
           <span className="notes-revenue-title">{field.label}</span>
-          <div className={`notes-gst-link-bar${linked ? ' is-linked' : ''}`}>
-            {linked && (
+          <div className={`notes-gst-link-bar${gstTaxableSales > 0 ? ' is-linked' : ''}`}>
+            {gstTaxableSales > 0 && (
               <span
                 className="notes-gst-linked-badge"
-                title={`Taxable sales (${formatAmount(taxableSales)}) from GST Reco`}
+                title={`GST Reco taxable sales: ${formatAmount(gstTaxableSales)}`}
               >
-                Linked
+                GST Sales {formatAmount(gstTaxableSales)}
               </span>
             )}
-            {!isFsReadOnly && (
-              <label className="notes-gst-link-chip" title="Link taxable sales from GST Reco to this note">
-                <input
-                  type="checkbox"
-                  className="notes-gst-link-checkbox"
-                  checked={linked}
-                  onChange={(event) => toggleGstSalesLink(event.target.checked)}
-                  aria-label="Link GST Reco sales to this note"
-                />
-              </label>
-            )}
-            {linked && !isFsReadOnly && <span className="notes-gst-link-divider" aria-hidden="true" />}
             <button
               type="button"
               className="notes-gst-open-btn"
@@ -2927,6 +2917,24 @@ function FinancialStatement() {
       ) {
         return renderFinanceInterestLabel(sub)
       }
+      if (noteKey === 'revenueFromOperations' && sub.id === 'gst-sales') {
+        return (
+          <div className="notes-gst-sales-label">
+            <span>{sub.label}</span>
+            <button
+              type="button"
+              className="gst-note-link-btn notes-gst-ref-link-btn"
+              onClick={(event) => {
+                event.stopPropagation()
+                navigateToGstReco()
+              }}
+              title="Open GST Reco sheet"
+            >
+              View GST Reco
+            </button>
+          </div>
+        )
+      }
       return sub.label
     }
 
@@ -3001,14 +3009,6 @@ function FinancialStatement() {
               sub.id !== 'cash-flow-adjustment' || sub.current !== 0 || sub.previous !== 0,
           )
           .map((sub) => {
-          if (
-            noteKey === 'revenueFromOperations' &&
-            fsData?.gstReco.linkSalesToRevenueNote &&
-            sub.id === 'sales-services'
-          ) {
-            return null
-          }
-
           if (sub.kind === 'subtotal') {
             return null
           }
@@ -3413,30 +3413,15 @@ function FinancialStatement() {
     setSaveMessage('')
   }
 
-  const toggleGstSalesLink = (linked: boolean) => {
-    if (!fsData) {
-      return
-    }
-
-    const gstReco = { ...fsData.gstReco, linkSalesToRevenueNote: linked }
-    const noteSubAmounts = linked
-      ? applyGstSalesLinkToRevenue(fsData.noteSubAmounts, gstReco)
-      : fsData.noteSubAmounts
-
-    setFsData({ ...fsData, gstReco, noteSubAmounts })
-    setSaveMessage('')
-  }
-
   const updateGstReco = (gstReco: GstRecoStatement) => {
-    if (!fsData) {
-      return
-    }
+    setFsData((prev) => {
+      if (!prev) {
+        return prev
+      }
 
-    const noteSubAmounts = gstReco.linkSalesToRevenueNote
-      ? applyGstSalesLinkToRevenue(fsData.noteSubAmounts, gstReco)
-      : fsData.noteSubAmounts
-
-    setFsData({ ...fsData, gstReco, noteSubAmounts })
+      const noteSubAmounts = applyGstSalesFromRecoToRevenue(prev.noteSubAmounts, gstReco)
+      return { ...prev, gstReco, noteSubAmounts }
+    })
     setSaveMessage('')
   }
 
@@ -3480,7 +3465,7 @@ function FinancialStatement() {
       return false
     }
 
-    const workingData = options?.dataOverride || fsData
+    const workingData = options?.dataOverride || fsDataRef.current || fsData
 
     if (!clientId || !fyId || !businessId || !workingData || !effectiveNotes || !computed) {
       return false
@@ -3575,9 +3560,7 @@ function FinancialStatement() {
         cogsExtraLinesForSave,
         ledgers,
       )
-      if (gstRecoForSave.linkSalesToRevenueNote) {
-        noteSubAmountsForSave = applyGstSalesLinkToRevenue(noteSubAmountsForSave, gstRecoForSave)
-      }
+      noteSubAmountsForSave = applyGstSalesFromRecoToRevenue(noteSubAmountsForSave, gstRecoForSave)
       noteSubAmountsForSave = applyClosingStockLink(noteSubAmountsForSave)
 
       const payload: FinancialStatementData = {
@@ -3635,6 +3618,12 @@ function FinancialStatement() {
       savedSubAmounts = migrateCogsExtraSubAmounts(savedCogsExtraLines, savedSubAmounts)
       savedSubAmounts = applyOpeningStockLink(savedSubAmounts, previousYearSubAmounts)
       savedSubAmounts = applyClosingStockLink(savedSubAmounts)
+      const savedGstRecoFromServer = normalizeGstReco(saved.gstReco)
+      const savedGstReco =
+        getGstTaxableSalesTotal(savedGstRecoFromServer) > 0
+          ? savedGstRecoFromServer
+          : gstRecoForSave
+      savedSubAmounts = applyGstSalesFromRecoToRevenue(savedSubAmounts, savedGstReco)
 
       const nextState = {
         ...saved,
@@ -3651,15 +3640,18 @@ function FinancialStatement() {
         depreciationSchedule: normalizeDepreciationSchedule(saved.depreciationSchedule || []),
         previousYearDepreciation: normalizePreviousYearDepreciation(saved.previousYearDepreciation),
         loans: workingData.loans,
-        gstReco: normalizeGstReco(saved.gstReco),
+        gstReco: savedGstReco,
         bankAccounts: normalizeBankAccounts(saved.bankAccounts),
         cashAdjustment: normalizeCashAdjustment(saved.cashAdjustment),
         udinDetails: normalizeUdinDetails(saved.udinDetails),
         finalizationInfo: normalizeFinalizationInfo(saved.finalizationInfo),
+        savedAt: saved.savedAt || new Date().toISOString(),
       }
 
       setFsData(nextState)
+      setLastSavedGstReco(savedGstReco)
       setSavedFingerprint(fsDataFingerprint(nextState))
+      setGstRecoDbRefreshKey((value) => value + 1)
       setUnlockConfirmationCode('')
       setSaveMessage(options?.successMessage || 'Financial statement saved successfully.')
       if (options?.successMessage) {
@@ -5827,11 +5819,18 @@ function FinancialStatement() {
         {renderPrintSectionStationery('gst-reco')}
         <GstRecoTab
           gstReco={fsData.gstReco}
+          savedGstReco={lastSavedGstReco ?? undefined}
           fyLabel={currentFyLabel}
+          clientId={clientId}
+          businessId={businessId}
+          fyId={fyId}
           salesFromBooks={
             effectiveNotes?.revenueFromOperations.current ??
             fsData.notes.revenueFromOperations.current
           }
+          gstSalesInNote={getGstTaxableSalesTotal(fsData.gstReco)}
+          dbRefreshKey={gstRecoDbRefreshKey}
+          fsSavedAt={fsData.savedAt ?? undefined}
           onOpenRevenueNote={() => navigateToNote('revenueFromOperations')}
           onChange={updateGstReco}
         />
@@ -5844,6 +5843,14 @@ function FinancialStatement() {
           data-print-title={printTitleForTab('udin-details')}
         >
           {renderPrintSectionStationery('udin-details')}
+          {udinDetails.enabled && udinDetails.caProfileId && (
+            <FsPrintCaSignOff
+              caProfile={effectivePrintCaProfile}
+              udinNumber={udinDetails.udinNumber || effectivePrintCaProfile.udin}
+              udinDate={printUdinDate}
+              className="fs-print-ca-signoff--tab"
+            />
+          )}
           <h2>UDIN Details</h2>
           <p className="hint">
             Select an active CA profile and enter UDIN details for this financial statement print.

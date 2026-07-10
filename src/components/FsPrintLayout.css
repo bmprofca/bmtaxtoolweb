@@ -516,6 +516,17 @@
     justify-content: flex-end;
   }
 
+  .fs-print-footer--ca-signoff {
+    padding-top: 2mm;
+    margin-top: 2mm;
+    overflow: visible !important;
+  }
+
+  .fs-print-footer--ca-signoff .fs-print-ca-signoff {
+    width: 100%;
+    overflow: visible !important;
+  }
+
   .fs-print-footer-left,
   .fs-print-footer-right {
     flex: 1;
@@ -676,7 +687,9 @@
   }
 
   .fs-print-footer,
-  .fs-print-seal-image {
+  .fs-print-seal-image,
+  .fs-print-ca-signoff,
+  .fs-print-ca-signoff-seal {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
@@ -723,6 +736,12 @@
 
   .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='udin-details'] {
     order: 8;
+  }
+
+  .fs-tab-panel[data-fs-tab='udin-details'] > h2,
+  .fs-tab-panel[data-fs-tab='udin-details'] > .hint,
+  .fs-tab-panel[data-fs-tab='udin-details'] .fs-udin-grid {
+    display: none !important;
   }
 
   .fs-print-body .panel,

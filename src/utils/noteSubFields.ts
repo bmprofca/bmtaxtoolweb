@@ -157,6 +157,7 @@ export const NOTE_SUB_TEMPLATES: Record<keyof FsNotes, NoteSubFieldDef[]> = {
   revenueFromOperations: [
     { id: 'sales-goods', label: 'Sales of Goods', kind: 'entry' },
     { id: 'sales-services', label: 'Sales of Services', kind: 'entry' },
+    { id: 'gst-sales', label: 'GST Sales', kind: 'entry' },
     { id: 'revenue-total', label: 'Total', kind: 'total', autoKey: 'note-sum' },
   ],
   otherIncome: [

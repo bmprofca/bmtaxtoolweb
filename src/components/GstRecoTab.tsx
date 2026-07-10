@@ -1,12 +1,22 @@
+import { useEffect, useMemo, useState } from 'react'
+import { fetchGstReco } from '../api/fs'
 import type { GstInputTaxRow, GstRecoStatement, GstTaxTriple } from '../types/gst'
-import { computeGstReco, isInputRowEditable } from '../utils/gstCalculator'
+import { computeGstReco, getGstTaxableSalesTotal, isInputRowEditable } from '../utils/gstCalculator'
 import { formatAmount } from '../utils/fsCalculator'
 import './GstRecoTab.css'
 
 interface GstRecoTabProps {
   gstReco: GstRecoStatement
+  /** Last saved GST Reco snapshot (from FS load/save), used for the DB info line. */
+  savedGstReco?: GstRecoStatement
   fyLabel: string
+  clientId?: string
+  businessId?: string
+  fyId?: string
   salesFromBooks?: number
+  gstSalesInNote?: number
+  dbRefreshKey?: number
+  fsSavedAt?: string
   onOpenRevenueNote?: () => void
   onChange: (data: GstRecoStatement) => void
 }
@@ -60,8 +70,54 @@ function TaxCells({
   )
 }
 
-function GstRecoTab({ gstReco, fyLabel, salesFromBooks, onOpenRevenueNote, onChange }: GstRecoTabProps) {
+function GstRecoTab({
+  gstReco,
+  savedGstReco,
+  fyLabel,
+  clientId,
+  businessId,
+  fyId,
+  salesFromBooks,
+  gstSalesInNote,
+  dbRefreshKey = 0,
+  fsSavedAt,
+  onOpenRevenueNote,
+  onChange,
+}: GstRecoTabProps) {
   const computed = computeGstReco(gstReco)
+  const [dbGstReco, setDbGstReco] = useState<GstRecoStatement | null>(null)
+  const [dbGstRecoLoading, setDbGstRecoLoading] = useState(false)
+
+  useEffect(() => {
+    if (!clientId || !businessId || !fyId) {
+      setDbGstReco(null)
+      return
+    }
+
+    let cancelled = false
+    setDbGstRecoLoading(true)
+
+    fetchGstReco(clientId, fyId, businessId)
+      .then(({ gstReco: saved }) => {
+        if (!cancelled) {
+          setDbGstReco(saved)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDbGstReco(null)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setDbGstRecoLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [clientId, businessId, fyId, dbRefreshKey])
 
   const updateSales = (field: keyof GstRecoStatement['sales'], value: string) => {
     onChange({
@@ -74,6 +130,52 @@ function GstRecoTab({ gstReco, fyLabel, salesFromBooks, onOpenRevenueNote, onCha
   }
 
   const totalTaxableSales = n(gstReco.sales.sales) + n(gstReco.sales.amendedSales)
+
+  const savedSource = useMemo(() => {
+    const baselineTaxable = savedGstReco ? getGstTaxableSalesTotal(savedGstReco) : 0
+    const dbTaxable = dbGstReco ? getGstTaxableSalesTotal(dbGstReco) : 0
+    // Prefer parent baseline so the info line updates immediately after FS save.
+    if (baselineTaxable > 0) {
+      return savedGstReco!
+    }
+    if (dbTaxable > 0) {
+      return dbGstReco!
+    }
+    return null
+  }, [savedGstReco, dbGstReco])
+
+  const savedSales = savedSource?.sales
+  const savedTaxableTotal = savedSource ? getGstTaxableSalesTotal(savedSource) : 0
+  const savedOutputTax = savedSource ? computeGstReco(savedSource).outputTax : null
+  const hasSavedGstSales = savedTaxableTotal > 0
+  const hasUnsavedSalesChanges =
+    hasSavedGstSales && !amountsMatch(savedTaxableTotal, totalTaxableSales)
+  const showDbLoading = dbGstRecoLoading && !hasSavedGstSales
+
+  const savedUpdatedLabel = useMemo(() => {
+    if (!fsSavedAt) {
+      return null
+    }
+    const date = new Date(fsSavedAt)
+    if (Number.isNaN(date.getTime())) {
+      return null
+    }
+    return date.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }, [fsSavedAt])
+
+  function amountsMatch(a: number, b: number) {
+    return Math.abs(n(a) - n(b)) < 0.01
+  }
+
+  function formatTaxTriple(triple: GstTaxTriple) {
+    return `IGST ${formatAmount(triple.igst)} · CGST ${formatAmount(triple.cgst)} · SGST ${formatAmount(triple.sgst)}`
+  }
 
   function n(v: number) {
     return Number.isFinite(v) ? v : 0
@@ -185,10 +287,6 @@ function GstRecoTab({ gstReco, fyLabel, salesFromBooks, onOpenRevenueNote, onCha
     )
   }
 
-  const updateSalesLink = (linked: boolean) => {
-    onChange({ ...gstReco, linkSalesToRevenueNote: linked })
-  }
-
   return (
     <section className="panel gst-reco-panel">
       <h2>GST Reconciliation Statement</h2>
@@ -197,10 +295,10 @@ function GstRecoTab({ gstReco, fyLabel, salesFromBooks, onOpenRevenueNote, onCha
         tax ledger and simple reco.
       </p>
 
-      {gstReco.linkSalesToRevenueNote ? (
+      {totalTaxableSales > 0 ? (
         <p className="gst-books-hint gst-books-hint--linked">
-          <strong>Linked to Note 19 (Revenue from Operation).</strong> Taxable sales (
-          {formatAmount(totalTaxableSales)}) flow to the P&amp;L note automatically.
+          Taxable sales (<strong>{formatAmount(totalTaxableSales)}</strong>) show in Note 19 —{' '}
+          <strong>GST Sales</strong> row.
           {onOpenRevenueNote && (
             <>
               {' '}
@@ -226,12 +324,6 @@ function GstRecoTab({ gstReco, fyLabel, salesFromBooks, onOpenRevenueNote, onCha
         salesFromBooks > 0 && (
           <p className="gst-books-hint">
             Sales as per books (Note 19): <strong>{formatAmount(salesFromBooks)}</strong>
-            {totalTaxableSales > 0 && salesFromBooks !== totalTaxableSales && (
-              <span className="gst-books-diff">
-                {' '}
-                (GST Reco taxable sales: {formatAmount(totalTaxableSales)})
-              </span>
-            )}
           </p>
         )
       )}
@@ -240,14 +332,79 @@ function GstRecoTab({ gstReco, fyLabel, salesFromBooks, onOpenRevenueNote, onCha
       <div className="gst-reco-section">
         <div className="gst-section-header">
           <h3>1. Sales & GST on Sales (Output Tax)</h3>
-          <label className="gst-sales-link-toggle" title="Link taxable sales to Note 19">
-            <input
-              type="checkbox"
-              checked={Boolean(gstReco.linkSalesToRevenueNote)}
-              onChange={(event) => updateSalesLink(event.target.checked)}
-              aria-label="Link sales to Note 19"
-            />
-          </label>
+          {onOpenRevenueNote && (
+            <button
+              type="button"
+              className="notes-gst-open-btn gst-section-note-btn"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onOpenRevenueNote()
+              }}
+              title="Open Note 19 — GST Sales row"
+            >
+              Note 19
+              <span className="notes-gst-open-arrow" aria-hidden="true">
+                →
+              </span>
+            </button>
+          )}
+        </div>
+        <div className="gst-sales-db-info" role="note">
+          {showDbLoading ? (
+            <p className="gst-sales-db-info-line">
+              <span className="gst-sales-db-info-label">FY {fyLabel}</span>
+              <span className="gst-sales-db-info-loading">Loading saved GST sales…</span>
+            </p>
+          ) : hasSavedGstSales && savedSales ? (
+            <p className="gst-sales-db-info-line">
+              <span className="gst-sales-db-info-label">FY {fyLabel}</span>
+              <span className="gst-sales-db-info-sep">·</span>
+              <span>
+                Turnover <strong>{formatAmount(savedSales.sales)}</strong>
+              </span>
+              <span className="gst-sales-db-info-sep">·</span>
+              <span>
+                Amended <strong>{formatAmount(savedSales.amendedSales)}</strong>
+              </span>
+              <span className="gst-sales-db-info-sep">·</span>
+              <span>
+                Taxable <strong>{formatAmount(savedTaxableTotal)}</strong>
+              </span>
+              {savedOutputTax && (
+                <>
+                  <span className="gst-sales-db-info-sep">·</span>
+                  <span className="gst-sales-db-info-muted">
+                    Tax {formatTaxTriple(savedOutputTax)}
+                  </span>
+                </>
+              )}
+              {gstSalesInNote !== undefined && gstSalesInNote > 0 && (
+                <>
+                  <span className="gst-sales-db-info-sep">·</span>
+                  <span className="gst-sales-db-info-muted">
+                    Note 19 GST Sales <strong>{formatAmount(gstSalesInNote)}</strong>
+                  </span>
+                </>
+              )}
+              {savedUpdatedLabel && (
+                <>
+                  <span className="gst-sales-db-info-sep">·</span>
+                  <span className="gst-sales-db-info-meta">Saved {savedUpdatedLabel}</span>
+                </>
+              )}
+              {hasUnsavedSalesChanges && (
+                <>
+                  <span className="gst-sales-db-info-sep">·</span>
+                  <span className="gst-sales-db-info-unsaved">Unsaved</span>
+                </>
+              )}
+            </p>
+          ) : (
+            <p className="gst-sales-db-info-line gst-sales-db-info-muted">
+              FY {fyLabel} — no GST sales saved yet. Enter below and save the statement.
+            </p>
+          )}
         </div>
         <div className="table-wrap">
           <table className="data-table gst-simple-table">

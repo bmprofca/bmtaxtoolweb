@@ -211,7 +211,7 @@ export function getGstTaxableSalesTotal(gstReco: GstRecoStatement): number {
   return n(gstReco.sales.sales) + n(gstReco.sales.amendedSales)
 }
 
-export const GST_LINKED_REVENUE_SUB_IDS = ['sales-goods', 'sales-services'] as const
+export const GST_LINKED_REVENUE_SUB_IDS = ['gst-sales'] as const
 
 export function isGstLinkedRevenueSub(subId: string): boolean {
   return (GST_LINKED_REVENUE_SUB_IDS as readonly string[]).includes(subId)

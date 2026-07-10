@@ -1,0 +1,115 @@
+/* Keep off-screen on screen so the seal image loads before print (display:none blocks print in Chrome). */
+@media screen {
+  .fs-print-ca-signoff {
+    position: fixed;
+    left: -10000px;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    visibility: hidden;
+    pointer-events: none;
+    opacity: 0;
+  }
+}
+
+@media print {
+  .fs-print-ca-signoff {
+    position: static;
+    left: auto;
+    top: auto;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+    display: flex !important;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 10mm;
+    margin-top: 4mm;
+    color: #000;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .fs-print-ca-signoff--footer {
+    margin-top: 0;
+  }
+
+  .fs-print-ca-signoff-left {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif;
+    font-size: 8pt;
+    line-height: 1.35;
+  }
+
+  .fs-print-ca-signoff-right {
+    flex: 0 0 auto;
+    text-align: right;
+    overflow: visible;
+  }
+
+  .fs-print-ca-signoff-mark,
+  .fs-print-ca-signoff-firm,
+  .fs-print-ca-signoff-name,
+  .fs-print-ca-signoff-line {
+    margin: 0;
+    padding: 0;
+    font-size: 8pt;
+    line-height: 1.35;
+    color: #000;
+  }
+
+  .fs-print-ca-signoff-mark {
+    margin-bottom: 1mm;
+  }
+
+  .fs-print-ca-signoff-firm {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .fs-print-ca-signoff-name {
+    margin-top: 0.5mm;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .fs-print-ca-signoff-line {
+    margin-top: 0.4mm;
+    font-weight: 400;
+  }
+
+  .fs-print-ca-signoff-seal {
+    display: block !important;
+    visibility: visible !important;
+    max-height: 30mm;
+    max-width: 34mm;
+    min-width: 20mm;
+    min-height: 20mm;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    margin-left: auto;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .fs-print-ca-signoff--tab {
+    display: none !important;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-tab-panel[data-fs-tab='udin-details'] .fs-print-ca-signoff--tab {
+    display: flex !important;
+    margin-top: 12mm;
+  }
+
+  .fs-page:not(.fs-print-all) .fs-print-footer--ca-signoff {
+    display: none !important;
+  }
+}
