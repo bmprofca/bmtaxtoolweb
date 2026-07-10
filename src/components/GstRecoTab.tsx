@@ -134,15 +134,19 @@ function GstRecoTab({
   const savedSource = useMemo(() => {
     const baselineTaxable = savedGstReco ? getGstTaxableSalesTotal(savedGstReco) : 0
     const dbTaxable = dbGstReco ? getGstTaxableSalesTotal(dbGstReco) : 0
-    // Prefer parent baseline so the info line updates immediately after FS save.
-    if (baselineTaxable > 0) {
-      return savedGstReco!
-    }
+    const loadedTaxable = getGstTaxableSalesTotal(gstReco)
+    // DB fetch is authoritative after navigating back to this client/FY.
     if (dbTaxable > 0) {
       return dbGstReco!
     }
+    if (baselineTaxable > 0) {
+      return savedGstReco!
+    }
+    if (fsSavedAt && loadedTaxable > 0) {
+      return gstReco
+    }
     return null
-  }, [savedGstReco, dbGstReco])
+  }, [savedGstReco, dbGstReco, gstReco, fsSavedAt])
 
   const savedSales = savedSource?.sales
   const savedTaxableTotal = savedSource ? getGstTaxableSalesTotal(savedSource) : 0

@@ -19,6 +19,7 @@ import { updateGlobalFinancialYearStatementType } from '../api/fySettings'
 import {
   fetchDepreciationHistory,
   fetchFsData,
+  fetchGstReco,
   saveBankAccounts,
   saveDepreciationSchedule,
   saveFsData,
@@ -849,6 +850,7 @@ function FinancialStatement() {
     try {
       setError('')
       setSavedFingerprint(null)
+      setLastSavedGstReco(null)
       const [clientData, ledgerData] = await Promise.all([
         fetchClient(clientId),
         fetchLedgers().catch(() => ({ ledgers: [] })),
@@ -1179,8 +1181,18 @@ function FinancialStatement() {
       noteSubAmounts = migrateCapitalAccountSubAmounts(capitalAccountLines, noteSubAmounts)
       noteSubAmounts = migrateCogsExtraSubAmounts(cogsExtraLines, noteSubAmounts)
 
-      const gstReco = normalizeGstReco(fs.gstReco)
-      setLastSavedGstReco(gstReco)
+      let gstReco = normalizeGstReco(fs.gstReco)
+      if (!isConsolidatedView && getGstTaxableSalesTotal(gstReco) === 0) {
+        try {
+          const { gstReco: gstRecoFromDb } = await fetchGstReco(clientId, fyId, businessId)
+          const normalizedDbGst = normalizeGstReco(gstRecoFromDb)
+          if (getGstTaxableSalesTotal(normalizedDbGst) > 0) {
+            gstReco = normalizedDbGst
+          }
+        } catch {
+          // fetchFsData already loads GST Reco; this is a fallback for legacy gaps.
+        }
+      }
       noteSubAmounts = applyGstSalesFromRecoToRevenue(noteSubAmounts, gstReco)
       noteSubAmounts = applyClosingStockLink(noteSubAmounts)
 
@@ -1411,6 +1423,7 @@ function FinancialStatement() {
       }
 
       setFsData(nextFsData)
+      setLastSavedGstReco(gstReco)
       // Never-saved years stay dirty until first save. Saved years become dirty when
       // carry-forward / auto-populate changed data vs the server baseline.
       setSavedFingerprint(fs.savedAt ? serverBaselineFingerprint : '__never_saved__')
@@ -3547,7 +3560,16 @@ function FinancialStatement() {
       )
       const cogsExtraLinesForSave = normalizeCogsExtraLines(workingData.cogsExtraLines)
       const bankAccountsForSave = normalizeBankAccounts(workingData.bankAccounts)
-      const gstRecoForSave = normalizeGstReco(workingData.gstReco)
+      const gstRecoForSave = (() => {
+        let next = normalizeGstReco(workingData.gstReco)
+        if (getGstTaxableSalesTotal(next) === 0 && lastSavedGstReco) {
+          const prior = normalizeGstReco(lastSavedGstReco)
+          if (getGstTaxableSalesTotal(prior) > 0) {
+            next = prior
+          }
+        }
+        return next
+      })()
       let noteSubAmountsForSave = buildCompleteNoteSubAmounts(
         workingData.noteSubAmounts,
         migrateNoteBreakdowns(workingData.noteBreakdowns),
