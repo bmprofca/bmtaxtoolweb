@@ -51,6 +51,8 @@ import {
   getLedgerById,
   isLedgerSubId,
   ledgerIdFromSubId,
+  resolveAdminExpenseCategoryId,
+  resolveAdminExpenseLabel,
 } from './ledgerUtils'
 import { calcBalanceProfit } from './plAppropriation'
 import { sumDepreciationSchedule } from './depreciation'
@@ -220,7 +222,7 @@ export function getAdminExpenseSubRows(
 ): NoteSubFieldDef[] {
   return lines.map((line) => ({
     id: adminExpenseSubId(line.id),
-    label: resolveLedgerLineLabel(ledgers, 'otherAdministrativeExpenses', line.categoryId),
+    label: resolveAdminExpenseLabel(ledgers, line.categoryId),
     kind: 'entry' as const,
   }))
 }
@@ -791,6 +793,119 @@ export function normalizeAdministrativeExpenseLines(
   }
 
   return []
+}
+
+/** Ensure admin expense lines exist for stored subs and migrate legacy category ids to ledgers. */
+export function reconcileAdministrativeExpenseLines(
+  raw: AdministrativeExpenseLine[] | undefined,
+  noteSubAmounts: NoteSubAmounts | undefined,
+  ledgers: LedgerRecord[] = [],
+  priorLines: AdministrativeExpenseLine[] = [],
+): AdministrativeExpenseLine[] {
+  const byId = new Map<string, AdministrativeExpenseLine>()
+
+  for (const line of [...priorLines, ...(raw ?? [])]) {
+    byId.set(line.id, {
+      id: line.id,
+      categoryId: normalizeAdminCategoryId(line.categoryId),
+    })
+  }
+
+  const subs = noteSubAmounts?.otherAdministrativeExpenses ?? {}
+  for (const [subId, amount] of Object.entries(subs)) {
+    if (!subId.startsWith('admin-line-')) {
+      continue
+    }
+    const lineId = subId.slice('admin-line-'.length)
+    if (byId.has(lineId)) {
+      continue
+    }
+    if ((amount?.current ?? 0) === 0 && (amount?.previous ?? 0) === 0) {
+      continue
+    }
+    byId.set(lineId, { id: lineId, categoryId: 'others' })
+  }
+
+  const normalized = normalizeAdministrativeExpenseLines(Array.from(byId.values()), noteSubAmounts)
+  return normalized.map((line) => ({
+    id: line.id,
+    categoryId: resolveAdminExpenseCategoryId(ledgers, line.categoryId),
+  }))
+}
+
+function adminExpenseDedupKey(ledgers: LedgerRecord[], categoryId: string) {
+  const resolvedId = resolveAdminExpenseCategoryId(ledgers, categoryId)
+  const ledger = getLedgerById(ledgers, resolvedId)
+  if (ledger?.group === 'otherAdministrativeExpenses') {
+    return `name:${ledger.name.trim().toLowerCase()}`
+  }
+  return `id:${resolvedId}`
+}
+
+function adminExpenseLineAmountScore(
+  lineId: string,
+  adminSubs: Record<string, { current?: number; previous?: number }>,
+) {
+  const sub = adminSubs[adminExpenseSubId(lineId)]
+  return Math.abs(sub?.current ?? 0) + Math.abs(sub?.previous ?? 0)
+}
+
+/** Merge admin expense lines that resolve to the same ledger/category label. */
+export function deduplicateAdministrativeExpenseLines(
+  lines: AdministrativeExpenseLine[],
+  noteSubAmounts: NoteSubAmounts,
+  ledgers: LedgerRecord[] = [],
+): { lines: AdministrativeExpenseLine[]; noteSubAmounts: NoteSubAmounts } {
+  const adminSubs = { ...(noteSubAmounts.otherAdministrativeExpenses ?? {}) }
+  const groups = new Map<string, AdministrativeExpenseLine[]>()
+
+  for (const line of lines) {
+    const categoryId = resolveAdminExpenseCategoryId(ledgers, line.categoryId)
+    const normalized = { id: line.id, categoryId }
+    const key = adminExpenseDedupKey(ledgers, categoryId)
+    const group = groups.get(key) ?? []
+    group.push(normalized)
+    groups.set(key, group)
+  }
+
+  const dedupedLines: AdministrativeExpenseLine[] = []
+
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      dedupedLines.push(group[0])
+      continue
+    }
+
+    const ranked = [...group].sort(
+      (a, b) => adminExpenseLineAmountScore(b.id, adminSubs) - adminExpenseLineAmountScore(a.id, adminSubs),
+    )
+    const keeper = ranked[0]
+    let merged = adminSubs[adminExpenseSubId(keeper.id)] ?? emptyCell()
+
+    for (let index = 1; index < ranked.length; index += 1) {
+      const drop = ranked[index]
+      const dropSubId = adminExpenseSubId(drop.id)
+      const dropAmount = adminSubs[dropSubId]
+      if (dropAmount) {
+        merged = {
+          current: (merged.current ?? 0) + (dropAmount.current ?? 0),
+          previous: (merged.previous ?? 0) + (dropAmount.previous ?? 0),
+        }
+        delete adminSubs[dropSubId]
+      }
+    }
+
+    adminSubs[adminExpenseSubId(keeper.id)] = merged
+    dedupedLines.push(keeper)
+  }
+
+  return {
+    lines: dedupedLines,
+    noteSubAmounts: {
+      ...noteSubAmounts,
+      otherAdministrativeExpenses: adminSubs,
+    },
+  }
 }
 
 export function migrateAdminExpenseSubAmounts(
@@ -1436,6 +1551,7 @@ export function buildSubResolveContext(
   ledgers: LedgerRecord[] = [],
   openingBalanceLocks: OpeningBalanceLocks | null = null,
   cashAdjustment: NoteValue = { current: 0, previous: 0 },
+  bankAccountExclusions: string[] = [],
 ): Omit<SubResolveContext, 'noteKey'> {
   const depTotals = sumDepreciationSchedule(depreciationSchedule)
   const depGrossWdv = depTotals.closingWdv + depTotals.depreciation
@@ -1443,8 +1559,22 @@ export function buildSubResolveContext(
     previousYearDepreciation.closingWdv + previousYearDepreciation.depreciation
   const loanClosings = new Map<string, NoteValue>()
   const loanInterests = new Map<string, NoteValue>()
-  const bankBalances = buildBankCashAtBankBalances(bankAccounts, previousYearBankAccounts)
-  const bankStBalances = buildBankShortTermBorrowingBalances(bankAccounts, previousYearBankAccounts)
+  const bankBalances = buildBankCashAtBankBalances(
+    bankAccounts,
+    previousYearBankAccounts,
+    undefined,
+    undefined,
+    undefined,
+    bankAccountExclusions,
+  )
+  const bankStBalances = buildBankShortTermBorrowingBalances(
+    bankAccounts,
+    previousYearBankAccounts,
+    undefined,
+    undefined,
+    undefined,
+    bankAccountExclusions,
+  )
   const prevClosingById = new Map(
     previousYearComputedLoans.map((loan) => [loan.id, loan.closingBalance]),
   )

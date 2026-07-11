@@ -25,6 +25,8 @@ export interface BankAccountRecord {
   status: BankAccountStatus
   /** Set when status is closed — the FY in which the account was closed. */
   closedInFyId?: string
+  /** FY in which this bank account was first opened — controls visibility from that year onward. */
+  startedInFyId?: string
   openingBalance: number
   debit: number
   credit: number
@@ -33,6 +35,8 @@ export interface BankAccountRecord {
   interest: number
   /** Manual closing balance: positive = credit balance, negative = debit (OD) balance */
   closingBalance: number
+  /** Set by API when figures exist in any financial year — global delete is blocked. */
+  hasEntries?: boolean
 }
 
 export interface BankAccountFormInput {
@@ -40,6 +44,7 @@ export interface BankAccountFormInput {
   accountNumber: string
   accountType: BankAccountTypeId
   status: BankAccountStatus
+  startedInFyId: string
 }
 
 export interface BankAccountHistoryRow {
@@ -53,6 +58,7 @@ export interface BankAccountHistoryRow {
   accountType: BankAccountTypeId
   status: BankAccountStatus
   closedInFyId?: string
+  startedInFyId?: string
   openingBalance: number
   debit: number
   credit: number

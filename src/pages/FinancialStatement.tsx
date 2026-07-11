@@ -1,4 +1,4 @@
-import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import FsContextBar from '../components/FsContextBar'
@@ -28,6 +28,7 @@ import {
 import { fetchLedgers } from '../api/ledger'
 import type { Client } from '../types'
 import type {
+  AdministrativeExpenseLine,
   AssetDepreciationHistoryRow,
   CashAdjustment,
   DepreciationRow,
@@ -65,7 +66,12 @@ import { isProfitLossNoteNo, profitLossRowId, NOTE_SUB_PL_REFS } from '../utils/
 import {
   createEmptyFsData,
   NOTE_FIELDS,
-  NOTE_GROUP_ORDER,
+  NOTES_TABLE_SECTIONS,
+  getNoteFieldsForTableSection,
+  getNoteSectionTabForNoteKey,
+  isNoteSectionTab,
+  NOTE_SECTION_TAB_IDS,
+  type NoteSectionTabId,
   createEmptyUdinDetails,
   buildComparativeCashAdjustment,
   migrateNoteBreakdowns,
@@ -104,7 +110,10 @@ import {
   normalizePlAppropriationCategoryId,
   plAppropriationSubId,
 } from '../utils/plAppropriationCategories'
-import { adminExpenseSubId } from '../utils/adminExpenseCategories'
+import {
+  adminExpenseSubId,
+  isLegacyAdminCategoryId,
+} from '../utils/adminExpenseCategories'
 import {
   manualShortTermInterestSubId,
   manualShortTermSubId,
@@ -138,7 +147,8 @@ import {
   migrateAdminExpenseSubAmounts,
   migrateManualNoteLineSubAmounts,
   migrateOtherShortTermSubAmounts,
-  normalizeAdministrativeExpenseLines,
+  deduplicateAdministrativeExpenseLines,
+  reconcileAdministrativeExpenseLines,
   normalizeManualNoteLines,
   normalizeNoteSubAmounts,
   normalizeOtherShortTermBorrowingLines,
@@ -159,22 +169,29 @@ import {
   getBankAccountTypeLabel,
   getCreditClosingAmount,
   getDebitClosingAmount,
+  deduplicateBankAccountsByAccountNumber,
+  filterBankAccountsForFy,
+  formatBankAccountStartedFyLabel,
+  canDeleteBankAccount,
+  shouldOfferCloseBankAccount,
   isBankAccountActive,
   normalizeBankAccounts,
+  parseBankAccountIdFromSubId,
   partitionBankAccountsByClosing,
   sumBankAccountColumn,
   sumBankCreditClosingBalances,
   sumBankDebitClosingBalances,
+  unionBankAccountsForComparative,
 } from '../utils/bankAccount'
 import {
   defaultLedgerIdForGroup,
-  firstUnusedLedgerIdForGroup,
-  hasUnusedLedgerInGroup,
+  getUnusedAdminExpenseLedgers,
   getLedgersForGroup,
   getFixedAssetLedgers,
   normalizeLedgerSign,
   normalizeLedgers,
   resolveAdminExpenseLabel,
+  resolveAdminExpenseCategoryId,
   resolveCapitalAccountLineLabel,
   resolveManualNoteLineLabel,
   resolveShortTermBorrowingLabel,
@@ -206,6 +223,7 @@ import {
   buildPriorDepClosingsByLedgerId,
   hasPriorYearDepreciationData,
   isAdminExpenseLineCategoryLocked,
+  canRemoveAdministrativeExpenseLine,
   isManualNoteLineCategoryLocked,
   type OpeningBalanceLocks,
 } from '../utils/openingBalanceCarryForward'
@@ -239,6 +257,7 @@ import './FinancialStatement.css'
 
 type FsTab =
   | 'notes'
+  | NoteSectionTabId
   | 'balance-sheet'
   | 'profit-loss'
   | 'depreciation'
@@ -248,12 +267,18 @@ type FsTab =
   | 'final-info'
   | 'udin-details'
 
-const CONSOLIDATED_REPORT_TABS: FsTab[] = ['balance-sheet', 'profit-loss', 'notes']
+const CONSOLIDATED_REPORT_TABS: FsTab[] = [
+  'balance-sheet',
+  'profit-loss',
+  'notes',
+  ...NOTE_SECTION_TAB_IDS,
+]
 
 const PRINT_ALL_TAB_ORDER: FsTab[] = [
   'balance-sheet',
   'profit-loss',
   'notes',
+  ...NOTE_SECTION_TAB_IDS,
   'depreciation',
   'repayment',
   'bank-account',
@@ -582,6 +607,7 @@ function FinancialStatement() {
   } | null>(null)
   const [highlightedBsRow, setHighlightedBsRow] = useState<string | null>(null)
   const [highlightedPlRow, setHighlightedPlRow] = useState<string | null>(null)
+  const [highlightedBankId, setHighlightedBankId] = useState<string | null>(null)
   const [openingBalanceLocks, setOpeningBalanceLocks] = useState<OpeningBalanceLocks | null>(null)
   const [caProfiles, setCaProfiles] = useState<CaProfile[]>([])
   const [printAll, setPrintAll] = useState(false)
@@ -596,6 +622,8 @@ function FinancialStatement() {
   const [quickEntryNoteKey, setQuickEntryNoteKey] = useState<keyof FsNotes>('capitalAccount')
   const [quickEntryNoteSearch, setQuickEntryNoteSearch] = useState('')
   const [quickEntryNoteMenuOpen, setQuickEntryNoteMenuOpen] = useState(false)
+  const [adminExpenseAddMenuOpen, setAdminExpenseAddMenuOpen] = useState(false)
+  const adminExpenseAddMenuRef = useRef<HTMLDivElement | null>(null)
   const pendingScrollTargetRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -628,6 +656,21 @@ function FinancialStatement() {
   }, [])
 
   useEffect(() => {
+    if (!adminExpenseAddMenuOpen) {
+      return
+    }
+
+    const closeMenu = (event: MouseEvent) => {
+      if (!adminExpenseAddMenuRef.current?.contains(event.target as Node)) {
+        setAdminExpenseAddMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', closeMenu)
+    return () => document.removeEventListener('mousedown', closeMenu)
+  }, [adminExpenseAddMenuOpen])
+
+  useEffect(() => {
     if (tabFromNavigation) {
       setActiveTab(tabFromNavigation)
       return
@@ -637,7 +680,12 @@ function FinancialStatement() {
   }, [tabFromNavigation, clientId, fyId, businessId])
 
   useEffect(() => {
-    if (activeTab !== 'notes' || !highlightedNote) {
+    if (!highlightedNote) {
+      return
+    }
+
+    const noteTab = getNoteSectionTabForNoteKey(highlightedNote.noteKey)
+    if (activeTab !== noteTab) {
       return
     }
 
@@ -746,6 +794,33 @@ function FinancialStatement() {
     }
   }, [activeTab, highlightedPlRow])
 
+  useEffect(() => {
+    if (activeTab !== 'bank-account' || !highlightedBankId) {
+      return
+    }
+
+    let cancelled = false
+    const targetId = pendingScrollTargetRef.current ?? `bank-row-${highlightedBankId}`
+
+    const scrollToTarget = () => {
+      if (cancelled) {
+        return
+      }
+      const element = document.getElementById(targetId)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        pendingScrollTargetRef.current = null
+      }
+    }
+
+    requestAnimationFrame(scrollToTarget)
+    const highlightTimer = window.setTimeout(() => setHighlightedBankId(null), 2500)
+    return () => {
+      cancelled = true
+      window.clearTimeout(highlightTimer)
+    }
+  }, [activeTab, highlightedBankId])
+
   const switchFsTab = (tab: FsTab, options?: { scrollToTop?: boolean }) => {
     setActiveTab(tab)
     if (options?.scrollToTop !== false) {
@@ -761,7 +836,7 @@ function FinancialStatement() {
       : `note-row-${noteKey}`
     pendingScrollTargetRef.current = targetId
     setHighlightedNote({ noteKey, noteSubId })
-    switchFsTab('notes', { scrollToTop: false })
+    switchFsTab(getNoteSectionTabForNoteKey(noteKey), { scrollToTop: false })
   }
 
   const navigateToBalanceSheet = (noteKey: keyof FsNotes, noteSubId?: string) => {
@@ -780,6 +855,14 @@ function FinancialStatement() {
 
   const navigateToGstReco = () => {
     switchFsTab('gst-reco')
+  }
+
+  const navigateToBankAccount = (accountId?: string) => {
+    if (accountId) {
+      pendingScrollTargetRef.current = `bank-row-${accountId}`
+      setHighlightedBankId(accountId)
+    }
+    switchFsTab('bank-account', { scrollToTop: false })
   }
 
   const renderNoteNumberLink = (
@@ -966,20 +1049,28 @@ function FinancialStatement() {
       let priorSubAmounts: NoteSubAmounts | null = null
       let priorLoans: LoanRecord[] | null = null
       let priorBankAccounts: BankAccountRecord[] = []
+      let priorAdminLines: AdministrativeExpenseLine[] = []
       let priorFsPrepared: FinancialStatementData | null = null
       let priorPlAppropriationAmounts: Record<string, NoteSubCell> | null = null
       let previousYearDerivedSnapshot: FsDerivedState | null = null
       if (priorFy && priorFsFetched) {
+        priorBankAccounts = normalizeBankAccounts(priorFsFetched.bankAccounts)
         try {
           const priorFs = priorFsFetched
-          priorBankAccounts = normalizeBankAccounts(priorFs.bankAccounts)
           const priorFyStart = priorFyMeta?.startYear ?? new Date().getFullYear()
           const priorFyEnd = priorFyMeta?.endYear ?? priorFyStart + 1
           priorLoans = normalizeLoans(priorFs.loans, priorFs.repaymentSchedule, priorFyStart, priorFyEnd)
-          const priorAdminLines = normalizeAdministrativeExpenseLines(
+          priorAdminLines = reconcileAdministrativeExpenseLines(
             priorFs.administrativeExpenseLines,
             priorFs.noteSubAmounts,
+            loadedLedgers,
           )
+          const priorDedupedAdminExpense = deduplicateAdministrativeExpenseLines(
+            priorAdminLines,
+            priorFs.noteSubAmounts,
+            loadedLedgers,
+          )
+          priorAdminLines = priorDedupedAdminExpense.lines
           const priorOtherStLines = normalizeOtherShortTermBorrowingLines(
             priorFs.otherShortTermBorrowingLines,
             priorFs.noteSubAmounts,
@@ -1122,8 +1213,10 @@ function FinancialStatement() {
           priorNotes = null
           priorSubAmounts = null
           priorLoans = null
-          priorBankAccounts = []
-          priorFsPrepared = null
+          priorFsPrepared = priorFsPrepared ?? {
+            ...priorFsFetched,
+            bankAccounts: priorBankAccounts,
+          }
           priorPlAppropriationAmounts = null
           previousYearDerivedSnapshot = null
           setPreviousYearPlAppropriationAmounts(null)
@@ -1143,10 +1236,19 @@ function FinancialStatement() {
       const fyStart = fyMeta?.startYear ?? new Date().getFullYear()
       const fyEnd = fyMeta?.endYear ?? fyStart + 1
       let loans = normalizeLoans(fs.loans, fs.repaymentSchedule, fyStart, fyEnd)
-      let administrativeExpenseLines = normalizeAdministrativeExpenseLines(
+      let administrativeExpenseLines = reconcileAdministrativeExpenseLines(
         fs.administrativeExpenseLines,
         fs.noteSubAmounts,
+        loadedLedgers,
+        priorAdminLines,
       )
+      const dedupedAdminExpense = deduplicateAdministrativeExpenseLines(
+        administrativeExpenseLines,
+        fs.noteSubAmounts,
+        loadedLedgers,
+      )
+      administrativeExpenseLines = dedupedAdminExpense.lines
+      let noteSubAmounts = dedupedAdminExpense.noteSubAmounts
       let otherShortTermBorrowingLines = normalizeOtherShortTermBorrowingLines(
         fs.otherShortTermBorrowingLines,
         fs.noteSubAmounts,
@@ -1163,8 +1265,8 @@ function FinancialStatement() {
         fs.plAppropriationAmounts ?? {},
       )
       let bankAccounts = normalizeBankAccounts(fs.bankAccounts)
-      let noteSubAmounts = normalizeNoteSubAmounts(
-        fs.noteSubAmounts,
+      noteSubAmounts = normalizeNoteSubAmounts(
+        noteSubAmounts,
         migrateNoteBreakdowns(fs.noteBreakdowns),
         loans,
         administrativeExpenseLines,
@@ -1180,6 +1282,10 @@ function FinancialStatement() {
       noteSubAmounts = migrateManualNoteLineSubAmounts(manualNoteLines, noteSubAmounts)
       noteSubAmounts = migrateCapitalAccountSubAmounts(capitalAccountLines, noteSubAmounts)
       noteSubAmounts = migrateCogsExtraSubAmounts(cogsExtraLines, noteSubAmounts)
+
+      const fyStartYearMap = new Map(
+        (clientData.financialYears || []).map((item) => [item.id, item.startYear]),
+      )
 
       let gstReco = normalizeGstReco(fs.gstReco)
       if (!isConsolidatedView && getGstTaxableSalesTotal(gstReco) === 0) {
@@ -1242,6 +1348,9 @@ function FinancialStatement() {
           previousYearBankAccounts: [],
           previousYearPlAppropriationAmounts: priorPlAppropriationAmounts,
           ledgers: loadedLedgers,
+          fyStartYearById: new Map(
+            (clientData.financialYears || []).map((item) => [item.id, item.startYear]),
+          ),
         })
         const priorClosings = buildPriorDepClosingsByLedgerId(
           expandPriorScheduleWithHistory(
@@ -1400,6 +1509,19 @@ function FinancialStatement() {
       }
       noteSubAmounts = applyClosingStockLink(noteSubAmounts)
 
+      bankAccounts = deduplicateBankAccountsByAccountNumber(bankAccounts, fyStartYearMap)
+      const currentFyMeta = (clientData.financialYears || []).find((item) => item.id === fyId)
+      const currentFyStartYear = currentFyMeta?.startYear ?? 0
+      if (currentFyStartYear > 0) {
+        const closedLookup = unionBankAccountsForComparative(bankAccounts, priorBankAccounts)
+        bankAccounts = filterBankAccountsForFy(
+          bankAccounts,
+          currentFyStartYear,
+          fyStartYearMap,
+          closedLookup,
+        )
+      }
+
       const nextFsData = {
         ...fs,
         notes: migratedNotes,
@@ -1440,6 +1562,48 @@ function FinancialStatement() {
   }, [clientId, fyId, businessId])
 
   const fy = client?.financialYears?.find((item) => item.id === fyId)
+  const priorFy = useMemo(() => {
+    if (!client?.financialYears || !fyId) {
+      return null
+    }
+    return findPreviousFinancialYear(client.financialYears, fyId)
+  }, [client?.financialYears, fyId])
+  const fyStartYearById = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const item of client?.financialYears ?? []) {
+      map.set(item.id, item.startYear)
+    }
+    return map
+  }, [client?.financialYears])
+  const allKnownBankAccounts = useMemo(
+    () => unionBankAccountsForComparative(fsData?.bankAccounts ?? [], previousYearBankAccounts),
+    [fsData?.bankAccounts, previousYearBankAccounts],
+  )
+  const visibleBankAccounts = useMemo(() => {
+    if (!fsData || !fy) {
+      return []
+    }
+    const filtered = filterBankAccountsForFy(
+      fsData.bankAccounts,
+      fy.startYear,
+      fyStartYearById,
+      allKnownBankAccounts,
+    )
+    return deduplicateBankAccountsByAccountNumber(filtered, fyStartYearById)
+  }, [fsData, fy, fyStartYearById, allKnownBankAccounts])
+  const visiblePreviousYearBankAccounts = useMemo(() => {
+    if (!priorFy) {
+      return []
+    }
+    const priorFyMeta = client?.financialYears?.find((item) => item.id === priorFy.id)
+    const priorStartYear = priorFyMeta?.startYear ?? priorFy.startYear
+    return filterBankAccountsForFy(
+      previousYearBankAccounts,
+      priorStartYear,
+      fyStartYearById,
+      allKnownBankAccounts,
+    )
+  }, [previousYearBankAccounts, priorFy, client?.financialYears, fyStartYearById, allKnownBankAccounts])
   const udinEnabled = normalizeUdinDetails(fsData?.udinDetails).enabled
   const fsVisibleTabs = useMemo((): Array<[FsTab, string]> => {
     if (!fy) {
@@ -1522,11 +1686,14 @@ function FinancialStatement() {
     printAll ||
     Boolean(printAllSelectedTabs && printAllSelectedTabs.size > 0)
 
+  const isNotesRelatedTab = (tab: FsTab) => tab === 'notes' || isNoteSectionTab(tab)
+
   const isTabMounted = (tab: FsTab) =>
     printAll ||
     displayTab === tab ||
     activeTab === tab ||
     tab === 'notes' ||
+    isNoteSectionTab(tab) ||
     Boolean(printAllSelectedTabs?.has(tab))
 
   const deferredNoteSubAmounts = useDeferredValue(fsData?.noteSubAmounts)
@@ -1618,8 +1785,8 @@ function FinancialStatement() {
     if (!fsData) {
       return { credit: [], debit: [] }
     }
-    return partitionBankAccountsByClosing(fsData.bankAccounts)
-  }, [fsData])
+    return partitionBankAccountsByClosing(visibleBankAccounts)
+  }, [visibleBankAccounts])
 
   const noteCalcContext = useMemo(() => {
     if (!fsData || !fy) {
@@ -1650,8 +1817,8 @@ function FinancialStatement() {
       cogsExtraLines: fsData.cogsExtraLines ?? [],
       ledgers,
       plAppropriationTotal,
-      bankAccounts: fsData.bankAccounts,
-      previousYearBankAccounts,
+      bankAccounts: visibleBankAccounts,
+      previousYearBankAccounts: visiblePreviousYearBankAccounts,
       cashAdjustment: comparativeCashAdjustment,
     }
   }, [
@@ -1665,7 +1832,8 @@ function FinancialStatement() {
     loanCalcPayload,
     previousYearComputedLoans,
     plAppropriationTotal,
-    previousYearBankAccounts,
+    visibleBankAccounts,
+    visiblePreviousYearBankAccounts,
     ledgers,
   ])
 
@@ -1686,8 +1854,8 @@ function FinancialStatement() {
       otherShortTermBorrowingLines: fsData.otherShortTermBorrowingLines ?? [],
       manualNoteLines: fsData.manualNoteLines ?? [],
       plAppropriationTotal,
-      bankAccounts: fsData.bankAccounts,
-      previousYearBankAccounts,
+      bankAccounts: visibleBankAccounts,
+      previousYearBankAccounts: visiblePreviousYearBankAccounts,
       capitalAccountLines: fsData.capitalAccountLines ?? [],
       cogsExtraLines: fsData.cogsExtraLines ?? [],
       ledgers,
@@ -1707,7 +1875,8 @@ function FinancialStatement() {
     loanCalcPayload,
     previousYearComputedLoans,
     plAppropriationTotal,
-    previousYearBankAccounts,
+    visibleBankAccounts,
+    visiblePreviousYearBankAccounts,
     ledgers,
     openingBalanceLocks,
   ])
@@ -1906,22 +2075,16 @@ function FinancialStatement() {
     setSaveMessage('')
   }
 
-  const addAdministrativeExpenseLine = () => {
-    if (!fsData) {
+  const addAdministrativeExpenseLine = (categoryId: string) => {
+    if (!fsData || !categoryId) {
       return
     }
 
     const usedCategoryIds = (fsData.administrativeExpenseLines ?? []).map((line) => line.categoryId)
-    const categoryId = firstUnusedLedgerIdForGroup(
-      ledgers,
-      'otherAdministrativeExpenses',
-      usedCategoryIds,
+    const isAvailable = getUnusedAdminExpenseLedgers(ledgers, usedCategoryIds).some(
+      (ledger) => ledger.id === categoryId,
     )
-    if (!categoryId) {
-      void showActionAlert(
-        'Cannot add line',
-        'All administrative expense categories are already in use.',
-      )
+    if (!isAvailable) {
       return
     }
 
@@ -1942,6 +2105,7 @@ function FinancialStatement() {
         },
       },
     })
+    setAdminExpenseAddMenuOpen(false)
     setSaveMessage('')
   }
 
@@ -1967,11 +2131,22 @@ function FinancialStatement() {
   }
 
   const removeAdministrativeExpenseLine = (lineId: string) => {
-    if (!fsData || isAdminExpenseLineCategoryLocked(openingBalanceLocks, lineId)) {
+    const subId = adminExpenseSubId(lineId)
+    const resolvedSub = noteSubRowsMap?.otherAdministrativeExpenses?.find((row) => row.id === subId)
+
+    if (
+      !fsData ||
+      isAdminExpenseLineCategoryLocked(openingBalanceLocks, lineId) ||
+      !canRemoveAdministrativeExpenseLine(
+        fsData.noteSubAmounts,
+        lineId,
+        resolvedSub,
+        openingBalanceLocks,
+      )
+    ) {
       return
     }
 
-    const subId = adminExpenseSubId(lineId)
     const adminSubs = { ...(fsData.noteSubAmounts.otherAdministrativeExpenses ?? {}) }
     delete adminSubs[subId]
 
@@ -2298,12 +2473,18 @@ function FinancialStatement() {
   const renderLedgerSelectOptions = (
     group: keyof FsNotes,
     sign?: CapitalAccountLineSign,
-    options?: { disabledIds?: Set<string> },
+    options?: { disabledIds?: Set<string>; excludeUsedIds?: Set<string>; alwaysIncludeId?: string },
   ) => {
     let groupLedgers = getLedgersForGroup(ledgers, group)
     if (group === 'capitalAccount' && sign) {
       groupLedgers = groupLedgers.filter(
         (ledger) => normalizeLedgerSign(ledger.sign) === sign,
+      )
+    }
+    if (options?.excludeUsedIds) {
+      groupLedgers = groupLedgers.filter(
+        (ledger) =>
+          !options.excludeUsedIds!.has(ledger.id) || ledger.id === options.alwaysIncludeId,
       )
     }
     return groupLedgers.map((ledger) => (
@@ -2458,44 +2639,132 @@ function FinancialStatement() {
 
     if (field.key === 'shortTermBorrowings') {
       const hasStLoans = fsData?.loans.some((loan) => loan.loanType === 'short-term') ?? false
-      return renderRepaymentScheduleLinkHeader(
-        field,
-        hasStLoans,
-        <button
-          type="button"
-          className="notes-add-round-btn notes-add-round-btn-st"
-          onClick={addOtherShortTermBorrowingLine}
-          title="Add other short-term borrowing"
-          aria-label="Add other short-term borrowing"
-        >
-          +
-        </button>,
+      const hasStBankAccounts = visibleBankAccounts.some(
+        (account) => account.accountType === 'cc' || account.accountType === 'od',
+      )
+      return (
+        <div className="notes-main-label-row notes-schedule-header-row">
+          <div className="notes-revenue-header">
+            <span className="notes-revenue-title">{field.label}</span>
+            <div className={`notes-gst-link-bar notes-schedule-link-bar${hasStLoans ? ' is-linked' : ''}`}>
+              {hasStLoans && (
+                <span
+                  className="notes-gst-linked-badge"
+                  title="Closing balance linked from Loan Repayment Schedule"
+                >
+                  Linked
+                </span>
+              )}
+              <button
+                type="button"
+                className="notes-gst-open-btn"
+                onClick={() => switchFsTab('repayment')}
+                title="Open Loan Repayment Schedule"
+              >
+                Repayment Schedule
+                <span className="notes-gst-open-arrow" aria-hidden="true">
+                  →
+                </span>
+              </button>
+              {hasStBankAccounts && (
+                <button
+                  type="button"
+                  className="notes-gst-open-btn"
+                  onClick={() => navigateToBankAccount()}
+                  title="Open Bank Accounts"
+                >
+                  Bank Accounts
+                  <span className="notes-gst-open-arrow" aria-hidden="true">
+                    →
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="notes-add-round-btn notes-add-round-btn-st"
+            onClick={addOtherShortTermBorrowingLine}
+            title="Add other short-term borrowing"
+            aria-label="Add other short-term borrowing"
+          >
+            +
+          </button>
+        </div>
+      )
+    }
+
+    if (field.key === 'cashAtBank') {
+      const hasCashBankAccounts = visibleBankAccounts.some(
+        (account) => account.accountType === 'current' || account.accountType === 'savings',
+      )
+      if (!hasCashBankAccounts) {
+        return field.label
+      }
+      return (
+        <div className="notes-main-label-row notes-schedule-header-row">
+          <div className="notes-revenue-header">
+            <span className="notes-revenue-title">{field.label}</span>
+            <div className="notes-gst-link-bar notes-schedule-link-bar is-linked">
+              <span className="notes-gst-linked-badge" title="Balances linked from Bank Account tab">
+                Linked
+              </span>
+              <button
+                type="button"
+                className="notes-gst-open-btn"
+                onClick={() => navigateToBankAccount()}
+                title="Open Bank Accounts"
+              >
+                Bank Accounts
+                <span className="notes-gst-open-arrow" aria-hidden="true">
+                  →
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       )
     }
 
     if (field.key === 'otherAdministrativeExpenses') {
-      const canAddAdminLine = hasUnusedLedgerInGroup(
-        ledgers,
-        'otherAdministrativeExpenses',
-        (fsData?.administrativeExpenseLines ?? []).map((line) => line.categoryId),
-      )
+      const usedCategoryIds = (fsData?.administrativeExpenseLines ?? []).map((line) => line.categoryId)
+      const unusedAdminLedgers = getUnusedAdminExpenseLedgers(ledgers, usedCategoryIds)
+      const canAddAdminLine = unusedAdminLedgers.length > 0
       return (
         <div className="notes-main-label-row">
           <span>{field.label}</span>
-          <button
-            type="button"
-            className="notes-add-round-btn"
-            onClick={addAdministrativeExpenseLine}
-            title={
-              canAddAdminLine
-                ? 'Add administrative expense'
-                : 'All administrative expense categories are already in use'
-            }
-            aria-label="Add administrative expense"
-            disabled={!canAddAdminLine}
-          >
-            +
-          </button>
+          <div className="notes-add-menu-wrap" ref={adminExpenseAddMenuRef}>
+            <button
+              type="button"
+              className="notes-add-round-btn"
+              onClick={() => setAdminExpenseAddMenuOpen((open) => !open)}
+              title={
+                canAddAdminLine
+                  ? 'Add administrative expense'
+                  : 'All administrative expense categories are already in use'
+              }
+              aria-label="Add administrative expense"
+              aria-expanded={adminExpenseAddMenuOpen}
+              disabled={!canAddAdminLine}
+            >
+              +
+            </button>
+            {adminExpenseAddMenuOpen && canAddAdminLine ? (
+              <div className="notes-add-menu" role="menu">
+                {unusedAdminLedgers.map((ledger) => (
+                  <button
+                    key={ledger.id}
+                    type="button"
+                    className="notes-add-menu-item"
+                    role="menuitem"
+                    onClick={() => addAdministrativeExpenseLine(ledger.id)}
+                  >
+                    {ledger.name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
       )
     }
@@ -2605,12 +2874,24 @@ function FinancialStatement() {
   const renderAdminExpenseLabel = (sub: ResolvedSubRow) => {
     const lineId = sub.id.replace('admin-line-', '')
     const line = fsData?.administrativeExpenseLines?.find((item) => item.id === lineId)
-    const categoryId = line?.categoryId ?? defaultLedgerIdForGroup(ledgers, 'otherAdministrativeExpenses')
+    const storedCategoryId = line?.categoryId ?? ''
+    const categoryId = storedCategoryId
+      ? resolveAdminExpenseCategoryId(ledgers, storedCategoryId)
+      : defaultLedgerIdForGroup(ledgers, 'otherAdministrativeExpenses')
     const categoryLocked = isAdminExpenseLineCategoryLocked(openingBalanceLocks, lineId)
     const usedCategoryIds = new Set(
       (fsData?.administrativeExpenseLines ?? [])
         .filter((item) => item.id !== lineId)
-        .map((item) => item.categoryId),
+        .map((item) => resolveAdminExpenseCategoryId(ledgers, item.categoryId)),
+    )
+    const hasLedgerOption = getLedgersForGroup(ledgers, 'otherAdministrativeExpenses').some(
+      (ledger) => ledger.id === categoryId,
+    )
+    const canRemove = canRemoveAdministrativeExpenseLine(
+      fsData?.noteSubAmounts,
+      lineId,
+      sub,
+      openingBalanceLocks,
     )
 
     return (
@@ -2628,21 +2909,26 @@ function FinancialStatement() {
             disabled={categoryLocked}
             onChange={(event) => updateAdministrativeExpenseCategory(lineId, event.target.value)}
           >
+            {!hasLedgerOption && isLegacyAdminCategoryId(categoryId) ? (
+              <option value={categoryId}>{resolveAdminExpenseLabel(ledgers, categoryId)}</option>
+            ) : null}
             {renderLedgerSelectOptions('otherAdministrativeExpenses', undefined, {
-              disabledIds: usedCategoryIds,
+              excludeUsedIds: usedCategoryIds,
+              alwaysIncludeId: categoryId,
             })}
           </select>
         </div>
-        <button
-          type="button"
-          className="notes-admin-remove-btn"
-          onClick={() => removeAdministrativeExpenseLine(lineId)}
-          title="Remove expense line"
-          aria-label="Remove expense line"
-          disabled={categoryLocked}
-        >
-          ×
-        </button>
+        {canRemove ? (
+          <button
+            type="button"
+            className="notes-admin-remove-btn"
+            onClick={() => removeAdministrativeExpenseLine(lineId)}
+            title="Remove expense line"
+            aria-label="Remove expense line"
+          >
+            ×
+          </button>
+        ) : null}
       </div>
     )
   }
@@ -2947,6 +3233,25 @@ function FinancialStatement() {
             </button>
           </div>
         )
+      }
+      if (
+        (noteKey === 'cashAtBank' || noteKey === 'shortTermBorrowings') &&
+        sub.kind === 'auto' &&
+        (sub.id.startsWith('bank-') || sub.id.startsWith('bank-st-'))
+      ) {
+        const accountId = parseBankAccountIdFromSubId(sub.id)
+        if (accountId) {
+          return (
+            <button
+              type="button"
+              className="notes-repayment-link-btn"
+              onClick={() => navigateToBankAccount(accountId)}
+              title="Open Bank Account"
+            >
+              {sub.label}
+            </button>
+          )
+        }
       }
       return sub.label
     }
@@ -3336,7 +3641,8 @@ function FinancialStatement() {
   }
 
   const handleBankAccountsSaved = (bankAccounts: BankAccountRecord[]) => {
-    setFsData((current) => (current ? { ...current, bankAccounts } : current))
+    const deduped = deduplicateBankAccountsByAccountNumber(bankAccounts, fyStartYearById)
+    setFsData((current) => (current ? { ...current, bankAccounts: deduped } : current))
     setSaveMessage('')
     setError('')
     setBankModalOpen(false)
@@ -3349,8 +3655,15 @@ function FinancialStatement() {
     }
 
     const account = fsData.bankAccounts.find((item) => item.id === accountId)
+    if (account && !canDeleteBankAccount(account)) {
+      setError(
+        'Cannot delete this bank account — figures exist in one or more financial years.',
+      )
+      return
+    }
     const confirmed = await confirmDelete({
       itemLabel: account?.bankName || 'this bank account',
+      extraMessage: 'This removes the bank from all financial years.',
     })
     if (!confirmed) {
       return
@@ -3542,10 +3855,17 @@ function FinancialStatement() {
         ? filterActiveDepreciationSchedule(workingData.depreciationSchedule)
         : filterScheduleToBusinessAssets(workingData.depreciationSchedule, businessAssetLedgerIds)
 
-      const adminLinesForSave = normalizeAdministrativeExpenseLines(
+      const reconciledAdminLines = reconcileAdministrativeExpenseLines(
         workingData.administrativeExpenseLines,
         workingData.noteSubAmounts,
+        ledgers,
       )
+      const dedupedAdminForSave = deduplicateAdministrativeExpenseLines(
+        reconciledAdminLines,
+        workingData.noteSubAmounts,
+        ledgers,
+      )
+      const adminLinesForSave = dedupedAdminForSave.lines
       const otherStLinesForSave = normalizeOtherShortTermBorrowingLines(
         workingData.otherShortTermBorrowingLines,
         workingData.noteSubAmounts,
@@ -3571,7 +3891,7 @@ function FinancialStatement() {
         return next
       })()
       let noteSubAmountsForSave = buildCompleteNoteSubAmounts(
-        workingData.noteSubAmounts,
+        dedupedAdminForSave.noteSubAmounts,
         migrateNoteBreakdowns(workingData.noteBreakdowns),
         workingData.loans,
         adminLinesForSave,
@@ -3602,10 +3922,16 @@ function FinancialStatement() {
         ...(unlockCode ? { unlockConfirmationCode: unlockCode } : {}),
       }
       const saved = await saveFsData(clientId, fyId, businessId, payload)
-      const savedAdminLines = normalizeAdministrativeExpenseLines(
+      const savedReconciledAdminLines = reconcileAdministrativeExpenseLines(
         saved.administrativeExpenseLines,
         saved.noteSubAmounts,
+        ledgers,
       )
+      const savedAdminLines = deduplicateAdministrativeExpenseLines(
+        savedReconciledAdminLines,
+        saved.noteSubAmounts,
+        ledgers,
+      ).lines
       const savedOtherStLines = normalizeOtherShortTermBorrowingLines(
         saved.otherShortTermBorrowingLines,
         saved.noteSubAmounts,
@@ -3777,7 +4103,70 @@ function FinancialStatement() {
     )
   }
 
-  const noteGroups = NOTE_GROUP_ORDER
+  const renderNotesTableHead = (showPrintBanner: boolean) => (
+    <thead>
+      {showPrintBanner && renderPrintHeadSpacer('notes', notesPrintColSpan)}
+      {showPrintBanner && renderPrintTableBanner('notes', notesPrintColSpan)}
+      <tr className="notes-head-row">
+        <th className="notes-sno-col">Note</th>
+        <th className="notes-particular-col">Particulars</th>
+        <th className="notes-amount-col notes-curr-col">
+          <span className="notes-fy-label statement-fy-label--unified">{notesCurrentColumnLabel}</span>
+        </th>
+        <th className="notes-amount-col notes-prev-col">
+          <span className="notes-fy-label statement-fy-label--unified">{notesPreviousColumnLabel}</span>
+        </th>
+        <th className="notes-variance-col notes-change-col">
+          <span className="notes-fy-label">Change</span>
+          <span className="notes-fy-hint">vs last year</span>
+        </th>
+        <th className="notes-variance-col notes-pct-col">
+          <span className="notes-fy-label">% Change</span>
+          <span className="notes-fy-hint">vs last year</span>
+        </th>
+      </tr>
+    </thead>
+  )
+
+  const renderNotesTableFieldRows = (fields: typeof NOTE_FIELDS) =>
+    fields.map((field) => (
+      <tbody key={field.key} className="fs-print-note-block">
+        <tr
+          id={`note-row-${field.key}`}
+          className={`notes-main-row notes-main-row-header${field.key === 'longTermBorrowings' ? ' notes-main-row-lt' : ''}${field.key === 'otherAdministrativeExpenses' ? ' notes-main-row-admin' : ''}${field.key === 'shortTermBorrowings' ? ' notes-main-row-st' : ''}${field.key === 'financeCost' ? ' notes-main-row-finance' : ''}${field.key === 'capitalAccount' ? ' notes-main-row-capital' : ''}${field.key === 'costOfGoodsSold' ? ' notes-main-row-cogs' : ''}${field.key === 'revenueFromOperations' ? ' notes-main-row-revenue' : ''}${isManualNoteLineKey(field.key) ? ' notes-main-row-manual' : ''}${
+            highlightedNote?.noteKey === field.key && !highlightedNote.noteSubId
+              ? ' notes-row-highlight'
+              : ''
+          }`}
+        >
+          <td className="notes-sno-col">{renderNoteNumberLink(field.key, field.noteNo)}</td>
+          <td className="notes-particular-col notes-main-label">{renderMainNoteLabel(field)}</td>
+          {renderEmptyNoteHeadCells()}
+        </tr>
+        {renderNoteSubRows(field.key)}
+      </tbody>
+    ))
+
+  const renderNotesSectionTable = (
+    section: (typeof NOTES_TABLE_SECTIONS)[number],
+    showPrintBanner: boolean,
+  ) => (
+    <div className="table-wrap notes-table-wrap">
+      <table className="data-table notes-table">
+        <colgroup>
+          <col className="notes-sno-col" />
+          <col className="notes-particular-col" />
+          <col className="notes-amount-col notes-curr-col" />
+          <col className="notes-amount-col notes-prev-col" />
+          <col className="notes-variance-col notes-change-col" />
+          <col className="notes-variance-col notes-pct-col" />
+        </colgroup>
+        {renderNotesTableHead(showPrintBanner)}
+        {renderNotesTableFieldRows(getNoteFieldsForTableSection(section))}
+      </table>
+    </div>
+  )
+
   const depTotals = sumDepreciationSchedule(fsData.depreciationSchedule)
   const fixedAssetLedgers = getFixedAssetLedgers(ledgers)
   const availableFixedAssetLedgers = getAvailableFixedAssetLedgers(fsData.depreciationSchedule, ledgers)
@@ -3834,17 +4223,18 @@ function FinancialStatement() {
     ? printableTabsInPrintOrder.filter((tab) => printAllSelectedTabs.has(tab))
     : printableTabsInPrintOrder
   const firstPrintableTabInAll = selectedPrintTabsInOrder[0]
-  const hidePrintHeader = printAll || (!printAll && resolvedActiveTab === 'notes')
+  const hidePrintHeader = printAll || (!printAll && isNotesRelatedTab(resolvedActiveTab))
   const notesPrintColSpan = 6
   const isNotesPrintOutput =
-    (!printAll && resolvedActiveTab === 'notes') ||
-    (printAll && Boolean(printAllSelectedTabs?.has('notes')))
+    (!printAll && isNotesRelatedTab(resolvedActiveTab)) ||
+    (printAll && Boolean(printAllSelectedTabs?.has('notes'))) ||
+    (printAll && NOTE_SECTION_TAB_IDS.some((tab) => printAllSelectedTabs?.has(tab)))
 
   const isNotesOnlyPrintAll =
     printAll &&
-    Boolean(printAllSelectedTabs?.has('notes')) &&
-    selectedPrintTabsInOrder.length === 1 &&
-    selectedPrintTabsInOrder[0] === 'notes'
+    (Boolean(printAllSelectedTabs?.has('notes')) ||
+      NOTE_SECTION_TAB_IDS.some((tab) => printAllSelectedTabs?.has(tab))) &&
+    selectedPrintTabsInOrder.every((tab) => isNotesRelatedTab(tab))
 
   const tabLabelFor = (tab: FsTab) =>
     visibleTabs.find(([visibleTab]) => visibleTab === tab)?.[1] ?? printTitleForTab(tab)
@@ -3858,7 +4248,7 @@ function FinancialStatement() {
     if (tab === 'profit-loss') {
       return 'profit-loss'
     }
-    if (tab === 'notes') {
+    if (tab === 'notes' || isNoteSectionTab(tab)) {
       return 'notes'
     }
     return 'other'
@@ -3873,7 +4263,7 @@ function FinancialStatement() {
     if (!printAll) {
       return true
     }
-    if (isNotesOnlyPrintAll && tab === 'notes') {
+    if (isNotesOnlyPrintAll && isNotesRelatedTab(tab)) {
       return true
     }
     return false
@@ -3881,7 +4271,7 @@ function FinancialStatement() {
 
   const shouldRenderSectionStationery = (tab: FsTab) => {
     if (printAll) {
-      if (isNotesOnlyPrintAll && tab === 'notes') {
+      if (isNotesOnlyPrintAll && isNotesRelatedTab(tab)) {
         return isTabSelectedForPrint(tab)
       }
       if (tab === 'gst-reco' || tab === 'udin-details') {
@@ -3889,7 +4279,7 @@ function FinancialStatement() {
       }
       return false
     }
-    return tab === 'notes' && resolvedActiveTab === 'notes'
+    return isNotesRelatedTab(tab) && resolvedActiveTab === tab
   }
 
   const shouldRenderPrintTableBanner = (tab: FsTab) => {
@@ -3968,7 +4358,7 @@ function FinancialStatement() {
       ? 'balance-sheet'
       : resolvedActiveTab === 'profit-loss'
         ? 'profit-loss'
-        : resolvedActiveTab === 'notes'
+        : isNotesRelatedTab(resolvedActiveTab)
           ? 'notes'
           : 'other'
 
@@ -4635,76 +5025,24 @@ function FinancialStatement() {
         >
           <h2>{notesLabel}</h2>
           <p className="hint">
-            Enter {currentFyLabel} figures in the sub-lines below each note. {previousFyLabel} amounts are shown for
-            reference. Click a <strong>Note</strong> number to jump to the {balanceSheetLabel} (1–18) or{' '}
-            {profitLossLabel} (19–24).
+            Notes are grouped into four sections. Open a section tab below to enter {currentFyLabel}{' '}
+            figures. {previousFyLabel} amounts are shown for reference. Click a <strong>Note</strong>{' '}
+            number to jump to the {balanceSheetLabel} (1–18) or {profitLossLabel} (19–24).
           </p>
 
-          {renderPrintSectionStationery('notes')}
-
-          <div className="table-wrap notes-table-wrap">
-            <table className="data-table notes-table">
-              <colgroup>
-                <col className="notes-sno-col" />
-                <col className="notes-particular-col" />
-                <col className="notes-amount-col notes-curr-col" />
-                <col className="notes-amount-col notes-prev-col" />
-                <col className="notes-variance-col notes-change-col" />
-                <col className="notes-variance-col notes-pct-col" />
-              </colgroup>
-              <thead>
-                {renderPrintHeadSpacer('notes', notesPrintColSpan)}
-                {renderPrintTableBanner('notes', notesPrintColSpan)}
-                <tr className="notes-head-row">
-                  <th className="notes-sno-col">Note</th>
-                  <th className="notes-particular-col">Particulars</th>
-                  <th className="notes-amount-col notes-curr-col">
-                    <span className="notes-fy-label statement-fy-label--unified">{notesCurrentColumnLabel}</span>
-                  </th>
-                  <th className="notes-amount-col notes-prev-col">
-                    <span className="notes-fy-label statement-fy-label--unified">{notesPreviousColumnLabel}</span>
-                  </th>
-                  <th className="notes-variance-col notes-change-col">
-                    <span className="notes-fy-label">Change</span>
-                    <span className="notes-fy-hint">vs last year</span>
-                  </th>
-                  <th className="notes-variance-col notes-pct-col">
-                    <span className="notes-fy-label">% Change</span>
-                    <span className="notes-fy-hint">vs last year</span>
-                  </th>
-                </tr>
-              </thead>
-              {noteGroups.map((group) => (
-                <Fragment key={group}>
-                  <tbody className="fs-print-note-group">
-                    <tr className="notes-section-row">
-                      <td colSpan={6}>{group}</td>
-                    </tr>
-                  </tbody>
-                  {NOTE_FIELDS.filter((field) => field.group === group).map((field) => (
-                    <tbody key={field.key} className="fs-print-note-block">
-                      <tr
-                        id={`note-row-${field.key}`}
-                        className={`notes-main-row notes-main-row-header${field.key === 'longTermBorrowings' ? ' notes-main-row-lt' : ''}${field.key === 'otherAdministrativeExpenses' ? ' notes-main-row-admin' : ''}${field.key === 'shortTermBorrowings' ? ' notes-main-row-st' : ''}${field.key === 'financeCost' ? ' notes-main-row-finance' : ''}${field.key === 'capitalAccount' ? ' notes-main-row-capital' : ''}${field.key === 'costOfGoodsSold' ? ' notes-main-row-cogs' : ''}${field.key === 'revenueFromOperations' ? ' notes-main-row-revenue' : ''}${isManualNoteLineKey(field.key) ? ' notes-main-row-manual' : ''}${
-                          highlightedNote?.noteKey === field.key && !highlightedNote.noteSubId
-                            ? ' notes-row-highlight'
-                            : ''
-                        }`}
-                      >
-                        <td className="notes-sno-col">
-                          {renderNoteNumberLink(field.key, field.noteNo)}
-                        </td>
-                        <td className="notes-particular-col notes-main-label">
-                          {renderMainNoteLabel(field)}
-                        </td>
-                        {renderEmptyNoteHeadCells()}
-                      </tr>
-                      {renderNoteSubRows(field.key)}
-                    </tbody>
-                  ))}
-                </Fragment>
-              ))}
-            </table>
+          <div className="notes-section-nav">
+            {NOTES_TABLE_SECTIONS.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                className="notes-section-nav-card"
+                onClick={() => switchFsTab(section.tabId)}
+              >
+                <span className="notes-section-nav-range">{section.rangeLabel}</span>
+                <span className="notes-section-nav-title">{section.title}</span>
+                <span className="notes-section-nav-action">Open section →</span>
+              </button>
+            ))}
           </div>
 
           <div className="auto-summary">
@@ -4744,6 +5082,30 @@ function FinancialStatement() {
               )}
           </div>
         </section>
+      )}
+
+      {NOTES_TABLE_SECTIONS.map((section, sectionIndex) =>
+        isTabMounted(section.tabId) && printableTabSet.has(section.tabId) ? (
+          <section
+            key={section.id}
+            className={`${tabPanelClass(section.tabId)} fs-notes-section-tab-panel`}
+            data-fs-tab="notes"
+            data-note-section={section.id}
+            data-print-title={printTitleForTab(section.tabId)}
+          >
+            <h2>
+              {notesLabel} — {section.title}
+            </h2>
+            <p className="hint">
+              {section.rangeLabel}: enter {currentFyLabel} figures below. {previousFyLabel} amounts are
+              for reference.
+            </p>
+
+            {renderPrintSectionStationery(section.tabId)}
+
+            {renderNotesSectionTable(section, sectionIndex === 0)}
+          </section>
+        ) : null,
       )}
 
       {isTabMounted('balance-sheet') && printableTabSet.has('balance-sheet') && fy && (
@@ -5533,7 +5895,7 @@ function FinancialStatement() {
             accounts with debit balance flow to <strong>Short Term Borrowings</strong>.
           </p>
 
-          {fsData.bankAccounts.length === 0 ? (
+          {visibleBankAccounts.length === 0 ? (
             <p className="empty-state">No bank accounts added yet. Click &quot;Add Bank&quot; to begin.</p>
           ) : (
             <>
@@ -5544,6 +5906,7 @@ function FinancialStatement() {
                   <col className="bank-col-number" />
                   <col className="bank-col-type" />
                   <col className="bank-col-status" />
+                  <col className="bank-col-started" />
                   <col className="bank-col-amount" />
                   <col className="bank-col-amount" />
                   <col className="bank-col-amount" />
@@ -5553,13 +5916,14 @@ function FinancialStatement() {
                   <col className="bank-col-closing" />
                 </colgroup>
                 <thead>
-                  {renderPrintHeadSpacer('bank-account', 11)}
-                  {renderPrintTableBanner('bank-account', 11)}
+                  {renderPrintHeadSpacer('bank-account', 12)}
+                  {renderPrintTableBanner('bank-account', 12)}
                   <tr>
                     <th className="bank-col-name">Bank Name</th>
                     <th className="bank-col-number">A/c No.</th>
                     <th className="bank-col-type">Type</th>
                     <th className="bank-col-status">Status</th>
+                    <th className="bank-col-started">Started FY</th>
                     <th className="bank-col-amount" title="Opening Balance">
                       Op. Bal.
                     </th>
@@ -5591,14 +5955,17 @@ function FinancialStatement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {fsData.bankAccounts.map((account) => {
+                  {visibleBankAccounts.map((account) => {
                     const debitClosing = getDebitClosingAmount(account.closingBalance)
                     const creditClosing = getCreditClosingAmount(account.closingBalance)
                     const isClosed = !isBankAccountActive(account)
+                    const isHighlighted = highlightedBankId === account.id
+                    const showCloseHint = shouldOfferCloseBankAccount(account)
                     return (
                       <tr
                         key={account.id}
-                        className={`bank-data-row${isClosed ? ' bank-data-row-closed' : ''}`}
+                        id={`bank-row-${account.id}`}
+                        className={`bank-data-row${isClosed ? ' bank-data-row-closed' : ''}${isHighlighted ? ' bank-row-highlight' : ''}`}
                       >
                         <td className="bank-col-name">
                           <div className="bank-name-cell">
@@ -5610,20 +5977,26 @@ function FinancialStatement() {
                                 type="button"
                                 className="bank-icon-btn"
                                 onClick={() => openEditBank(account)}
-                                title="Edit bank details"
+                                title={
+                                  showCloseHint
+                                    ? 'Edit bank — set Status to Closed to stop in later years'
+                                    : 'Edit bank details'
+                                }
                                 aria-label="Edit bank"
                               >
                                 ✎
                               </button>
+                              {canDeleteBankAccount(account) ? (
                               <button
                                 type="button"
                                 className="bank-icon-btn bank-icon-btn-danger"
                                 onClick={() => void deleteBank(account.id)}
-                                title="Delete bank"
+                                title="Delete bank account from all years"
                                 aria-label="Delete bank"
                               >
                                 ×
                               </button>
+                              ) : null}
                             </span>
                           </div>
                         </td>
@@ -5642,11 +6015,25 @@ function FinancialStatement() {
                             className={`bank-status-badge bank-status-${account.status}`}
                             title={
                               isClosed
-                                ? 'Closed in this financial year — will not carry forward'
-                                : 'Active — carries forward to next financial year'
+                                ? 'Closed — will not appear in later financial years'
+                                : showCloseHint
+                                  ? 'Has figures in one or more years — use Edit → Closed to stop in later years'
+                                  : 'Active — appears in this and later financial years until closed'
                             }
                           >
                             {getBankAccountStatusLabel(account.status)}
+                          </span>
+                        </td>
+                        <td className="bank-col-started">
+                          <span
+                            className="bank-started-fy"
+                            title="Financial year from which this account appears in statements"
+                          >
+                            {formatBankAccountStartedFyLabel(
+                              account,
+                              client?.financialYears ?? [],
+                              account.startedInFyId || fyId,
+                            )}
                           </span>
                         </td>
                         <td className="bank-col-amount">
@@ -5739,29 +6126,29 @@ function FinancialStatement() {
                     )
                   })}
                   <tr className="bank-total-row">
-                    <td colSpan={4} className="bank-total-label">
+                    <td colSpan={5} className="bank-total-label">
                       Total
                     </td>
                     <td className="bank-col-amount">
-                      {formatAmount(sumBankAccountColumn(fsData.bankAccounts, 'openingBalance'))}
+                      {formatAmount(sumBankAccountColumn(visibleBankAccounts, 'openingBalance'))}
                     </td>
                     <td className="bank-col-amount bank-col-debit bank-total-value">
-                      {formatAmount(sumBankAccountColumn(fsData.bankAccounts, 'debit'))}
+                      {formatAmount(sumBankAccountColumn(visibleBankAccounts, 'debit'))}
                     </td>
                     <td className="bank-col-amount bank-col-credit bank-total-value">
-                      {formatAmount(sumBankAccountColumn(fsData.bankAccounts, 'credit'))}
+                      {formatAmount(sumBankAccountColumn(visibleBankAccounts, 'credit'))}
                     </td>
                     <td className="bank-col-amount">
-                      {formatAmount(sumBankAccountColumn(fsData.bankAccounts, 'bankCharge'))}
+                      {formatAmount(sumBankAccountColumn(visibleBankAccounts, 'bankCharge'))}
                     </td>
                     <td className="bank-col-amount">
-                      {formatAmount(sumBankAccountColumn(fsData.bankAccounts, 'interest'))}
+                      {formatAmount(sumBankAccountColumn(visibleBankAccounts, 'interest'))}
                     </td>
                     <td className="bank-col-amount bank-col-closing bank-col-debit bank-total-value">
-                      {formatAmount(sumBankDebitClosingBalances(fsData.bankAccounts))}
+                      {formatAmount(sumBankDebitClosingBalances(visibleBankAccounts))}
                     </td>
                     <td className="bank-col-amount bank-col-closing bank-col-credit bank-total-value">
-                      {formatAmount(sumBankCreditClosingBalances(fsData.bankAccounts))}
+                      {formatAmount(sumBankCreditClosingBalances(visibleBankAccounts))}
                     </td>
                   </tr>
                 </tbody>
@@ -5790,7 +6177,7 @@ function FinancialStatement() {
                       <tr className="bank-closing-group-total">
                         <td colSpan={2}>Total Credit Balance</td>
                         <td className="bank-closing-amount bank-closing-amount-credit">
-                          {formatAmount(sumBankCreditClosingBalances(fsData.bankAccounts))}
+                          {formatAmount(sumBankCreditClosingBalances(visibleBankAccounts))}
                         </td>
                       </tr>
                     </tbody>
@@ -5819,7 +6206,7 @@ function FinancialStatement() {
                       <tr className="bank-closing-group-total">
                         <td colSpan={2}>Total Debit Balance</td>
                         <td className="bank-closing-amount bank-closing-amount-debit">
-                          {formatAmount(sumBankDebitClosingBalances(fsData.bankAccounts))}
+                          {formatAmount(sumBankDebitClosingBalances(visibleBankAccounts))}
                         </td>
                       </tr>
                     </tbody>
@@ -6128,7 +6515,9 @@ function FinancialStatement() {
           clientId={clientId}
           fyId={fyId}
           businessId={businessId}
+          financialYears={client?.financialYears ?? []}
           existingAccounts={fsData.bankAccounts}
+          allBusinessAccounts={allKnownBankAccounts}
           account={editingBank}
           onClose={() => {
             setBankModalOpen(false)

@@ -44,7 +44,8 @@ import {
   migrateAdminExpenseSubAmounts,
   migrateManualNoteLineSubAmounts,
   migrateOtherShortTermSubAmounts,
-  normalizeAdministrativeExpenseLines,
+  deduplicateAdministrativeExpenseLines,
+  reconcileAdministrativeExpenseLines,
   normalizeManualNoteLines,
   normalizeNoteSubAmounts,
   normalizeOtherShortTermBorrowingLines,
@@ -108,10 +109,17 @@ export function prepareYearFsData(
 ): PreparedYearFs {
   const bankAccounts = normalizeBankAccounts(rawFs.bankAccounts)
   const loans = normalizeLoans(rawFs.loans, rawFs.repaymentSchedule, fyStartYear, fyEndYear)
-  const administrativeExpenseLines = normalizeAdministrativeExpenseLines(
+  const reconciledAdminLines = reconcileAdministrativeExpenseLines(
     rawFs.administrativeExpenseLines,
     rawFs.noteSubAmounts,
+    ledgers,
   )
+  const dedupedAdminExpense = deduplicateAdministrativeExpenseLines(
+    reconciledAdminLines,
+    rawFs.noteSubAmounts,
+    ledgers,
+  )
+  const administrativeExpenseLines = dedupedAdminExpense.lines
   const otherShortTermBorrowingLines = normalizeOtherShortTermBorrowingLines(
     rawFs.otherShortTermBorrowingLines,
     rawFs.noteSubAmounts,
@@ -131,7 +139,7 @@ export function prepareYearFsData(
   const noteBreakdowns = migrateNoteBreakdowns(rawFs.noteBreakdowns)
 
   let noteSubAmounts = normalizeNoteSubAmounts(
-    rawFs.noteSubAmounts,
+    dedupedAdminExpense.noteSubAmounts,
     noteBreakdowns,
     loans,
     administrativeExpenseLines,

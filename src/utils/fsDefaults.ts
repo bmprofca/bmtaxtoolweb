@@ -74,6 +74,89 @@ export const NOTE_FIELDS: {
   { key: 'financeCost', label: 'Finance Cost', group: 'Profit & Loss', noteNo: '24' },
 ]
 
+export type NoteSectionTabId =
+  | 'notes-sources'
+  | 'notes-assets-i'
+  | 'notes-assets-ii'
+  | 'notes-pl'
+
+export type NotesTableSection = {
+  id: string
+  tabId: NoteSectionTabId
+  tabLabel: string
+  title: string
+  rangeLabel: string
+  minNoteNo: number
+  maxNoteNo: number
+}
+
+/** Four note groups — each has its own tab between Notes and Depreciation Schedule. */
+export const NOTES_TABLE_SECTIONS: NotesTableSection[] = [
+  {
+    id: 'sources',
+    tabId: 'notes-sources',
+    tabLabel: 'Notes 1–8',
+    title: 'Sources of Funds',
+    rangeLabel: 'Notes 1–8',
+    minNoteNo: 1,
+    maxNoteNo: 8,
+  },
+  {
+    id: 'assets-i',
+    tabId: 'notes-assets-i',
+    tabLabel: 'Notes 9–14',
+    title: 'Non-current Assets',
+    rangeLabel: 'Notes 9–14',
+    minNoteNo: 9,
+    maxNoteNo: 14,
+  },
+  {
+    id: 'assets-ii',
+    tabId: 'notes-assets-ii',
+    tabLabel: 'Notes 15–18',
+    title: 'Current Assets & Cash',
+    rangeLabel: 'Notes 15–18',
+    minNoteNo: 15,
+    maxNoteNo: 18,
+  },
+  {
+    id: 'pl',
+    tabId: 'notes-pl',
+    tabLabel: 'Notes 19–24',
+    title: 'Profit & Loss',
+    rangeLabel: 'Notes 19–24',
+    minNoteNo: 19,
+    maxNoteNo: 24,
+  },
+]
+
+export const NOTE_SECTION_TAB_IDS = NOTES_TABLE_SECTIONS.map((section) => section.tabId)
+
+export function isNoteSectionTab(tab: string): tab is NoteSectionTabId {
+  return NOTE_SECTION_TAB_IDS.includes(tab as NoteSectionTabId)
+}
+
+export function getNoteSectionForTab(tabId: NoteSectionTabId) {
+  return NOTES_TABLE_SECTIONS.find((section) => section.tabId === tabId)
+}
+
+export function getNoteSectionTabForNoteKey(noteKey: keyof FsNotes): NoteSectionTabId {
+  const field = NOTE_FIELDS.find((item) => item.key === noteKey)
+  const noteNo = Number(field?.noteNo ?? 1)
+  return (
+    NOTES_TABLE_SECTIONS.find(
+      (section) => noteNo >= section.minNoteNo && noteNo <= section.maxNoteNo,
+    )?.tabId ?? 'notes-sources'
+  )
+}
+
+export function getNoteFieldsForTableSection(section: NotesTableSection) {
+  return NOTE_FIELDS.filter((field) => {
+    const noteNo = Number(field.noteNo)
+    return noteNo >= section.minNoteNo && noteNo <= section.maxNoteNo
+  })
+}
+
 function mergeNoteValues(...sources: (NoteValue | undefined)[]): NoteValue {
   return {
     current: sources.reduce((total, source) => total + (source?.current ?? 0), 0),

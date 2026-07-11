@@ -1,4 +1,10 @@
 import type { FinancialYear } from '../types'
+import {
+  NOTES_TABLE_SECTIONS,
+  getNoteSectionForTab,
+  isNoteSectionTab,
+  type NoteSectionTabId,
+} from './fsDefaults'
 
 export function buildShortFyLabel(startYear: number, endYear?: number) {
   const end = endYear ?? startYear + 1
@@ -294,6 +300,7 @@ export type FsPrintTab =
   | 'balance-sheet'
   | 'profit-loss'
   | 'notes'
+  | NoteSectionTabId
   | 'depreciation'
   | 'repayment'
   | 'bank-account'
@@ -302,6 +309,11 @@ export type FsPrintTab =
   | 'udin-details'
 
 export function formatFsTabPrintTitle(tab: FsPrintTab, statementType?: string): string {
+  const noteSection = isNoteSectionTab(tab) ? getNoteSectionForTab(tab) : undefined
+  if (noteSection) {
+    return `${formatNotesReportTitle(statementType)} — ${noteSection.title}`
+  }
+
   switch (tab) {
     case 'balance-sheet':
       return formatBalanceSheetReportTitle(statementType)
@@ -326,16 +338,16 @@ export function formatFsTabPrintTitle(tab: FsPrintTab, statementType?: string): 
   }
 }
 
-export function buildFsTabOptions(statementType?: string): Array<
-  [
-    'notes' | 'balance-sheet' | 'profit-loss' | 'depreciation' | 'repayment' | 'bank-account' | 'gst-reco',
-    string,
-  ]
-> {
+export function buildFsTabOptions(statementType?: string): Array<[FsPrintTab, string]> {
+  const noteSectionTabs = NOTES_TABLE_SECTIONS.map(
+    (section) => [section.tabId, section.tabLabel] as [FsPrintTab, string],
+  )
+
   return [
     ['balance-sheet', formatBalanceSheetTabLabel(statementType)],
     ['profit-loss', formatProfitLossTabLabel(statementType)],
     ['notes', formatNotesTabLabel(statementType)],
+    ...noteSectionTabs,
     ['depreciation', 'Depreciation Schedule'],
     ['repayment', 'Repayment Schedule'],
     ['bank-account', 'Bank Account'],

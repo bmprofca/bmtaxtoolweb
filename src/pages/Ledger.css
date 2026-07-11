@@ -144,6 +144,18 @@
   color: #0f172a;
 }
 
+.ledger-in-use-badge {
+  display: inline-block;
+  margin-left: 0.45rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.72rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
 .ledger-actions-col {
   width: 3.25rem;
   min-width: 3.25rem;
@@ -247,6 +259,19 @@
 
 .ledger-actions-item-danger:hover:not(:disabled) {
   background: #fef2f2;
+}
+
+.ledger-actions-item-disabled {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #94a3b8;
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: not-allowed;
 }
 
 .ledger-group-badge {

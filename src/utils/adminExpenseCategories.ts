@@ -24,6 +24,12 @@ const categoryLabelMap = new Map(
   ADMIN_EXPENSE_CATEGORIES.map((item) => [item.id, item.label]),
 )
 
+const categoryIdSet = new Set(ADMIN_EXPENSE_CATEGORIES.map((item) => item.id))
+
+export function isLegacyAdminCategoryId(categoryId: string) {
+  return categoryIdSet.has(categoryId as AdminExpenseCategoryId)
+}
+
 export function getAdminCategoryLabel(categoryId: string) {
   return categoryLabelMap.get(categoryId as AdminExpenseCategoryId) ?? 'Others'
 }

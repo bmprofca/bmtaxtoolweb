@@ -1,5 +1,5 @@
 import type { BankAccountRecord } from '../types/bankAccount'
-import { isBankAccountActive } from './bankAccount'
+import { filterBankAccountsForFy, isBankAccountActive } from './bankAccount'
 import type {
   AdministrativeExpenseLine,
   DepreciationRow,
@@ -12,6 +12,7 @@ import type {
 } from '../types/fs'
 import type { LoanRecord } from '../types/loan'
 import { manualNoteLineSubId } from './manualNoteLineConfig'
+import { adminExpenseSubId } from './adminExpenseCategories'
 import { isOpeningStockLinkedFromPriorYear } from './closingStockLink'
 import type { LedgerRecord } from '../types/ledger'
 import type { FinancialYear } from '../types'
@@ -109,6 +110,24 @@ export function isAdminExpenseLineCategoryLocked(
   return locks?.adminExpenseLineIds.has(lineId) ?? false
 }
 
+export function canRemoveAdministrativeExpenseLine(
+  noteSubAmounts: NoteSubAmounts | undefined,
+  lineId: string,
+  resolved?: { current: number; previous: number },
+  openingBalanceLocks?: OpeningBalanceLocks | null,
+): boolean {
+  if (isAdminExpenseLineCategoryLocked(openingBalanceLocks, lineId)) {
+    return false
+  }
+
+  const subId = adminExpenseSubId(lineId)
+  const stored = noteSubAmounts?.otherAdministrativeExpenses?.[subId]
+  const current = resolved?.current ?? stored?.current ?? 0
+  const previous = resolved?.previous ?? stored?.previous ?? 0
+
+  return current === 0 && previous === 0
+}
+
 function manualNoteLineLockKey(noteKey: keyof FsNotes, lineId: string) {
   return `${noteKey}.${lineId}`
 }
@@ -166,6 +185,7 @@ export function buildPriorYearClosingSnapshot(params: {
   previousYearBankAccounts: BankAccountRecord[]
   previousYearPlAppropriationAmounts: Record<string, { current: number; previous: number }> | null
   ledgers: LedgerRecord[]
+  fyStartYearById?: Map<string, number>
 }): PriorClosingSnapshot {
   const {
     fs,
@@ -177,7 +197,15 @@ export function buildPriorYearClosingSnapshot(params: {
     previousYearBankAccounts,
     previousYearPlAppropriationAmounts,
     ledgers,
+    fyStartYearById,
   } = params
+
+  const visibleBankAccounts = fyStartYearById
+    ? filterBankAccountsForFy(fs.bankAccounts, fyStartYear, fyStartYearById)
+    : fs.bankAccounts
+  const visiblePreviousBankAccounts = fyStartYearById
+    ? filterBankAccountsForFy(previousYearBankAccounts, fyStartYear - 1, fyStartYearById)
+    : previousYearBankAccounts
 
   const computedLoans = recomputeLoansForFy(fs.loans, fyStartYear, fyEndYear)
   const loanCalcPayload = computedLoans.map((loan) => ({
@@ -223,8 +251,8 @@ export function buildPriorYearClosingSnapshot(params: {
     cogsExtraLines: fs.cogsExtraLines ?? [],
     ledgers,
     plAppropriationTotal,
-    bankAccounts: fs.bankAccounts,
-    previousYearBankAccounts,
+    bankAccounts: visibleBankAccounts,
+    previousYearBankAccounts: visiblePreviousBankAccounts,
     cashAdjustment: {
       current: Number(fs.cashAdjustment?.current) || 0,
       previous: Number(fs.cashAdjustment?.previous) || 0,
@@ -255,8 +283,8 @@ export function buildPriorYearClosingSnapshot(params: {
     fs.otherShortTermBorrowingLines ?? [],
     fs.manualNoteLines ?? [],
     plAppropriationTotal,
-    fs.bankAccounts,
-    previousYearBankAccounts,
+    visibleBankAccounts,
+    visiblePreviousBankAccounts,
     fs.capitalAccountLines ?? [],
     fs.cogsExtraLines ?? [],
     ledgers,
@@ -279,7 +307,10 @@ export function buildPriorYearClosingSnapshot(params: {
   }
 
   const bankClosings = new Map<string, number>()
-  for (const account of fs.bankAccounts) {
+  for (const account of visibleBankAccounts) {
+    if (!isBankAccountActive(account)) {
+      continue
+    }
     bankClosings.set(account.id, account.closingBalance)
   }
 
@@ -577,7 +608,16 @@ function carryForwardBankAccounts(
     }
 
     locks.bankIds.add(account.id)
-    return { ...account, openingBalance: priorClosingBalance }
+    const hasMovement =
+      account.debit !== 0 ||
+      account.credit !== 0 ||
+      account.bankCharge !== 0 ||
+      account.interest !== 0
+    return {
+      ...account,
+      openingBalance: priorClosingBalance,
+      closingBalance: hasMovement ? account.closingBalance : priorClosingBalance,
+    }
   })
 
   const existingIds = new Set(next.map((account) => account.id))
@@ -596,6 +636,7 @@ function carryForwardBankAccounts(
       ...priorAccount,
       status: 'active',
       closedInFyId: undefined,
+      startedInFyId: priorAccount.startedInFyId,
       openingBalance: priorClosingBalance,
       debit: 0,
       credit: 0,

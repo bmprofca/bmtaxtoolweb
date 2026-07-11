@@ -2,7 +2,7 @@ function normalizeBaseUrl(url: string) {
   return url.replace(/\/$/, '')
 }
 
-function isLocalHostname(hostname: string) {
+export function isLocalHostname(hostname: string) {
   return (
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||

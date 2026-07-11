@@ -98,3 +98,12 @@
   color: #b45309;
   line-height: 1.35;
 }
+
+.bank-account-start-hint {
+  color: #4b5563;
+}
+
+.bank-account-readonly-input {
+  background: #f9fafb;
+  color: #374151;
+}

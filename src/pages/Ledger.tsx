@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { LedgerGroupSearch } from '../components/LedgerGroupSearch'
-import { fetchLedgers, saveLedgers } from '../api/ledger'
+import { fetchLedgers, invalidateLedgersCache, saveLedgers } from '../api/ledger'
 import type { LedgerRecord } from '../types/ledger'
 import type { FsNotes } from '../types/fs'
 import {
@@ -8,12 +8,16 @@ import {
   getLedgerGroupOptions,
   getNoteFieldLabel,
   filterLedgers,
+  findDuplicateLedger,
+  formatLedgerDuplicateError,
   normalizeLedgerSign,
+  normalizeLedgerRecord,
   normalizeLedgers,
 } from '../utils/ledgerUtils'
 import {
   confirmDelete,
   confirmSave,
+  showActionAlert,
   showAddedAlert,
   showDeletedAlert,
   showUpdatedAlert,
@@ -60,7 +64,8 @@ function Ledger() {
     setLoading(true)
     try {
       setError('')
-      const data = await fetchLedgers()
+      invalidateLedgersCache()
+      const data = await fetchLedgers({ fresh: true })
       setLedgers(normalizeLedgers(data.ledgers))
     } catch {
       setLedgers([])
@@ -171,6 +176,24 @@ function Ledger() {
   }
 
   const deleteLedger = async (ledger: LedgerRecord) => {
+    let latestLedger = ledger
+    try {
+      invalidateLedgersCache()
+      const data = await fetchLedgers({ fresh: true })
+      latestLedger =
+        data.ledgers.find((item) => item.id === ledger.id) ?? normalizeLedgerRecord(ledger) ?? ledger
+    } catch {
+      // Fall back to in-memory ledger when refresh fails.
+    }
+
+    if (Boolean(latestLedger.hasEntries)) {
+      await showActionAlert(
+        'Cannot delete ledger',
+        `"${latestLedger.name}" has transaction entries in current or past years and cannot be deleted.`,
+      )
+      return
+    }
+
     const confirmed = await confirmDelete({
       itemLabel: ledger.name,
     })
@@ -226,6 +249,17 @@ function Ledger() {
     const name = formName.trim()
     if (!name) {
       setModalError('Ledger name is required')
+      return
+    }
+
+    const editingId = modalMode === 'edit' ? editingLedgerId ?? '' : ''
+    const duplicate = findDuplicateLedger(ledgers, {
+      id: editingId,
+      name,
+      group: formGroup,
+    })
+    if (duplicate) {
+      setModalError(formatLedgerDuplicateError(name, formGroup, duplicate))
       return
     }
 
@@ -358,7 +392,17 @@ function Ledger() {
                 {filteredLedgers.map((ledger, index) => (
                   <tr key={ledger.id}>
                     <td className="ledger-col-sno">{index + 1}</td>
-                    <td className="ledger-col-name">{ledger.name}</td>
+                    <td className="ledger-col-name">
+                      {ledger.name}
+                      {Boolean(ledger.hasEntries) ? (
+                        <span
+                          className="ledger-in-use-badge"
+                          title="Used in financial statements — cannot delete"
+                        >
+                          In use
+                        </span>
+                      ) : null}
+                    </td>
                     <td>
                       <span className="ledger-group-badge">
                         Note {groupOptions.find((item) => item.group === ledger.group)?.noteNo}:{' '}
@@ -507,7 +551,9 @@ function Ledger() {
         </div>
       )}
 
-      {openActionsMenuId && actionsMenuPosition && (
+      {openActionsMenuId && actionsMenuPosition && (() => {
+        const openMenuLedger = ledgers.find((item) => item.id === openActionsMenuId)
+        return (
         <div
           className="ledger-actions-dropdown ledger-actions-dropdown-fixed"
           style={{
@@ -525,17 +571,27 @@ function Ledger() {
           >
             Edit
           </button>
-          <button
-            type="button"
-            className="ledger-actions-item ledger-actions-item-danger"
-            role="menuitem"
-            onClick={handleDeleteFromMenu}
-            disabled={saving}
-          >
-            Delete
-          </button>
+          {Boolean(openMenuLedger?.hasEntries) ? (
+            <span
+              className="ledger-actions-item ledger-actions-item-disabled"
+              title="Cannot delete — entries exist in current or past years"
+            >
+              Delete (in use)
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="ledger-actions-item ledger-actions-item-danger"
+              role="menuitem"
+              onClick={handleDeleteFromMenu}
+              disabled={saving}
+            >
+              Delete
+            </button>
+          )}
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

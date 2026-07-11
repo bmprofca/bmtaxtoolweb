@@ -1,4 +1,11 @@
-import { REMOTE_API_BASE, formatApiFetchError } from '../config/api'
+import { REMOTE_API_BASE, formatApiFetchError, isLocalHostname } from '../config/api'
+
+function shouldPreferLocalApi() {
+  return (
+    import.meta.env.DEV ||
+    (typeof window !== 'undefined' && isLocalHostname(window.location.hostname))
+  )
+}
 
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504])
 const MAX_ATTEMPTS = 5
@@ -41,14 +48,16 @@ function buildAuthHeaders(options?: RequestInit) {
 }
 
 function resolveRequestUrls(url: string): string[] {
+  const preferLocal = shouldPreferLocalApi()
+
   if (url.startsWith(REMOTE_API_BASE)) {
     const localUrl = `/api${url.slice(REMOTE_API_BASE.length)}`
-    return [url, localUrl]
+    return preferLocal ? [localUrl, url] : [url, localUrl]
   }
 
   if (url.startsWith('/api')) {
     const remoteUrl = `${REMOTE_API_BASE}${url.slice(4)}`
-    return [remoteUrl, url]
+    return preferLocal ? [url, remoteUrl] : [remoteUrl, url]
   }
 
   return [url]

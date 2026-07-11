@@ -12,28 +12,37 @@ export function invalidateLedgersCache() {
   ledgersInflight = null
 }
 
-export function fetchLedgers(): Promise<{ ledgers: LedgerRecord[] }> {
-  if (ledgersCache) {
+export function fetchLedgers(options?: { fresh?: boolean }): Promise<{ ledgers: LedgerRecord[] }> {
+  if (!options?.fresh && ledgersCache) {
     return Promise.resolve({ ledgers: ledgersCache })
   }
 
-  if (!ledgersInflight) {
-    ledgersInflight = request<{ ledgers: LedgerRecord[] }>(`${API_BASE}/ledgers`).then((data) => {
-      ledgersCache = data.ledgers
-      ledgersInflight = null
-      return data
-    })
+  if (!options?.fresh && ledgersInflight) {
+    return ledgersInflight
   }
+
+  ledgersInflight = request<{ ledgers: LedgerRecord[] }>(`${API_BASE}/ledgers`).then((data) => {
+    ledgersCache = (data.ledgers ?? []).map((ledger) => ({
+      ...ledger,
+      hasEntries: Boolean(ledger.hasEntries),
+    }))
+    ledgersInflight = null
+    return { ledgers: ledgersCache }
+  })
 
   return ledgersInflight
 }
 
 export function saveLedgers(ledgers: LedgerRecord[]): Promise<{ ledgers: LedgerRecord[] }> {
+  const payload = ledgers.map(({ hasEntries: _hasEntries, ...ledger }) => ledger)
   return request<{ ledgers: LedgerRecord[] }>(`${API_BASE}/ledgers`, {
     method: 'PUT',
-    body: JSON.stringify({ ledgers }),
+    body: JSON.stringify({ ledgers: payload }),
   }).then((data) => {
-    ledgersCache = data.ledgers
-    return data
+    ledgersCache = (data.ledgers ?? []).map((ledger) => ({
+      ...ledger,
+      hasEntries: Boolean(ledger.hasEntries),
+    }))
+    return { ledgers: ledgersCache }
   })
 }
