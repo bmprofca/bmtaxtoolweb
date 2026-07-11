@@ -8,6 +8,7 @@ import FsPrintTableBannerRow, { FsPrintHeadSpacerRow } from '../components/FsPri
 import '../components/FsPrintLayout.css'
 import GstRecoTab from '../components/GstRecoTab'
 import FsPrintCaSignOff from '../components/FsPrintCaSignOff'
+import { AdminExpenseLedgerPicker } from '../components/AdminExpenseLedgerPicker'
 import BankAccountModal from '../components/BankAccountModal'
 import LoanModal from '../components/LoanModal'
 import LoanCashFlowTable from '../components/LoanCashFlowTable'
@@ -622,8 +623,6 @@ function FinancialStatement() {
   const [quickEntryNoteKey, setQuickEntryNoteKey] = useState<keyof FsNotes>('capitalAccount')
   const [quickEntryNoteSearch, setQuickEntryNoteSearch] = useState('')
   const [quickEntryNoteMenuOpen, setQuickEntryNoteMenuOpen] = useState(false)
-  const [adminExpenseAddMenuOpen, setAdminExpenseAddMenuOpen] = useState(false)
-  const adminExpenseAddMenuRef = useRef<HTMLDivElement | null>(null)
   const pendingScrollTargetRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -654,21 +653,6 @@ function FinancialStatement() {
     window.addEventListener('afterprint', onAfterPrint)
     return () => window.removeEventListener('afterprint', onAfterPrint)
   }, [])
-
-  useEffect(() => {
-    if (!adminExpenseAddMenuOpen) {
-      return
-    }
-
-    const closeMenu = (event: MouseEvent) => {
-      if (!adminExpenseAddMenuRef.current?.contains(event.target as Node)) {
-        setAdminExpenseAddMenuOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', closeMenu)
-    return () => document.removeEventListener('mousedown', closeMenu)
-  }, [adminExpenseAddMenuOpen])
 
   useEffect(() => {
     if (tabFromNavigation) {
@@ -2075,17 +2059,22 @@ function FinancialStatement() {
     setSaveMessage('')
   }
 
-  const addAdministrativeExpenseLine = (categoryId: string) => {
+  const addAdministrativeExpenseLine = (
+    categoryId: string,
+    options?: { skipAvailabilityCheck?: boolean },
+  ) => {
     if (!fsData || !categoryId) {
       return
     }
 
-    const usedCategoryIds = (fsData.administrativeExpenseLines ?? []).map((line) => line.categoryId)
-    const isAvailable = getUnusedAdminExpenseLedgers(ledgers, usedCategoryIds).some(
-      (ledger) => ledger.id === categoryId,
-    )
-    if (!isAvailable) {
-      return
+    if (!options?.skipAvailabilityCheck) {
+      const usedCategoryIds = (fsData.administrativeExpenseLines ?? []).map((line) => line.categoryId)
+      const isAvailable = getUnusedAdminExpenseLedgers(ledgers, usedCategoryIds).some(
+        (ledger) => ledger.id === categoryId,
+      )
+      if (!isAvailable) {
+        return
+      }
     }
 
     const lineId = Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
@@ -2105,7 +2094,6 @@ function FinancialStatement() {
         },
       },
     })
-    setAdminExpenseAddMenuOpen(false)
     setSaveMessage('')
   }
 
@@ -2728,43 +2716,17 @@ function FinancialStatement() {
 
     if (field.key === 'otherAdministrativeExpenses') {
       const usedCategoryIds = (fsData?.administrativeExpenseLines ?? []).map((line) => line.categoryId)
-      const unusedAdminLedgers = getUnusedAdminExpenseLedgers(ledgers, usedCategoryIds)
-      const canAddAdminLine = unusedAdminLedgers.length > 0
       return (
         <div className="notes-main-label-row">
           <span>{field.label}</span>
-          <div className="notes-add-menu-wrap" ref={adminExpenseAddMenuRef}>
-            <button
-              type="button"
-              className="notes-add-round-btn"
-              onClick={() => setAdminExpenseAddMenuOpen((open) => !open)}
-              title={
-                canAddAdminLine
-                  ? 'Add administrative expense'
-                  : 'All administrative expense categories are already in use'
-              }
-              aria-label="Add administrative expense"
-              aria-expanded={adminExpenseAddMenuOpen}
-              disabled={!canAddAdminLine}
-            >
-              +
-            </button>
-            {adminExpenseAddMenuOpen && canAddAdminLine ? (
-              <div className="notes-add-menu" role="menu">
-                {unusedAdminLedgers.map((ledger) => (
-                  <button
-                    key={ledger.id}
-                    type="button"
-                    className="notes-add-menu-item"
-                    role="menuitem"
-                    onClick={() => addAdministrativeExpenseLine(ledger.id)}
-                  >
-                    {ledger.name}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
+          <AdminExpenseLedgerPicker
+            ledgers={ledgers}
+            usedCategoryIds={usedCategoryIds}
+            onSelect={(categoryId) =>
+              addAdministrativeExpenseLine(categoryId, { skipAvailabilityCheck: true })
+            }
+            onLedgersUpdated={setLedgers}
+          />
         </div>
       )
     }
@@ -3289,8 +3251,8 @@ function FinancialStatement() {
           <tr className="notes-admin-empty-row">
             <td className="notes-sno-col" />
             <td className="notes-particular-col notes-admin-empty-hint" colSpan={trailingColSpan}>
-              Click <span className="notes-admin-empty-plus">+</span> to add an expense line (add
-              ledgers in <strong>Ledger</strong> for dropdown options)
+              Click <span className="notes-admin-empty-plus">+</span> to search and add an expense
+              line — type a new name to create it in <strong>Ledger</strong> automatically
             </td>
           </tr>
         )}
