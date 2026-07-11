@@ -189,9 +189,20 @@
   background: #dbeafe;
 }
 
-.admin-expense-picker-create:disabled {
-  opacity: 0.7;
-  cursor: wait;
+.admin-expense-picker-create--existing {
+  border-style: solid;
+  border-color: #86efac;
+  background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%);
+  color: #047857;
+}
+
+.admin-expense-picker-create--existing .admin-expense-picker-create-icon {
+  background: #10b981;
+}
+
+.admin-expense-picker-create--existing:hover:not(:disabled) {
+  border-color: #22c55e;
+  background: #dcfce7;
 }
 
 .admin-expense-picker-create-icon {

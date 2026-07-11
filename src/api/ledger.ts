@@ -46,3 +46,28 @@ export function saveLedgers(ledgers: LedgerRecord[]): Promise<{ ledgers: LedgerR
     return { ledgers: ledgersCache }
   })
 }
+
+export function createLedger(
+  ledger: Pick<LedgerRecord, 'name' | 'group' | 'sign'> & { id?: string },
+): Promise<{ ledger: LedgerRecord; created: boolean }> {
+  return request<{ ledger: LedgerRecord; created: boolean }>(`${API_BASE}/ledgers`, {
+    method: 'POST',
+    body: JSON.stringify(ledger),
+  }).then((data) => {
+    const saved = {
+      ...data.ledger,
+      hasEntries: Boolean(data.ledger?.hasEntries),
+    }
+    if (ledgersCache) {
+      const existingIndex = ledgersCache.findIndex((item) => item.id === saved.id)
+      if (existingIndex >= 0) {
+        ledgersCache = ledgersCache.map((item, index) =>
+          index === existingIndex ? saved : item,
+        )
+      } else {
+        ledgersCache = [...ledgersCache, saved]
+      }
+    }
+    return { ledger: saved, created: Boolean(data.created) }
+  })
+}

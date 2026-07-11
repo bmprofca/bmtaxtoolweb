@@ -4,12 +4,11 @@ import type { CSSProperties } from 'react'
 import type { LedgerRecord } from '../types/ledger'
 import {
   findDuplicateLedger,
-  generateLedgerId,
   getLedgersForGroup,
   getUnusedAdminExpenseLedgers,
   normalizeLedgers,
 } from '../utils/ledgerUtils'
-import { invalidateLedgersCache, saveLedgers } from '../api/ledger'
+import { createLedger, fetchLedgers, invalidateLedgersCache } from '../api/ledger'
 import './AdminExpenseLedgerPicker.css'
 
 interface AdminExpenseLedgerPickerProps {
@@ -97,10 +96,26 @@ export function AdminExpenseLedgerPicker({
     [allAdminLedgers, normalizedQuery],
   )
 
+  const exactDuplicateUnused = useMemo(() => {
+    if (!normalizedQuery) {
+      return undefined
+    }
+    const duplicate = findDuplicateLedger(ledgers, {
+      id: '',
+      name: query.trim(),
+      group: 'otherAdministrativeExpenses',
+    })
+    if (!duplicate || usedIdSet.has(duplicate.id)) {
+      return undefined
+    }
+    return duplicate
+  }, [ledgers, normalizedQuery, query, usedIdSet])
+
   const canCreateFromQuery = Boolean(
     normalizedQuery &&
       !exactUnusedMatch &&
       !exactUsedMatch &&
+      !exactDuplicateUnused &&
       !findDuplicateLedger(ledgers, {
         id: '',
         name: query.trim(),
@@ -109,6 +124,7 @@ export function AdminExpenseLedgerPicker({
   )
 
   const showCreateAction = canCreateFromQuery
+  const showUseExistingAction = Boolean(exactDuplicateUnused)
   const trimmedQuery = query.trim()
 
   const updatePanelPosition = useCallback(() => {
@@ -166,6 +182,7 @@ export function AdminExpenseLedgerPicker({
     filteredUnusedLedgers.length,
     usedMatches.length,
     showCreateAction,
+    showUseExistingAction,
     updatePanelPosition,
   ])
 
@@ -223,6 +240,11 @@ export function AdminExpenseLedgerPicker({
       return
     }
 
+    if (exactDuplicateUnused) {
+      handleSelect(exactDuplicateUnused.id)
+      return
+    }
+
     const duplicate = findDuplicateLedger(ledgers, {
       id: '',
       name,
@@ -242,18 +264,23 @@ export function AdminExpenseLedgerPicker({
     setError('')
 
     try {
-      const newLedger: LedgerRecord = {
-        id: generateLedgerId(),
+      invalidateLedgersCache()
+      const result = await createLedger({
         name,
         group: 'otherAdministrativeExpenses',
         sign: 'add',
+      })
+
+      const fresh = await fetchLedgers({ fresh: true })
+      const normalized = normalizeLedgers(fresh.ledgers)
+      onLedgersUpdated(normalized)
+
+      if (usedIdSet.has(result.ledger.id)) {
+        setError(`"${result.ledger.name}" is already in this statement.`)
+        return
       }
 
-      invalidateLedgersCache()
-      const saved = await saveLedgers([...ledgers, newLedger])
-      const normalized = normalizeLedgers(saved.ledgers)
-      onLedgersUpdated(normalized)
-      handleSelect(newLedger.id)
+      handleSelect(result.ledger.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not add ledger')
     } finally {
@@ -330,6 +357,21 @@ export function AdminExpenseLedgerPicker({
               </div>
             ))}
           </div>
+        ) : null}
+
+        {showUseExistingAction && exactDuplicateUnused ? (
+          <button
+            type="button"
+            className="admin-expense-picker-create admin-expense-picker-create--existing"
+            onClick={() => handleSelect(exactDuplicateUnused.id)}
+          >
+            <span className="admin-expense-picker-create-icon" aria-hidden="true">
+              ✓
+            </span>
+            <span className="admin-expense-picker-create-text">
+              Use existing ledger &quot;{exactDuplicateUnused.name}&quot;
+            </span>
+          </button>
         ) : null}
 
         {showCreateAction ? (
