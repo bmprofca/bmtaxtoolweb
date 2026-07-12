@@ -1,20 +1,8 @@
-/* Keep off-screen on screen so the seal image loads before print (display:none blocks print in Chrome). */
-@media screen {
-  .fs-print-ca-signoff {
-    position: fixed;
-    left: -10000px;
-    top: 0;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    visibility: hidden;
-    pointer-events: none;
-    opacity: 0;
-  }
-}
-
 @media print {
-  .fs-print-ca-signoff {
+  .fs-udin-sign-banner.fs-print-ca-signoff--footer,
+  .fs-udin-sign-banner.fs-print-ca-signoff--section,
+  .fs-udin-sign-banner.fs-print-ca-signoff--balance-sheet,
+  .fs-udin-sign-banner.fs-print-ca-signoff--tab {
     position: static;
     left: auto;
     top: auto;
@@ -24,92 +12,114 @@
     visibility: visible;
     pointer-events: auto;
     opacity: 1;
-    display: flex !important;
-    justify-content: space-between;
-    align-items: flex-end;
-    gap: 10mm;
-    margin-top: 4mm;
-    color: #000;
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
+    display: block !important;
   }
 
-  .fs-print-ca-signoff--footer {
+  .fs-udin-sign-banner.fs-print-ca-signoff--footer {
     margin-top: 0;
   }
 
-  .fs-print-ca-signoff-left {
-    flex: 1;
-    min-width: 0;
-    text-align: left;
-    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif;
-    font-size: 8pt;
-    line-height: 1.35;
+  .fs-udin-sign-banner.fs-print-ca-signoff--tab {
+    display: none !important;
   }
 
-  .fs-print-ca-signoff-right {
-    flex: 0 0 auto;
-    text-align: right;
-    overflow: visible;
+  .fs-page.fs-print-all .fs-udin-sign-banner.fs-print-ca-signoff--section,
+  .fs-page.fs-print-all .fs-udin-sign-banner.fs-print-ca-signoff--balance-sheet,
+  .fs-page:not(.fs-print-all) .fs-udin-sign-banner.fs-print-ca-signoff--section,
+  .fs-page:not(.fs-print-all) .fs-udin-sign-banner.fs-print-ca-signoff--balance-sheet,
+  .fs-page.fs-print-all .fs-print-udin-closing .fs-udin-sign-banner.fs-print-ca-signoff--tab,
+  .fs-page.fs-print-udin-section .fs-tab-panel[data-fs-tab='udin-details'] .fs-udin-sign-banner.fs-print-ca-signoff--tab {
+    display: block !important;
+    margin-top: 0;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-before: avoid;
+    page-break-before: avoid;
   }
 
-  .fs-print-ca-signoff-mark,
-  .fs-print-ca-signoff-firm,
-  .fs-print-ca-signoff-name,
-  .fs-print-ca-signoff-line {
-    margin: 0;
-    padding: 0;
-    font-size: 8pt;
-    line-height: 1.35;
-    color: #000;
+  /* Sign-off sits in normal flow directly below each part's content tables. */
+  .fs-print-part-shell {
+    display: block;
+    width: 100%;
   }
 
-  .fs-print-ca-signoff-mark {
-    margin-bottom: 1mm;
+  .fs-print-part-body {
+    display: block;
+    width: 100%;
   }
 
-  .fs-print-ca-signoff-firm {
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+  .fs-print-part-signoff {
+    display: block;
+    width: 100%;
+    margin-top: 6mm;
+    padding-top: 0;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
-  .fs-print-ca-signoff-name {
-    margin-top: 0.5mm;
-    font-weight: 700;
-    letter-spacing: 0.02em;
+  .fs-print-part-shell > .fs-print-part-body > .fs-udin-print-block .fs-udin-sign-banner.fs-print-ca-signoff--tab {
+    display: block !important;
+    margin-top: 6mm;
+    padding-top: 0;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
-  .fs-print-ca-signoff-line {
-    margin-top: 0.4mm;
-    font-weight: 400;
-  }
-
-  .fs-print-ca-signoff-seal {
+  .fs-print-footer--ca-signoff,
+  .fs-print-footer--ca-signoff .fs-udin-sign-banner,
+  .fs-print-footer--ca-signoff .fs-udin-sign-banner.fs-print-ca-signoff--footer {
     display: block !important;
     visibility: visible !important;
-    max-height: 30mm;
-    max-width: 34mm;
-    min-width: 20mm;
-    min-height: 20mm;
-    width: auto;
-    height: auto;
-    object-fit: contain;
-    margin-left: auto;
+    opacity: 1 !important;
+  }
+
+  .fs-page:has(.fs-print-part-signoff) .fs-print-footer--ca-signoff,
+  .fs-page.fs-print-all:has(.fs-print-udin-closing) .fs-print-footer--ca-signoff,
+  .fs-page.fs-print-udin-section .fs-print-footer--ca-signoff {
+    display: none !important;
+  }
+
+  .fs-udin-sign-banner-body {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(34%, 42%);
+    column-gap: 8mm;
+    align-items: end;
+  }
+
+  .fs-udin-sign-banner-text {
+    grid-column: 1;
+    grid-row: 1;
+    max-width: none !important;
+  }
+
+  .fs-udin-sign-banner-client {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative;
+    z-index: 4;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+    justify-self: end;
+    width: 100%;
+    min-width: 0;
+    flex-shrink: 0;
+    background: #fff;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
 
-  .fs-print-ca-signoff--tab {
-    display: none !important;
+  .fs-udin-sign-banner-client-name,
+  .fs-udin-sign-banner-client-label,
+  .fs-udin-sign-banner-client-line {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #000 !important;
   }
 
-  .fs-page:not(.fs-print-all) .fs-tab-panel[data-fs-tab='udin-details'] .fs-print-ca-signoff--tab {
-    display: flex !important;
-    margin-top: 12mm;
-  }
-
-  .fs-page:not(.fs-print-all) .fs-print-footer--ca-signoff {
-    display: none !important;
+  .fs-udin-sign-banner-seal {
+    z-index: 2;
   }
 }

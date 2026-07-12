@@ -1,15 +1,19 @@
 import { useEffect } from 'react'
 import type { CaProfile } from '../types/caProfile'
+import FsUdinSignBanner from './FsUdinSignBanner'
 import './FsPrintCaSignOff.css'
 
 interface FsPrintCaSignOffProps {
   caProfile: CaProfile
+  clientName?: string
   udinNumber?: string
   udinDate?: string
+  sealOffsetX?: number
+  sealOffsetY?: number
   className?: string
 }
 
-function normalizeSealDataUrl(value?: string) {
+export function normalizeSealDataUrl(value?: string) {
   const trimmed = value?.trim() || ''
   if (!trimmed) {
     return ''
@@ -17,10 +21,16 @@ function normalizeSealDataUrl(value?: string) {
   if (trimmed.startsWith('data:') || trimmed.startsWith('blob:') || /^https?:\/\//i.test(trimmed)) {
     return trimmed
   }
+  if (trimmed.startsWith('/9j/')) {
+    return `data:image/jpeg;base64,${trimmed}`
+  }
+  if (trimmed.startsWith('R0lGOD')) {
+    return `data:image/gif;base64,${trimmed}`
+  }
   return `data:image/png;base64,${trimmed}`
 }
 
-function formatUdinDatePrint(value?: string) {
+export function formatUdinDatePrint(value?: string) {
   if (!value) {
     return ''
   }
@@ -34,7 +44,7 @@ function formatUdinDatePrint(value?: string) {
   return `${day}.${month}.${year}`
 }
 
-function formatCaName(partnerName: string) {
+export function formatCaNamePrint(partnerName: string) {
   const trimmed = partnerName.trim()
   if (!trimmed) {
     return ''
@@ -42,7 +52,7 @@ function formatCaName(partnerName: string) {
   return /^ca\b/i.test(trimmed) ? trimmed.toUpperCase() : `CA ${trimmed.toUpperCase()}`
 }
 
-function formatFrn(frnNumber: string) {
+export function formatFrnPrint(frnNumber: string) {
   const trimmed = frnNumber.trim()
   if (!trimmed) {
     return ''
@@ -50,15 +60,25 @@ function formatFrn(frnNumber: string) {
   return /^frn/i.test(trimmed) ? trimmed : `FRN.${trimmed}`
 }
 
-function FsPrintCaSignOff({ caProfile, udinNumber, udinDate, className }: FsPrintCaSignOffProps) {
+function FsPrintCaSignOff({
+  caProfile,
+  clientName,
+  udinNumber,
+  udinDate,
+  sealOffsetX,
+  sealOffsetY,
+  className,
+}: FsPrintCaSignOffProps) {
   const sealDataUrl = normalizeSealDataUrl(caProfile.sealSignatureDataUrl)
   const firmName = caProfile.firmName?.trim() || ''
-  const partnerName = formatCaName(caProfile.partnerName || '')
-  const frn = formatFrn(caProfile.frnNumber || '')
+  const partnerName = formatCaNamePrint(caProfile.partnerName || '')
+  const frn = formatFrnPrint(caProfile.frnNumber || '')
   const place = caProfile.place?.trim() || ''
   const formattedDate = formatUdinDatePrint(udinDate)
   const udin = udinNumber?.trim() || caProfile.udin?.trim() || ''
-  const hasDetails = Boolean(firmName || partnerName || frn || place || formattedDate || udin)
+  const hasDetails = Boolean(
+    firmName || partnerName || frn || place || formattedDate || udin || clientName?.trim(),
+  )
 
   useEffect(() => {
     if (!sealDataUrl) {
@@ -83,28 +103,15 @@ function FsPrintCaSignOff({ caProfile, udinNumber, udinDate, className }: FsPrin
   }
 
   return (
-    <div className={`fs-print-ca-signoff${className ? ` ${className}` : ''}`} aria-hidden="true">
-      <div className="fs-print-ca-signoff-left">
-        <p className="fs-print-ca-signoff-mark">sd/-</p>
-        {firmName && <p className="fs-print-ca-signoff-firm">{firmName}</p>}
-        {partnerName && <p className="fs-print-ca-signoff-name">{partnerName}</p>}
-        {frn && <p className="fs-print-ca-signoff-line">{frn}</p>}
-        {place && <p className="fs-print-ca-signoff-line">Place : {place.toUpperCase()}</p>}
-        {formattedDate && <p className="fs-print-ca-signoff-line">DATE : {formattedDate}</p>}
-        {udin && <p className="fs-print-ca-signoff-line">UDIN : {udin}</p>}
-      </div>
-      {sealDataUrl && (
-        <div className="fs-print-ca-signoff-right">
-          <img
-            src={sealDataUrl}
-            alt={caProfile.sealSignatureName || 'Seal and signature'}
-            className="fs-print-ca-signoff-seal"
-            decoding="sync"
-            loading="eager"
-          />
-        </div>
-      )}
-    </div>
+    <FsUdinSignBanner
+      caProfile={caProfile}
+      clientName={clientName}
+      udinNumber={udinNumber}
+      udinDate={udinDate}
+      sealOffsetX={sealOffsetX}
+      sealOffsetY={sealOffsetY}
+      className={className}
+    />
   )
 }
 

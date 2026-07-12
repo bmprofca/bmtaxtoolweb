@@ -1,7 +1,6 @@
 import type { FinancialYear } from '../types'
 import {
   NOTES_TABLE_SECTIONS,
-  getNoteSectionForTab,
   isNoteSectionTab,
   type NoteSectionTabId,
 } from './fsDefaults'
@@ -261,10 +260,11 @@ export function formatPrintReportPeriod(
   reportKind: 'balance-sheet' | 'profit-loss' | 'notes' | 'other',
   fy: Pick<FinancialYear, 'endYear'>,
 ): string {
+  const endDate = formatFyEndDateShort(fy.endYear)
   if (reportKind === 'balance-sheet') {
-    return formatBalanceSheetColumnLabel(fy.endYear)
+    return `As on ${endDate}`
   }
-  return formatProfitLossColumnLabelCompact(fy.endYear)
+  return `For the year ended ${endDate}`
 }
 
 export function formatPrintReportPeriodLong(
@@ -309,9 +309,8 @@ export type FsPrintTab =
   | 'udin-details'
 
 export function formatFsTabPrintTitle(tab: FsPrintTab, statementType?: string): string {
-  const noteSection = isNoteSectionTab(tab) ? getNoteSectionForTab(tab) : undefined
-  if (noteSection) {
-    return `${formatNotesReportTitle(statementType)} — ${noteSection.title}`
+  if (tab === 'notes' || isNoteSectionTab(tab)) {
+    return formatNotesReportTitle(statementType)
   }
 
   switch (tab) {
@@ -319,8 +318,6 @@ export function formatFsTabPrintTitle(tab: FsPrintTab, statementType?: string): 
       return formatBalanceSheetReportTitle(statementType)
     case 'profit-loss':
       return formatProfitLossReportTitle(statementType)
-    case 'notes':
-      return formatNotesReportTitle(statementType)
     case 'depreciation':
       return 'Depreciation Schedule'
     case 'repayment':

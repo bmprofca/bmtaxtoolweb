@@ -49,9 +49,8 @@ function ClientContextBar({
   const showBusinessSwitch = consolidatedApplicable || fyBusinesses.length > 1
 
   const goToContext = (nextFyId: string, nextBusinessId = businessId) => {
-    navigate(buildToolWorkspaceRoute(clientId, toolId, nextFyId, nextBusinessId), {
-      state: activeTab ? { activeTab } : undefined,
-    })
+    const tabQuery = activeTab ? `?tab=${encodeURIComponent(activeTab)}` : ''
+    navigate(`${buildToolWorkspaceRoute(clientId, toolId, nextFyId, nextBusinessId)}${tabQuery}`)
   }
 
   const goToToolPicker = () => {

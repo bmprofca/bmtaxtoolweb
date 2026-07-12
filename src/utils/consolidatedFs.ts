@@ -247,6 +247,23 @@ export async function loadConsolidatedFsData(
   fy: { endYear: number; closedBusinessIds?: string[] },
   fetchOne: (businessId: string) => Promise<FinancialStatementData>,
 ) {
+  const bundle = await loadConsolidatedFsBundle(clientId, fyId, businesses, fy, fetchOne)
+  return bundle.merged
+}
+
+export interface ConsolidatedFsBundle {
+  merged: FinancialStatementData
+  businesses: Business[]
+  records: FinancialStatementData[]
+}
+
+export async function loadConsolidatedFsBundle(
+  clientId: string,
+  fyId: string,
+  businesses: Business[],
+  fy: { endYear: number; closedBusinessIds?: string[] },
+  fetchOne: (businessId: string) => Promise<FinancialStatementData>,
+): Promise<ConsolidatedFsBundle> {
   const businessesForFy = getBusinessesForFy(businesses, fy)
 
   if (businessesForFy.length < 2) {
@@ -257,5 +274,9 @@ export async function loadConsolidatedFsData(
     businessesForFy.map((business) => fetchOne(business.id)),
   )
 
-  return mergeFinancialStatementData(clientId, fyId, records)
+  return {
+    merged: mergeFinancialStatementData(clientId, fyId, records),
+    businesses: businessesForFy,
+    records,
+  }
 }

@@ -1,0 +1,572 @@
+/* Print comparison column visibility and widths — modes: none | change | pct | both */
+@media print {
+  /* --- Visibility --- */
+  .fs-page.fs-print-cols-none .statement-change-col,
+  .fs-page.fs-print-cols-none .statement-pct-col,
+  .fs-page.fs-print-cols-none .notes-change-col,
+  .fs-page.fs-print-cols-none .notes-pct-col,
+  .fs-page.fs-print-cols-none .pl-appr-change-col,
+  .fs-page.fs-print-cols-none .pl-appr-pct-col {
+    display: none !important;
+  }
+
+  .fs-page.fs-print-cols-change .statement-pct-col,
+  .fs-page.fs-print-cols-change .notes-pct-col,
+  .fs-page.fs-print-cols-change .pl-appr-pct-col {
+    display: none !important;
+  }
+
+  .fs-page.fs-print-cols-pct .statement-change-col,
+  .fs-page.fs-print-cols-pct .notes-change-col,
+  .fs-page.fs-print-cols-pct .pl-appr-change-col {
+    display: none !important;
+  }
+
+  /* Notes: beat .notes-table th/td { display: table-cell !important } in FsPrintLayout.css */
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table th.notes-change-col,
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table td.notes-change-col,
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table th.notes-pct-col,
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table td.notes-pct-col,
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-change-col,
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-pct-col {
+    display: none !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table th.notes-pct-col,
+  .fs-page.fs-print-cols-change .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table td.notes-pct-col,
+  .fs-page.fs-print-cols-change .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-pct-col {
+    display: none !important;
+  }
+
+  .fs-page.fs-print-cols-pct .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table th.notes-change-col,
+  .fs-page.fs-print-cols-pct .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table td.notes-change-col,
+  .fs-page.fs-print-cols-pct .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-change-col {
+    display: none !important;
+  }
+
+  /* --- Shared: general statement / notes / P&L appropriation (no BS colgroup) --- */
+  .fs-page.fs-print-cols-none .fs-print-body .notes-sno-col,
+  .fs-page.fs-print-cols-none .fs-print-body .statement-note-col {
+    width: 8% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .notes-particular-col,
+  .fs-page.fs-print-cols-none .fs-print-body .statement-particular-col,
+  .fs-page.fs-print-cols-none .fs-print-body .pl-appr-particular-col {
+    width: 46% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .notes-amount-col,
+  .fs-page.fs-print-cols-none .fs-print-body .statement-amount-col,
+  .fs-page.fs-print-cols-none .fs-print-body .pl-appr-amount-col {
+    width: 23.5% !important;
+    text-align: right !important;
+    font-weight: 500 !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .notes-sno-col,
+  .fs-page.fs-print-cols-change .fs-print-body .statement-note-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .notes-sno-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .statement-note-col {
+    width: 7% !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .notes-particular-col,
+  .fs-page.fs-print-cols-change .fs-print-body .statement-particular-col,
+  .fs-page.fs-print-cols-change .fs-print-body .pl-appr-particular-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .notes-particular-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .statement-particular-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .pl-appr-particular-col {
+    width: 44% !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .notes-amount-col,
+  .fs-page.fs-print-cols-change .fs-print-body .statement-amount-col,
+  .fs-page.fs-print-cols-change .fs-print-body .pl-appr-amount-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .notes-amount-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .statement-amount-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .pl-appr-amount-col {
+    width: 17% !important;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .notes-change-col,
+  .fs-page.fs-print-cols-change .fs-print-body .statement-change-col,
+  .fs-page.fs-print-cols-change .fs-print-body .pl-appr-change-col {
+    width: 15% !important;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-page.fs-print-cols-pct .fs-print-body .notes-pct-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .statement-pct-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .pl-appr-pct-col {
+    width: 15% !important;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .notes-sno-col,
+  .fs-page.fs-print-cols-both .fs-print-body .statement-note-col {
+    width: 7% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .notes-particular-col,
+  .fs-page.fs-print-cols-both .fs-print-body .statement-particular-col,
+  .fs-page.fs-print-cols-both .fs-print-body .pl-appr-particular-col {
+    width: 38% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .notes-amount-col,
+  .fs-page.fs-print-cols-both .fs-print-body .statement-amount-col,
+  .fs-page.fs-print-cols-both .fs-print-body .pl-appr-amount-col {
+    width: 15% !important;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .notes-change-col,
+  .fs-page.fs-print-cols-both .fs-print-body .statement-change-col,
+  .fs-page.fs-print-cols-both .fs-print-body .pl-appr-change-col,
+  .fs-page.fs-print-cols-both .fs-print-body .notes-pct-col,
+  .fs-page.fs-print-cols-both .fs-print-body .statement-pct-col,
+  .fs-page.fs-print-cols-both .fs-print-body .pl-appr-pct-col {
+    width: 12.5% !important;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  /* --- Balance sheet --- */
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body .statement-change-col,
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body .statement-pct-col {
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body col.bs-col-change,
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body col.bs-col-pct,
+  .fs-page.fs-print-cols-change .fs-print-body .fs-balance-sheet-print-body col.bs-col-pct,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-balance-sheet-print-body col.bs-col-change {
+    width: 0 !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body col.bs-col-particular {
+    width: 60% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body col.bs-col-note {
+    width: 8% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body col.bs-col-prev,
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body col.bs-col-curr {
+    width: 16% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body .statement-particular-col {
+    width: 60% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body .statement-note-col {
+    width: 8% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body .statement-prev-col,
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body .statement-curr-col {
+    width: 16% !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-balance-sheet-print-body col.bs-col-particular,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-balance-sheet-print-body col.bs-col-particular {
+    width: 48% !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-balance-sheet-print-body col.bs-col-note,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-balance-sheet-print-body col.bs-col-note {
+    width: 7% !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-balance-sheet-print-body col.bs-col-prev,
+  .fs-page.fs-print-cols-change .fs-print-body .fs-balance-sheet-print-body col.bs-col-curr,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-balance-sheet-print-body col.bs-col-prev,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-balance-sheet-print-body col.bs-col-curr {
+    width: 15% !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-balance-sheet-print-body col.bs-col-change {
+    width: 15% !important;
+  }
+
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-balance-sheet-print-body col.bs-col-pct {
+    width: 15% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .fs-balance-sheet-print-body col.bs-col-particular {
+    width: 42% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .fs-balance-sheet-print-body col.bs-col-note {
+    width: 6% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .fs-balance-sheet-print-body col.bs-col-prev,
+  .fs-page.fs-print-cols-both .fs-print-body .fs-balance-sheet-print-body col.bs-col-curr {
+    width: 15% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .fs-balance-sheet-print-body col.bs-col-change {
+    width: 10% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .fs-balance-sheet-print-body col.bs-col-pct {
+    width: 12% !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-balance-sheet-print-body .statement-particular-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-balance-sheet-print-body .statement-particular-col {
+    width: 48% !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-balance-sheet-print-body .statement-note-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-balance-sheet-print-body .statement-note-col {
+    width: 7% !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-balance-sheet-print-body .statement-prev-col,
+  .fs-page.fs-print-cols-change .fs-print-body .fs-balance-sheet-print-body .statement-curr-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-balance-sheet-print-body .statement-prev-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-balance-sheet-print-body .statement-curr-col {
+    width: 15% !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-balance-sheet-print-body .statement-change-col {
+    width: 15% !important;
+  }
+
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-balance-sheet-print-body .statement-pct-col {
+    width: 15% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .fs-balance-sheet-print-body .statement-particular-col {
+    width: 40% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .fs-balance-sheet-print-body .statement-note-col {
+    width: 8% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .fs-balance-sheet-print-body .statement-prev-col,
+  .fs-page.fs-print-cols-both .fs-print-body .fs-balance-sheet-print-body .statement-curr-col {
+    width: 15% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .fs-balance-sheet-print-body .statement-change-col {
+    width: 10% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .fs-balance-sheet-print-body .statement-pct-col {
+    width: 12% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body .statement-curr-col,
+  .fs-page.fs-print-cols-change .fs-print-body .fs-balance-sheet-print-body .statement-curr-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-balance-sheet-print-body .statement-curr-col {
+    border-right: none !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-balance-sheet-print-body .statement-curr-col {
+    border-right: 0.5px solid #000 !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-balance-sheet-print-body .statement-change-col {
+    border-right: 0.5px solid #000 !important;
+  }
+
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-balance-sheet-print-body .statement-pct-col,
+  .fs-page.fs-print-cols-both .fs-print-body .fs-balance-sheet-print-body .statement-pct-col {
+    border-right: 0.5px solid #000 !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .statement-table-wrap--consolidated.statement-table-wrap--balance-sheet .statement-table {
+    table-layout: fixed !important;
+    font-size: 9pt !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .statement-table--consolidated {
+    --consolidated-business-col-width: calc(
+      (100% - 30% - 7% - 11%) / var(--consolidated-business-count, 2)
+    );
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .statement-table--consolidated col.bs-col-particular {
+    width: 30% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .statement-table--consolidated col.bs-col-note {
+    width: 7% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .statement-table--consolidated col.bs-col-business {
+    width: var(--consolidated-business-col-width) !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .statement-table--consolidated col.bs-col-total {
+    width: 11% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .statement-table--consolidated .statement-business-col,
+  .fs-page.fs-print-cols-none .fs-print-body .statement-table--consolidated .statement-total-col {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .statement-table--consolidated .statement-business-col,
+  .fs-page.fs-print-cols-none .fs-print-body .statement-table--consolidated .statement-total-col {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .notes-table--consolidated {
+    table-layout: fixed !important;
+    font-size: 9pt !important;
+    --consolidated-business-col-width: calc(
+      (100% - 9% - 30% - 11%) / var(--consolidated-business-count, 2)
+    );
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .notes-table--consolidated col.notes-sno-col {
+    width: 9% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .notes-table--consolidated col.notes-particular-col {
+    width: 30% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .notes-table--consolidated col.notes-business-col {
+    width: var(--consolidated-business-col-width) !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .notes-table--consolidated col.notes-total-col {
+    width: 11% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .notes-table--consolidated .notes-business-col,
+  .fs-page.fs-print-cols-none .fs-print-body .notes-table--consolidated .notes-total-col {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body .statement-table--consolidated {
+    --consolidated-business-col-width: calc(
+      (100% - 30% - 7% - 11%) / var(--consolidated-business-count, 2)
+    );
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body .statement-table--consolidated col.bs-col-particular {
+    width: 30% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body .statement-table--consolidated col.bs-col-note {
+    width: 7% !important;
+  }
+
+  /* --- P&L statement + appropriation --- */
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body col.pl-col-particular {
+    width: 60% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body col.pl-col-prev,
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body col.pl-col-curr {
+    width: 20% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body col.pl-col-change,
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body col.pl-col-pct,
+  .fs-page.fs-print-cols-change .fs-print-body .fs-profit-loss-print-body col.pl-col-pct,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-profit-loss-print-body col.pl-col-change {
+    width: 0 !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body .statement-particular-col {
+    width: 52% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body .statement-note-col {
+    width: 8% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body .pl-appr-particular-col {
+    width: 60% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body .statement-prev-col,
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body .statement-curr-col,
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body .pl-appr-prev-col,
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body .pl-appr-curr-col {
+    width: 20% !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-profit-loss-print-body col.pl-col-particular,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-profit-loss-print-body col.pl-col-particular {
+    width: 50% !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-profit-loss-print-body col.pl-col-prev,
+  .fs-page.fs-print-cols-change .fs-print-body .fs-profit-loss-print-body col.pl-col-curr,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-profit-loss-print-body col.pl-col-prev,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-profit-loss-print-body col.pl-col-curr {
+    width: 16% !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-profit-loss-print-body col.pl-col-change {
+    width: 18% !important;
+  }
+
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-profit-loss-print-body col.pl-col-pct {
+    width: 18% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .fs-profit-loss-print-body col.pl-col-particular {
+    width: 45% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .fs-profit-loss-print-body col.pl-col-prev,
+  .fs-page.fs-print-cols-both .fs-print-body .fs-profit-loss-print-body col.pl-col-curr {
+    width: 15% !important;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body .fs-profit-loss-print-body col.pl-col-change,
+  .fs-page.fs-print-cols-both .fs-print-body .fs-profit-loss-print-body col.pl-col-pct {
+    width: 12.5% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body .statement-curr-col,
+  .fs-page.fs-print-cols-none .fs-print-body .fs-profit-loss-print-body .pl-appr-curr-col {
+    border-right: 0.5px solid #000 !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-profit-loss-print-body .statement-curr-col,
+  .fs-page.fs-print-cols-change .fs-print-body .fs-profit-loss-print-body .pl-appr-curr-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-profit-loss-print-body .statement-curr-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-profit-loss-print-body .pl-appr-curr-col,
+  .fs-page.fs-print-cols-both .fs-print-body .fs-profit-loss-print-body .statement-curr-col,
+  .fs-page.fs-print-cols-both .fs-print-body .fs-profit-loss-print-body .pl-appr-curr-col {
+    border-right: none !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body .fs-profit-loss-print-body .statement-change-col,
+  .fs-page.fs-print-cols-change .fs-print-body .fs-profit-loss-print-body .pl-appr-change-col {
+    border-right: 0.5px solid #000 !important;
+  }
+
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-profit-loss-print-body .statement-pct-col,
+  .fs-page.fs-print-cols-pct .fs-print-body .fs-profit-loss-print-body .pl-appr-pct-col,
+  .fs-page.fs-print-cols-both .fs-print-body .fs-profit-loss-print-body .statement-pct-col,
+  .fs-page.fs-print-cols-both .fs-print-body .fs-profit-loss-print-body .pl-appr-pct-col {
+    border-right: 0.5px solid #000 !important;
+  }
+
+  /* --- Notes (fs-print-statement-format) --- */
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .notes-sno-col,
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .statement-note-col {
+    width: 8% !important;
+    text-align: center !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .notes-particular-col,
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .statement-particular-col {
+    width: 52% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .notes-amount-col,
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .statement-amount-col {
+    width: 20% !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-sno-col {
+    width: 8%;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-particular-col {
+    width: 52%;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-prev-col,
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-curr-col {
+    width: 20%;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-change-col,
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-pct-col {
+    width: 0;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-sno-col,
+  .fs-page.fs-print-cols-pct .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-sno-col,
+  .fs-page.fs-print-cols-both .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-sno-col {
+    width: 7%;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-particular-col,
+  .fs-page.fs-print-cols-pct .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-particular-col {
+    width: 44%;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-particular-col {
+    width: 38%;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-prev-col,
+  .fs-page.fs-print-cols-change .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-curr-col,
+  .fs-page.fs-print-cols-pct .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-prev-col,
+  .fs-page.fs-print-cols-pct .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-curr-col {
+    width: 17%;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-prev-col,
+  .fs-page.fs-print-cols-both .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-curr-col {
+    width: 15%;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-change-col {
+    width: 15%;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-pct-col {
+    width: 0;
+  }
+
+  .fs-page.fs-print-cols-pct .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-pct-col {
+    width: 15%;
+  }
+
+  .fs-page.fs-print-cols-pct .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-change-col {
+    width: 0;
+  }
+
+  .fs-page.fs-print-cols-both .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-change-col,
+  .fs-page.fs-print-cols-both .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-pct-col {
+    width: 12.5%;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .notes-curr-col,
+  .fs-page.fs-print-cols-change .fs-print-body.fs-print-statement-format .notes-curr-col,
+  .fs-page.fs-print-cols-pct .fs-print-body.fs-print-statement-format .notes-curr-col,
+  .fs-page.fs-print-cols-both .fs-print-body.fs-print-statement-format .notes-curr-col {
+    border-right: none !important;
+  }
+
+  .fs-page.fs-print-cols-none .fs-print-body.fs-print-statement-format .notes-curr-col {
+    border-right: 0.5px solid #000 !important;
+  }
+
+  .fs-page.fs-print-cols-change .fs-print-body.fs-print-statement-format .notes-change-col {
+    border-right: 0.5px solid #000 !important;
+  }
+
+  .fs-page.fs-print-cols-pct .fs-print-body.fs-print-statement-format .notes-pct-col,
+  .fs-page.fs-print-cols-both .fs-print-body.fs-print-statement-format .notes-pct-col {
+    border-right: 0.5px solid #000 !important;
+  }
+}

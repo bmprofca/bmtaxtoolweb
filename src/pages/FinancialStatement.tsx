@@ -1,13 +1,13 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import FsContextBar from '../components/FsContextBar'
 import FsPrintLayout from '../components/FsPrintLayout'
-import FsPrintSectionStationery from '../components/FsPrintSectionStationery'
-import FsPrintTableBannerRow, { FsPrintHeadSpacerRow } from '../components/FsPrintTableBannerRow'
 import '../components/FsPrintLayout.css'
+import PrintFooter from '../print/PrintFooter'
 import GstRecoTab from '../components/GstRecoTab'
-import FsPrintCaSignOff from '../components/FsPrintCaSignOff'
+import { formatUdinDatePrint, normalizeSealDataUrl } from '../components/FsPrintCaSignOff'
+import FsUdinSignBanner from '../components/FsUdinSignBanner'
 import { AdminExpenseLedgerPicker } from '../components/AdminExpenseLedgerPicker'
 import BankAccountModal from '../components/BankAccountModal'
 import LoanModal from '../components/LoanModal'
@@ -25,6 +25,7 @@ import {
   saveDepreciationSchedule,
   saveFsData,
   saveLoans,
+  saveUdinDetails,
 } from '../api/fs'
 import { fetchLedgers } from '../api/ledger'
 import type { Client } from '../types'
@@ -62,6 +63,14 @@ import {
 } from '../utils/fsEngine'
 import { resolveYearDisplaySnapshot, type YearDisplaySnapshotChain } from '../utils/yearDisplaySnapshot'
 import { buildExportBusinessHeaderHtml, buildExportBusinessHeaderLines } from '../utils/printExportHeader'
+import {
+  buildConsolidatedStatementDisplayLines,
+  buildBalanceSheetLinesForFsRecord,
+  buildProfitLossLinesForFsRecord,
+  buildFsDerivedForFsRecord,
+  consolidatedBusinessColumnsFromBusinesses,
+  getConsolidatedNoteSubBusinessValues,
+} from '../utils/consolidatedStatement'
 import { buildBalanceSheetLines, balanceSheetRowId, isBalanceSheetNoteNo, NOTE_SUB_BALANCE_SHEET_REFS } from '../utils/balanceSheetBuilder'
 import { isProfitLossNoteNo, profitLossRowId, NOTE_SUB_PL_REFS } from '../utils/plBuilder'
 import {
@@ -237,7 +246,8 @@ import {
   CONSOLIDATED_BUSINESS_LABEL,
   isConsolidatedApplicableForFy,
   isConsolidatedBusinessId,
-  loadConsolidatedFsData,
+  loadConsolidatedFsBundle,
+  type ConsolidatedFsBundle,
 } from '../utils/consolidatedFs'
 import {
   confirmDelete,
@@ -253,6 +263,7 @@ import {
 import type { LedgerRecord } from '../types/ledger'
 import type { GstRecoStatement } from '../types/gst'
 import PageRefreshButton from '../components/PageRefreshButton'
+import { useFinancialStatementPrint } from '../hooks/useFinancialStatementPrint'
 import '../styles/shared.css'
 import './FinancialStatement.css'
 
@@ -275,17 +286,25 @@ const CONSOLIDATED_REPORT_TABS: FsTab[] = [
   ...NOTE_SECTION_TAB_IDS,
 ]
 
-const PRINT_ALL_TAB_ORDER: FsTab[] = [
-  'balance-sheet',
-  'profit-loss',
+const FS_TAB_IDS = new Set<FsTab>([
   'notes',
   ...NOTE_SECTION_TAB_IDS,
+  'balance-sheet',
+  'profit-loss',
   'depreciation',
   'repayment',
   'bank-account',
   'gst-reco',
+  'final-info',
   'udin-details',
-]
+])
+
+function parseFsTabParam(value: string | null): FsTab | null {
+  if (!value || !FS_TAB_IDS.has(value as FsTab)) {
+    return null
+  }
+  return value as FsTab
+}
 
 function normalizeUdinDetails(value?: Partial<UdinDetails> | null): UdinDetails {
   return {
@@ -295,7 +314,19 @@ function normalizeUdinDetails(value?: Partial<UdinDetails> | null): UdinDetails 
     udinDate: value?.udinDate?.trim() || '',
     caPartnerName: value?.caPartnerName?.trim() || '',
     caFirmName: value?.caFirmName?.trim() || '',
+    sealAttachmentName: value?.sealAttachmentName?.trim() || '',
+    sealAttachmentDataUrl: value?.sealAttachmentDataUrl?.trim() || '',
+    sealOffsetX: clampSealOffsetPercent(value?.sealOffsetX, 82),
+    sealOffsetY: clampSealOffsetPercent(value?.sealOffsetY, 50),
   }
+}
+
+function clampSealOffsetPercent(value: unknown, fallback: number) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) {
+    return fallback
+  }
+  return Math.min(100, Math.max(0, parsed))
 }
 
 function normalizeCashAdjustment(value?: Partial<CashAdjustment> | null): CashAdjustment {
@@ -357,6 +388,8 @@ function StatementTable({
   wrapperClassName,
   printBanner,
   printHeadSpacer,
+  swapAmountColumns = false,
+  consolidatedBusinessColumns,
 }: {
   title: string
   lines: StatementLine[]
@@ -371,6 +404,8 @@ function StatementTable({
   wrapperClassName?: string
   printBanner?: ReactNode
   printHeadSpacer?: ReactNode
+  swapAmountColumns?: boolean
+  consolidatedBusinessColumns?: { id: string; name: string }[]
 }) {
   const formatValue = useStatementAmountFormat ? formatStatementAmount : formatAmount
 
@@ -424,8 +459,15 @@ function StatementTable({
     return <td className="statement-note-col">{row.noteNo}</td>
   }
 
-  const colSpan = showNoteColumn ? 6 : 5
+  const consolidatedMode = Boolean(consolidatedBusinessColumns && consolidatedBusinessColumns.length > 0)
+  const businessColumnCount = consolidatedBusinessColumns?.length ?? 0
+  const colSpan = consolidatedMode
+    ? (showNoteColumn ? 2 : 1) + businessColumnCount + 1
+    : showNoteColumn
+      ? 6
+      : 5
   const isBalanceSheetTable = wrapperClassName?.includes('balance-sheet') ?? false
+  const useStatementColGroup = isBalanceSheetTable || consolidatedMode
 
   const renderColumnHeaderLabel = (screenLabel: string, printLabel?: string) => {
     const print = printLabel?.trim() || screenLabel
@@ -441,19 +483,131 @@ function StatementTable({
     )
   }
 
+  const amountHeaderCells = swapAmountColumns ? (
+    <>
+      <th className="statement-amount-col statement-prev-col">
+        {renderColumnHeaderLabel(previousLabel, printPreviousLabel)}
+      </th>
+      <th className="statement-amount-col statement-curr-col">
+        {renderColumnHeaderLabel(currentLabel, printCurrentLabel)}
+      </th>
+    </>
+  ) : (
+    <>
+      <th className="statement-amount-col statement-curr-col">
+        {renderColumnHeaderLabel(currentLabel, printCurrentLabel)}
+      </th>
+      <th className="statement-amount-col statement-prev-col">
+        {renderColumnHeaderLabel(previousLabel, printPreviousLabel)}
+      </th>
+    </>
+  )
+
+  const renderAmountCells = (row: StatementLine, blankAmounts: boolean) =>
+    swapAmountColumns ? (
+      <>
+        <td className="statement-amount-col statement-prev-col">
+          {renderAmount(row.previous, 'prev', blankAmounts)}
+        </td>
+        <td className="statement-amount-col statement-curr-col">
+          {renderAmount(row.current, 'curr', blankAmounts)}
+        </td>
+      </>
+    ) : (
+      <>
+        <td className="statement-amount-col statement-curr-col">
+          {renderAmount(row.current, 'curr', blankAmounts)}
+        </td>
+        <td className="statement-amount-col statement-prev-col">
+          {renderAmount(row.previous, 'prev', blankAmounts)}
+        </td>
+      </>
+    )
+
+  const renderConsolidatedAmountCells = (row: StatementLine, blankAmounts: boolean) => {
+    const businessValues = row.businessCurrentValues ?? {}
+    const totalValue = blankAmounts
+      ? row.current
+      : consolidatedBusinessColumns!.reduce(
+          (sum, business) => sum + (businessValues[business.id] ?? 0),
+          0,
+        )
+
+    return (
+      <>
+        {consolidatedBusinessColumns!.map((business) => (
+          <td
+            key={business.id}
+            className="statement-amount-col statement-business-col"
+            data-business-id={business.id}
+          >
+            {renderAmount(businessValues[business.id] ?? 0, 'curr', blankAmounts)}
+          </td>
+        ))}
+        <td className="statement-amount-col statement-total-col">
+          {renderAmount(totalValue, 'curr', blankAmounts)}
+        </td>
+      </>
+    )
+  }
+
+  const consolidatedHeaderCells = consolidatedBusinessColumns?.map((business) => (
+    <th
+      key={business.id}
+      className="statement-amount-col statement-business-col"
+      data-business-id={business.id}
+      title={business.name}
+    >
+      <span className="statement-fy-label statement-fy-label--unified">{business.name}</span>
+    </th>
+  ))
+
   return (
-    <div className={`statement-table-wrap${wrapperClassName ? ` ${wrapperClassName}` : ''}`}>
+    <div
+      className={`statement-table-wrap${wrapperClassName ? ` ${wrapperClassName}` : ''}${
+        consolidatedMode ? ' statement-table-wrap--consolidated' : ''
+      }`}
+    >
       <h3>{title}</h3>
       <div className="table-wrap statement-table-container">
-        <table className={`statement-table${showNoteColumn ? ' has-note-col' : ''}`}>
-          {isBalanceSheetTable && (
+        <table
+          className={`statement-table${showNoteColumn ? ' has-note-col' : ''}${
+            consolidatedMode ? ' statement-table--consolidated' : ''
+          }`}
+          style={
+            consolidatedMode
+              ? ({ '--consolidated-business-count': businessColumnCount } as CSSProperties)
+              : undefined
+          }
+        >
+          {useStatementColGroup && (
             <colgroup>
               <col className="bs-col-particular" />
-              <col className="bs-col-note" />
-              <col className="bs-col-curr" />
-              <col className="bs-col-prev" />
-              <col className="bs-col-change" />
-              <col className="bs-col-pct" />
+              {showNoteColumn && <col className="bs-col-note" />}
+              {consolidatedMode ? (
+                <>
+                  {consolidatedBusinessColumns!.map((business) => (
+                    <col key={business.id} className="bs-col-business" data-business-id={business.id} />
+                  ))}
+                  <col className="bs-col-total" />
+                </>
+              ) : swapAmountColumns ? (
+                <>
+                  <col className="bs-col-prev" />
+                  <col className="bs-col-curr" />
+                </>
+              ) : (
+                <>
+                  <col className="bs-col-curr" />
+                  <col className="bs-col-prev" />
+                </>
+              )}
+              {!consolidatedMode && (
+                <>
+                  <col className="bs-col-change" />
+                  <col className="bs-col-pct" />
+                </>
+              )}
             </colgroup>
           )}
           <thead>
@@ -462,18 +616,24 @@ function StatementTable({
             <tr className="statement-head-row">
               <th className="statement-particular-col">Particulars</th>
               {showNoteColumn && <th className="statement-note-col">Note</th>}
-              <th className="statement-amount-col statement-curr-col">
-                {renderColumnHeaderLabel(currentLabel, printCurrentLabel)}
-              </th>
-              <th className="statement-amount-col statement-prev-col">
-                {renderColumnHeaderLabel(previousLabel, printPreviousLabel)}
-              </th>
-              <th className="statement-variance-col statement-change-col">
-                <span className="statement-fy-label">Change</span>
-              </th>
-              <th className="statement-variance-col statement-pct-col">
-                <span className="statement-fy-label">% Change</span>
-              </th>
+              {consolidatedMode ? (
+                <>
+                  {consolidatedHeaderCells}
+                  <th className="statement-amount-col statement-total-col">
+                    <span className="statement-fy-label">Total</span>
+                  </th>
+                </>
+              ) : (
+                <>
+                  {amountHeaderCells}
+                  <th className="statement-variance-col statement-change-col">
+                    <span className="statement-fy-label">Change</span>
+                  </th>
+                  <th className="statement-variance-col statement-pct-col">
+                    <span className="statement-fy-label">% Change</span>
+                  </th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -543,13 +703,10 @@ function StatementTable({
                     {row.label}
                   </td>
                   {showNoteColumn && renderNoteCell(row)}
-                  <td className="statement-amount-col statement-curr-col">
-                    {renderAmount(row.current, 'curr', blankAmounts)}
-                  </td>
-                  <td className="statement-amount-col statement-prev-col">
-                    {renderAmount(row.previous, 'prev', blankAmounts)}
-                  </td>
-                  {renderVariance(change, pct, blankAmounts)}
+                  {consolidatedMode
+                    ? renderConsolidatedAmountCells(row, blankAmounts)
+                    : renderAmountCells(row, blankAmounts)}
+                  {!consolidatedMode && renderVariance(change, pct, blankAmounts)}
                 </tr>
               )
             })}
@@ -567,18 +724,19 @@ function FinancialStatement() {
     businessId: string
   }>()
   const navigate = useNavigate()
-  const location = useLocation()
-  const tabFromNavigation = (location.state as { activeTab?: FsTab } | null)?.activeTab
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabFromUrl = parseFsTabParam(searchParams.get('tab'))
   const isConsolidatedView = isConsolidatedBusinessId(businessId)
 
   const [client, setClient] = useState<Client | null>(null)
   const [fsData, setFsData] = useState<FinancialStatementData | null>(null)
+  const [consolidatedFsBundle, setConsolidatedFsBundle] = useState<ConsolidatedFsBundle | null>(null)
   const [ledgers, setLedgers] = useState<LedgerRecord[]>([])
   const [depreciationHistory, setDepreciationHistory] = useState<AssetDepreciationHistoryRow[]>([])
   const [priorDepClosingsByLedgerId, setPriorDepClosingsByLedgerId] = useState<Map<string, number>>(
     new Map(),
   )
-  const [activeTab, setActiveTab] = useState<FsTab>(tabFromNavigation ?? 'notes')
+  const [activeTab, setActiveTab] = useState<FsTab>(tabFromUrl ?? 'notes')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -611,12 +769,6 @@ function FinancialStatement() {
   const [highlightedBankId, setHighlightedBankId] = useState<string | null>(null)
   const [openingBalanceLocks, setOpeningBalanceLocks] = useState<OpeningBalanceLocks | null>(null)
   const [caProfiles, setCaProfiles] = useState<CaProfile[]>([])
-  const [printAll, setPrintAll] = useState(false)
-  const [printAllModalOpen, setPrintAllModalOpen] = useState(false)
-  const [printAllSelection, setPrintAllSelection] = useState<Set<FsTab>>(new Set())
-  const [printAllSelectedTabs, setPrintAllSelectedTabs] = useState<Set<FsTab> | null>(null)
-  const [printAllSelectionError, setPrintAllSelectionError] = useState('')
-  const [printComparison, setPrintComparison] = useState(false)
   const [cashAdjustConfirmOpen, setCashAdjustConfirmOpen] = useState(false)
   const [unlockConfirmationCode, setUnlockConfirmationCode] = useState('')
   const [quickEntryOpen, setQuickEntryOpen] = useState(false)
@@ -646,22 +798,12 @@ function FinancialStatement() {
   )
 
   useEffect(() => {
-    const onAfterPrint = () => {
-      setPrintAll(false)
-      setPrintAllSelectedTabs(null)
+    const nextTab = tabFromUrl ?? 'notes'
+    setActiveTab((current) => (current === nextTab ? current : nextTab))
+    if (!tabFromUrl) {
+      setSearchParams({ tab: 'notes' }, { replace: true })
     }
-    window.addEventListener('afterprint', onAfterPrint)
-    return () => window.removeEventListener('afterprint', onAfterPrint)
-  }, [])
-
-  useEffect(() => {
-    if (tabFromNavigation) {
-      setActiveTab(tabFromNavigation)
-      return
-    }
-    // When opening FS from matrix links (no navigation state), always start on Notes.
-    setActiveTab('notes')
-  }, [tabFromNavigation, clientId, fyId, businessId])
+  }, [tabFromUrl, clientId, fyId, businessId, setSearchParams])
 
   useEffect(() => {
     if (!highlightedNote) {
@@ -807,6 +949,7 @@ function FinancialStatement() {
 
   const switchFsTab = (tab: FsTab, options?: { scrollToTop?: boolean }) => {
     setActiveTab(tab)
+    setSearchParams({ tab }, { replace: true })
     if (options?.scrollToTop !== false) {
       requestAnimationFrame(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -972,13 +1115,20 @@ function FinancialStatement() {
       ): Promise<FinancialStatementData | null> => {
         try {
           if (isConsolidatedView) {
-            return await loadConsolidatedFsData(
+            const bundle = await loadConsolidatedFsBundle(
               clientId,
               targetFyId,
               clientData.businesses,
               targetFyMeta || { endYear: new Date().getFullYear(), closedBusinessIds: [] },
               (targetBusinessId) => fetchFsData(clientId, targetFyId, targetBusinessId),
             )
+            if (targetFyId === fyId) {
+              setConsolidatedFsBundle(bundle)
+            }
+            return bundle.merged
+          }
+          if (targetFyId === fyId) {
+            setConsolidatedFsBundle(null)
           }
           return await fetchFsData(clientId, targetFyId, businessId)
         } catch {
@@ -1617,6 +1767,40 @@ function FinancialStatement() {
     [fsVisibleTabs],
   )
 
+  const tabHasPrintContentForPrint = useCallback(
+    (tab: FsTab): boolean => {
+      if (!fsData) {
+        return false
+      }
+      const assets = getFixedAssetLedgers(ledgers)
+      const udin = normalizeUdinDetails(fsData.udinDetails)
+      switch (tab) {
+        case 'depreciation':
+          return assets.length > 0 && fsData.depreciationSchedule.length > 0
+        case 'repayment':
+          return fsData.loans.length > 0
+        case 'bank-account':
+          return fsData.bankAccounts.length > 0
+        case 'udin-details':
+          return Boolean(
+            udin.enabled &&
+              (udin.udinNumber?.trim() ||
+                udin.caProfileId ||
+                udin.caPartnerName?.trim() ||
+                udin.caFirmName?.trim()),
+          )
+        default:
+          return true
+      }
+    },
+    [fsData, ledgers],
+  )
+
+  const printTitleForTabFn = useCallback(
+    (tab: FsTab) => formatFsTabPrintTitle(tab, normalizeStatementType(fy?.statementType)),
+    [fy?.statementType],
+  )
+
   useEffect(() => {
     if (isConsolidatedView && !CONSOLIDATED_REPORT_TABS.includes(resolvedActiveTab)) {
       setActiveTab('balance-sheet')
@@ -1651,6 +1835,105 @@ function FinancialStatement() {
             createdAt: '',
           }
         : undefined))
+  const {
+    printAll,
+    printAllModalOpen,
+    setPrintAllModalOpen,
+    printAllSelection,
+    setPrintAllSelection,
+    printAllSelectedTabs,
+    printAllSelectionError,
+    setPrintAllSelectionError,
+    printValueChange,
+    setPrintValueChange,
+    printPercentChange,
+    setPrintPercentChange,
+    printComparisonLayout,
+    printableTabsInPrintOrder,
+    hidePrintHeader,
+    isNotesPrintOutput,
+    isNotesOnlyPrintAll,
+    isGstPrintOutput,
+    isGstOnlyPrintAll,
+    isBalanceSheetPrintOutput,
+    isBalanceSheetOnlyPrintOutput,
+    isNotesRelatedTab,
+    mergedNoteSectionsForPrint,
+    firstSelectedNoteSectionTab,
+    shouldPrintMergedNotes,
+    renderPrintHeadSpacer,
+    renderPrintTableBanner,
+    renderPrintSectionStationery,
+    printTabExtraClass,
+    handlePrint,
+    togglePrintAllSelection,
+    confirmPrintAll,
+  } = useFinancialStatementPrint({
+    printableTabSet,
+    tabHasPrintContent: tabHasPrintContentForPrint,
+    resolvedActiveTab,
+    printTitleForTab: printTitleForTabFn,
+    fy,
+    client: client ?? ({ name: '', address: '', pin: '' } as Client),
+    business: business ?? null,
+    isConsolidatedView,
+  })
+
+  const udinDetailsForPrint = normalizeUdinDetails(fsData?.udinDetails)
+  const selectedUdinCaForPrint = udinDetailsForPrint.caProfileId
+    ? caProfiles.find((profile) => profile.id === udinDetailsForPrint.caProfileId) || null
+    : null
+  const effectivePrintCaProfileForHooks = selectedUdinCaForPrint
+    ? {
+        ...selectedUdinCaForPrint,
+        udin: udinDetailsForPrint.udinNumber || selectedUdinCaForPrint.udin,
+        sealSignatureName:
+          udinDetailsForPrint.sealAttachmentName || selectedUdinCaForPrint.sealSignatureName,
+        sealSignatureDataUrl:
+          udinDetailsForPrint.sealAttachmentDataUrl || selectedUdinCaForPrint.sealSignatureDataUrl,
+      }
+    : EMPTY_CA_PROFILE
+  const printUdinApplicableForHooks =
+    !isConsolidatedView && udinDetailsForPrint.enabled && Boolean(udinDetailsForPrint.caProfileId)
+  const hasPrintCaSealForHooks = Boolean(
+    normalizeSealDataUrl(effectivePrintCaProfileForHooks.sealSignatureDataUrl),
+  )
+
+  const ensureCaSealForPrint = useCallback(async () => {
+    if (!printUdinApplicableForHooks) {
+      return true
+    }
+    if (hasPrintCaSealForHooks) {
+      return true
+    }
+    await showActionAlert(
+      'CA seal required',
+      'Attach a CA seal in UDIN Details before printing documents.',
+    )
+    return false
+  }, [hasPrintCaSealForHooks, printUdinApplicableForHooks])
+
+  const onPrintCurrent = useCallback(async () => {
+    if (!(await ensureCaSealForPrint())) {
+      return
+    }
+    handlePrint('current')
+  }, [ensureCaSealForPrint, handlePrint])
+
+  const onPrintAll = useCallback(async () => {
+    if (!(await ensureCaSealForPrint())) {
+      return
+    }
+    handlePrint('all')
+  }, [ensureCaSealForPrint, handlePrint])
+
+  const onConfirmPrintAll = useCallback(async () => {
+    if (!(await ensureCaSealForPrint())) {
+      return
+    }
+    confirmPrintAll()
+  }, [confirmPrintAll, ensureCaSealForPrint])
+
   const hasLoans = (fsData?.loans.length ?? 0) > 0
   const previousFyLabel = fy
     ? buildShortFyLabel(fy.startYear - 1, fy.endYear - 1)
@@ -1669,8 +1952,6 @@ function FinancialStatement() {
     resolvedActiveTab === 'repayment' ||
     printAll ||
     Boolean(printAllSelectedTabs && printAllSelectedTabs.size > 0)
-
-  const isNotesRelatedTab = (tab: FsTab) => tab === 'notes' || isNoteSectionTab(tab)
 
   const isTabMounted = (tab: FsTab) =>
     printAll ||
@@ -1895,6 +2176,85 @@ function FinancialStatement() {
       fixedAssetRows: noteSubRowsMap.depreciationAmortization,
     })
   }, [effectiveNotes, noteSubRowsMap])
+
+  const consolidatedBusinessColumns = useMemo(() => {
+    if (!isConsolidatedView || !consolidatedFsBundle) {
+      return undefined
+    }
+    return consolidatedBusinessColumnsFromBusinesses(consolidatedFsBundle.businesses)
+  }, [isConsolidatedView, consolidatedFsBundle])
+
+  const displayBalanceSheetLines = useMemo(() => {
+    if (
+      !isConsolidatedView ||
+      !consolidatedBusinessColumns ||
+      !consolidatedFsBundle ||
+      !fy ||
+      balanceSheetLines.length === 0
+    ) {
+      return balanceSheetLines
+    }
+
+    const perBusinessLines = consolidatedFsBundle.records.map((record) =>
+      buildBalanceSheetLinesForFsRecord(record, fy, ledgers),
+    )
+
+    return buildConsolidatedStatementDisplayLines(
+      balanceSheetLines,
+      consolidatedBusinessColumns,
+      perBusinessLines,
+    )
+  }, [
+    balanceSheetLines,
+    consolidatedBusinessColumns,
+    consolidatedFsBundle,
+    fy,
+    isConsolidatedView,
+    ledgers,
+  ])
+
+  const displayProfitLossLines = useMemo(() => {
+    if (
+      !isConsolidatedView ||
+      !consolidatedBusinessColumns ||
+      !consolidatedFsBundle ||
+      !fy ||
+      !computed?.profitAndLoss.length
+    ) {
+      return computed?.profitAndLoss ?? []
+    }
+
+    const perBusinessLines = consolidatedFsBundle.records.map((record) =>
+      buildProfitLossLinesForFsRecord(record, fy, ledgers),
+    )
+
+    return buildConsolidatedStatementDisplayLines(
+      computed.profitAndLoss,
+      consolidatedBusinessColumns,
+      perBusinessLines,
+    )
+  }, [
+    computed?.profitAndLoss,
+    consolidatedBusinessColumns,
+    consolidatedFsBundle,
+    fy,
+    isConsolidatedView,
+    ledgers,
+  ])
+
+  const consolidatedPerBusinessDerived = useMemo(() => {
+    if (!isConsolidatedView || !consolidatedFsBundle || !fy) {
+      return null
+    }
+
+    return consolidatedFsBundle.records.map((record) =>
+      buildFsDerivedForFsRecord(record, fy, ledgers),
+    )
+  }, [consolidatedFsBundle, fy, isConsolidatedView, ledgers])
+
+  const consolidatedNotesAmountColSpan = consolidatedBusinessColumns
+    ? consolidatedBusinessColumns.length + 1
+    : 0
 
   const sourcesOfFundsLines = useMemo(() => {
     const applicationHeaderIndex = balanceSheetLines.findIndex(
@@ -2572,18 +2932,65 @@ function FinancialStatement() {
     )
   }
 
-  const renderEmptyNoteHeadCells = (hideVariance = false) => (
-    <>
-      <td className="notes-amount-col notes-curr-col notes-head-empty-col" aria-hidden="true" />
-      <td className="notes-amount-col notes-prev-col notes-head-empty-col" aria-hidden="true" />
-      {!hideVariance && (
+  const renderEmptyNoteHeadCells = (hideVariance = false) => {
+    if (consolidatedBusinessColumns && consolidatedPerBusinessDerived) {
+      return (
         <>
-          <td className="notes-variance-col notes-change-col notes-head-empty-col" aria-hidden="true" />
-          <td className="notes-variance-col notes-pct-col notes-head-empty-col" aria-hidden="true" />
+          {consolidatedBusinessColumns.map((business) => (
+            <td
+              key={business.id}
+              className="notes-amount-col notes-business-col notes-head-empty-col"
+              aria-hidden="true"
+            />
+          ))}
+          <td className="notes-amount-col notes-total-col notes-head-empty-col" aria-hidden="true" />
         </>
-      )}
-    </>
-  )
+      )
+    }
+
+    return (
+      <>
+        <td className="notes-amount-col notes-curr-col notes-head-empty-col" aria-hidden="true" />
+        <td className="notes-amount-col notes-prev-col notes-head-empty-col" aria-hidden="true" />
+        {!hideVariance && (
+          <>
+            <td className="notes-variance-col notes-change-col notes-head-empty-col" aria-hidden="true" />
+            <td className="notes-variance-col notes-pct-col notes-head-empty-col" aria-hidden="true" />
+          </>
+        )}
+      </>
+    )
+  }
+
+  const renderConsolidatedNoteValueCells = (noteKey: keyof FsNotes, sub: ResolvedSubRow) => {
+    const businessValues = getConsolidatedNoteSubBusinessValues(
+      consolidatedPerBusinessDerived!,
+      consolidatedBusinessColumns!,
+      noteKey,
+      sub,
+    )
+    const total = Object.values(businessValues).reduce((sum, value) => sum + value, 0)
+
+    return (
+      <>
+        {consolidatedBusinessColumns!.map((business) => {
+          const value = businessValues[business.id] ?? 0
+          return (
+            <td key={business.id} className="notes-amount-col notes-business-col">
+              <span className="note-amount-print">
+                {value ? formatSubAmount(value, sub.kind) : '—'}
+              </span>
+            </td>
+          )
+        })}
+        <td className="notes-amount-col notes-total-col">
+          <span className="note-amount-print">
+            {total ? formatSubAmount(total, sub.kind) : '—'}
+          </span>
+        </td>
+      </>
+    )
+  }
 
   const renderRepaymentScheduleLinkHeader = (
     field: (typeof NOTE_FIELDS)[number],
@@ -3113,7 +3520,14 @@ function FinancialStatement() {
 
   const renderNoteSubRows = (noteKey: keyof FsNotes, options?: { hideVariance?: boolean }) => {
     const hideVariance = options?.hideVariance ?? false
-    const trailingColSpan = hideVariance ? 3 : 5
+    const consolidatedNotesMode = Boolean(
+      consolidatedBusinessColumns && consolidatedPerBusinessDerived,
+    )
+    const trailingColSpan = consolidatedNotesMode
+      ? consolidatedNotesAmountColSpan
+      : hideVariance
+        ? 3
+        : 5
     const subRows = noteSubRowsMap?.[noteKey] ?? []
     const isAdminNote = noteKey === 'otherAdministrativeExpenses'
     const isFinanceNote = noteKey === 'financeCost'
@@ -3360,13 +3774,19 @@ function FinancialStatement() {
                   : null}
               </td>
               <td className="notes-particular-col notes-sub-label">{renderSubLabel(sub)}</td>
-              <td className="notes-amount-col notes-curr-col">
-                {renderSubCurrentCell(noteKey, sub)}
-              </td>
-              <td className="notes-amount-col notes-prev-col">
-                {renderSubPreviousRef(sub, noteKey)}
-              </td>
-              {!hideVariance && renderSubVarianceCells(sub)}
+              {consolidatedNotesMode ? (
+                renderConsolidatedNoteValueCells(noteKey, sub)
+              ) : (
+                <>
+                  <td className="notes-amount-col notes-curr-col">
+                    {renderSubCurrentCell(noteKey, sub)}
+                  </td>
+                  <td className="notes-amount-col notes-prev-col">
+                    {renderSubPreviousRef(sub, noteKey)}
+                  </td>
+                  {!hideVariance && renderSubVarianceCells(sub)}
+                </>
+              )}
             </tr>
           )
         })}
@@ -4065,67 +4485,115 @@ function FinancialStatement() {
     )
   }
 
-  const renderNotesTableHead = (showPrintBanner: boolean) => (
+  const renderNotesTableHead = () => (
     <thead>
-      {showPrintBanner && renderPrintHeadSpacer('notes', notesPrintColSpan)}
-      {showPrintBanner && renderPrintTableBanner('notes', notesPrintColSpan)}
+      {renderPrintHeadSpacer('notes', consolidatedBusinessColumns ? 2 + consolidatedNotesAmountColSpan : 6)}
+      {renderPrintTableBanner('notes', consolidatedBusinessColumns ? 2 + consolidatedNotesAmountColSpan : 6)}
       <tr className="notes-head-row">
         <th className="notes-sno-col">Note</th>
         <th className="notes-particular-col">Particulars</th>
-        <th className="notes-amount-col notes-curr-col">
-          <span className="notes-fy-label statement-fy-label--unified">{notesCurrentColumnLabel}</span>
-        </th>
-        <th className="notes-amount-col notes-prev-col">
-          <span className="notes-fy-label statement-fy-label--unified">{notesPreviousColumnLabel}</span>
-        </th>
-        <th className="notes-variance-col notes-change-col">
-          <span className="notes-fy-label">Change</span>
-          <span className="notes-fy-hint">vs last year</span>
-        </th>
-        <th className="notes-variance-col notes-pct-col">
-          <span className="notes-fy-label">% Change</span>
-          <span className="notes-fy-hint">vs last year</span>
-        </th>
+        {consolidatedBusinessColumns ? (
+          <>
+            {consolidatedBusinessColumns.map((business) => (
+              <th
+                key={business.id}
+                className="notes-amount-col notes-business-col"
+                data-business-id={business.id}
+                title={business.name}
+              >
+                <span className="notes-fy-label statement-fy-label--unified">{business.name}</span>
+              </th>
+            ))}
+            <th className="notes-amount-col notes-total-col">
+              <span className="notes-fy-label statement-fy-label--unified">Total</span>
+            </th>
+          </>
+        ) : (
+          <>
+            <th className="notes-amount-col notes-curr-col">
+              <span className="notes-fy-label statement-fy-label--unified">{notesCurrentColumnLabel}</span>
+            </th>
+            <th className="notes-amount-col notes-prev-col">
+              <span className="notes-fy-label statement-fy-label--unified">{notesPreviousColumnLabel}</span>
+            </th>
+            <th className="notes-variance-col notes-change-col">
+              <span className="notes-fy-label">Change</span>
+              <span className="notes-fy-hint">vs last year</span>
+            </th>
+            <th className="notes-variance-col notes-pct-col">
+              <span className="notes-fy-label">% Change</span>
+              <span className="notes-fy-hint">vs last year</span>
+            </th>
+          </>
+        )}
       </tr>
     </thead>
   )
 
-  const renderNotesTableFieldRows = (fields: typeof NOTE_FIELDS) =>
-    fields.map((field) => (
-      <tbody key={field.key} className="fs-print-note-block">
-        <tr
-          id={`note-row-${field.key}`}
-          className={`notes-main-row notes-main-row-header${field.key === 'longTermBorrowings' ? ' notes-main-row-lt' : ''}${field.key === 'otherAdministrativeExpenses' ? ' notes-main-row-admin' : ''}${field.key === 'shortTermBorrowings' ? ' notes-main-row-st' : ''}${field.key === 'financeCost' ? ' notes-main-row-finance' : ''}${field.key === 'capitalAccount' ? ' notes-main-row-capital' : ''}${field.key === 'costOfGoodsSold' ? ' notes-main-row-cogs' : ''}${field.key === 'revenueFromOperations' ? ' notes-main-row-revenue' : ''}${isManualNoteLineKey(field.key) ? ' notes-main-row-manual' : ''}${
-            highlightedNote?.noteKey === field.key && !highlightedNote.noteSubId
-              ? ' notes-row-highlight'
-              : ''
-          }`}
-        >
-          <td className="notes-sno-col">{renderNoteNumberLink(field.key, field.noteNo)}</td>
-          <td className="notes-particular-col notes-main-label">{renderMainNoteLabel(field)}</td>
-          {renderEmptyNoteHeadCells()}
-        </tr>
-        {renderNoteSubRows(field.key)}
-      </tbody>
-    ))
+  const renderSingleNoteTable = (field: (typeof NOTE_FIELDS)[number]) => (
+    <div key={field.key} className="table-wrap notes-table-wrap notes-print-note-unit">
+      <table
+        className={`data-table notes-table${consolidatedBusinessColumns ? ' notes-table--consolidated' : ''}`}
+        style={
+          consolidatedBusinessColumns
+            ? ({
+                '--consolidated-business-count': consolidatedBusinessColumns.length,
+              } as CSSProperties)
+            : undefined
+        }
+      >
+        {renderNotesTableColGroup()}
+        {renderNotesTableHead()}
+        <tbody className="fs-print-note-block">
+          <tr
+            id={`note-row-${field.key}`}
+            className={`notes-main-row notes-main-row-header${field.key === 'longTermBorrowings' ? ' notes-main-row-lt' : ''}${field.key === 'otherAdministrativeExpenses' ? ' notes-main-row-admin' : ''}${field.key === 'shortTermBorrowings' ? ' notes-main-row-st' : ''}${field.key === 'financeCost' ? ' notes-main-row-finance' : ''}${field.key === 'capitalAccount' ? ' notes-main-row-capital' : ''}${field.key === 'costOfGoodsSold' ? ' notes-main-row-cogs' : ''}${field.key === 'revenueFromOperations' ? ' notes-main-row-revenue' : ''}${isManualNoteLineKey(field.key) ? ' notes-main-row-manual' : ''}${
+              highlightedNote?.noteKey === field.key && !highlightedNote.noteSubId
+                ? ' notes-row-highlight'
+                : ''
+            }`}
+          >
+            <td className="notes-sno-col">{renderNoteNumberLink(field.key, field.noteNo)}</td>
+            <td className="notes-particular-col notes-main-label">{renderMainNoteLabel(field)}</td>
+            {renderEmptyNoteHeadCells()}
+          </tr>
+          {renderNoteSubRows(field.key)}
+        </tbody>
+      </table>
+    </div>
+  )
 
-  const renderNotesSectionTable = (
-    section: (typeof NOTES_TABLE_SECTIONS)[number],
-    showPrintBanner: boolean,
-  ) => (
-    <div className="table-wrap notes-table-wrap">
-      <table className="data-table notes-table">
-        <colgroup>
-          <col className="notes-sno-col" />
-          <col className="notes-particular-col" />
+  const renderNotesTableFieldRows = (fields: typeof NOTE_FIELDS) =>
+    fields.map((field) => renderSingleNoteTable(field))
+
+  const renderNotesTableColGroup = () => (
+    <colgroup>
+      <col className="notes-sno-col" />
+      <col className="notes-particular-col" />
+      {consolidatedBusinessColumns ? (
+        <>
+          {consolidatedBusinessColumns.map((business) => (
+            <col key={business.id} className="notes-business-col" data-business-id={business.id} />
+          ))}
+          <col className="notes-total-col" />
+        </>
+      ) : (
+        <>
           <col className="notes-amount-col notes-curr-col" />
           <col className="notes-amount-col notes-prev-col" />
           <col className="notes-variance-col notes-change-col" />
           <col className="notes-variance-col notes-pct-col" />
-        </colgroup>
-        {renderNotesTableHead(showPrintBanner)}
-        {renderNotesTableFieldRows(getNoteFieldsForTableSection(section))}
-      </table>
+        </>
+      )}
+    </colgroup>
+  )
+
+  const renderNotesSectionTable = (
+    section: (typeof NOTES_TABLE_SECTIONS)[number],
+    _options: { showTableHead?: boolean } = {},
+  ) => (
+    <div className="notes-tables-stack notes-print-notes-stack">
+      {renderNotesTableFieldRows(getNoteFieldsForTableSection(section))}
     </div>
   )
 
@@ -4154,165 +4622,11 @@ function FinancialStatement() {
 
   const printTitleForTab = (tab: FsTab) => formatFsTabPrintTitle(tab, statementType)
 
-  const tabHasPrintContent = (tab: FsTab): boolean => {
-    if (!fsData) {
-      return false
+  const tabLabelFor = (tab: FsTab) => {
+    if (tab === 'notes') {
+      return `${visibleTabs.find(([visibleTab]) => visibleTab === 'notes')?.[1] ?? printTitleForTab('notes')} (all parts)`
     }
-    switch (tab) {
-      case 'depreciation':
-        return fixedAssetLedgers.length > 0 && fsData.depreciationSchedule.length > 0
-      case 'repayment':
-        return fsData.loans.length > 0
-      case 'bank-account':
-        return fsData.bankAccounts.length > 0
-      case 'udin-details':
-        return Boolean(
-          udinDetails.enabled &&
-            (udinDetails.udinNumber?.trim() ||
-              udinDetails.caProfileId ||
-              udinDetails.caPartnerName?.trim() ||
-              udinDetails.caFirmName?.trim()),
-        )
-      default:
-        return true
-    }
-  }
-
-  const printableTabsInPrintOrder = PRINT_ALL_TAB_ORDER.filter(
-    (tab) => printableTabSet.has(tab) && tabHasPrintContent(tab),
-  )
-  const selectedPrintTabsInOrder = printAllSelectedTabs
-    ? printableTabsInPrintOrder.filter((tab) => printAllSelectedTabs.has(tab))
-    : printableTabsInPrintOrder
-  const firstPrintableTabInAll = selectedPrintTabsInOrder[0]
-  const hidePrintHeader = printAll || (!printAll && isNotesRelatedTab(resolvedActiveTab))
-  const notesPrintColSpan = 6
-  const isNotesPrintOutput =
-    (!printAll && isNotesRelatedTab(resolvedActiveTab)) ||
-    (printAll && Boolean(printAllSelectedTabs?.has('notes'))) ||
-    (printAll && NOTE_SECTION_TAB_IDS.some((tab) => printAllSelectedTabs?.has(tab)))
-
-  const isNotesOnlyPrintAll =
-    printAll &&
-    (Boolean(printAllSelectedTabs?.has('notes')) ||
-      NOTE_SECTION_TAB_IDS.some((tab) => printAllSelectedTabs?.has(tab))) &&
-    selectedPrintTabsInOrder.every((tab) => isNotesRelatedTab(tab))
-
-  const tabLabelFor = (tab: FsTab) =>
-    visibleTabs.find(([visibleTab]) => visibleTab === tab)?.[1] ?? printTitleForTab(tab)
-
-  const printReportKindForTab = (
-    tab: FsTab,
-  ): 'balance-sheet' | 'profit-loss' | 'notes' | 'other' => {
-    if (tab === 'balance-sheet') {
-      return 'balance-sheet'
-    }
-    if (tab === 'profit-loss') {
-      return 'profit-loss'
-    }
-    if (tab === 'notes' || isNoteSectionTab(tab)) {
-      return 'notes'
-    }
-    return 'other'
-  }
-
-  const isTabSelectedForPrint = (tab: FsTab) =>
-    printableTabSet.has(tab) &&
-    tabHasPrintContent(tab) &&
-    (!printAllSelectedTabs || printAllSelectedTabs.has(tab))
-
-  const showClientDetailsInSectionHeader = (tab: FsTab) => {
-    if (!printAll) {
-      return true
-    }
-    if (isNotesOnlyPrintAll && isNotesRelatedTab(tab)) {
-      return true
-    }
-    return false
-  }
-
-  const shouldRenderSectionStationery = (tab: FsTab) => {
-    if (printAll) {
-      if (isNotesOnlyPrintAll && isNotesRelatedTab(tab)) {
-        return isTabSelectedForPrint(tab)
-      }
-      if (tab === 'gst-reco' || tab === 'udin-details') {
-        return isTabSelectedForPrint(tab)
-      }
-      return false
-    }
-    return isNotesRelatedTab(tab) && resolvedActiveTab === tab
-  }
-
-  const shouldRenderPrintTableBanner = (tab: FsTab) => {
-    if (!printAll || isNotesOnlyPrintAll) {
-      return false
-    }
-    if (tab === 'gst-reco' || tab === 'udin-details') {
-      return false
-    }
-    return isTabSelectedForPrint(tab)
-  }
-
-  const shouldRenderPrintHeadSpacer = (tab: FsTab) =>
-    shouldRenderSectionStationery(tab) || shouldRenderPrintTableBanner(tab)
-
-  const renderPrintHeadSpacer = (tab: FsTab, colSpan: number) => {
-    if (!shouldRenderPrintHeadSpacer(tab)) {
-      return null
-    }
-    return <FsPrintHeadSpacerRow colSpan={colSpan} />
-  }
-
-  const renderPrintTableBanner = (tab: FsTab, colSpan: number) => {
-    if (!shouldRenderPrintTableBanner(tab) || !fy) {
-      return null
-    }
-    return (
-      <FsPrintTableBannerRow
-        colSpan={colSpan}
-        client={client}
-        business={business ?? null}
-        isConsolidated={isConsolidatedView}
-        title={printTitleForTab(tab)}
-        period={formatPrintReportPeriod(printReportKindForTab(tab), fy)}
-        showClientDetails={showClientDetailsInSectionHeader(tab)}
-      />
-    )
-  }
-
-  const renderPrintSectionStationery = (tab: FsTab) => {
-    if (!shouldRenderSectionStationery(tab) || !fy) {
-      return null
-    }
-    return (
-      <FsPrintSectionStationery
-        client={client}
-        business={business ?? null}
-        isConsolidated={isConsolidatedView}
-        title={printTitleForTab(tab)}
-        period={formatPrintReportPeriod(printReportKindForTab(tab), fy)}
-        showClientDetails={showClientDetailsInSectionHeader(tab)}
-      />
-    )
-  }
-
-  const printTabExtraClass = (tab: FsTab) => {
-    if (!printAll) {
-      return ''
-    }
-    if (
-      tab === 'final-info' ||
-      !printableTabSet.has(tab) ||
-      !tabHasPrintContent(tab) ||
-      (printAllSelectedTabs && !printAllSelectedTabs.has(tab))
-    ) {
-      return ' fs-print-tab-skip'
-    }
-    if (tab !== firstPrintableTabInAll) {
-      return ' fs-print-section-break'
-    }
-    return ''
+    return visibleTabs.find(([visibleTab]) => visibleTab === tab)?.[1] ?? printTitleForTab(tab)
   }
 
   const printReportKind: 'balance-sheet' | 'profit-loss' | 'notes' | 'other' =
@@ -4439,43 +4753,6 @@ function FinancialStatement() {
     })
   }
 
-  const handlePrint = (mode: 'current' | 'all') => {
-    if (mode === 'all') {
-      setPrintAllSelection(new Set(printableTabsInPrintOrder))
-      setPrintAllSelectionError('')
-      setPrintAllModalOpen(true)
-      return
-    }
-    setPrintAll(false)
-    setPrintAllSelectedTabs(null)
-    window.print()
-  }
-
-  const togglePrintAllSelection = (tab: FsTab) => {
-    setPrintAllSelection((current) => {
-      const next = new Set(current)
-      if (next.has(tab)) {
-        next.delete(tab)
-      } else {
-        next.add(tab)
-      }
-      return next
-    })
-    setPrintAllSelectionError('')
-  }
-
-  const confirmPrintAll = () => {
-    if (printAllSelection.size === 0) {
-      setPrintAllSelectionError('Select at least one section to print.')
-      return
-    }
-    setPrintAllSelectedTabs(new Set(printAllSelection))
-    setPrintAll(true)
-    setPrintAllModalOpen(false)
-    setPrintAllSelectionError('')
-    requestAnimationFrame(() => window.print())
-  }
-
   const handleExportPdf = () => {
     const escapeHtml = (value: string) =>
       String(value || '')
@@ -4517,20 +4794,54 @@ function FinancialStatement() {
     }
 
     const sections: string[] = []
-    sections.push(
-      renderSection(
-        'Balance Sheet',
-        ['Particular', 'Note', currentFyLabel, previousFyLabel],
-        balanceSheetLines.map((line) => [line.label, line.noteNo || '', line.current, line.previous]),
-      ),
-    )
-    sections.push(
-      renderSection(
-        'Profit & Loss',
-        ['Particular', 'Note', currentFyLabel, previousFyLabel],
-        computed.profitAndLoss.map((line) => [line.label, line.noteNo || '', line.current, line.previous]),
-      ),
-    )
+    const consolidatedBalanceSheetExport = isConsolidatedView && consolidatedBusinessColumns
+    const balanceSheetExportLines = consolidatedBalanceSheetExport
+      ? displayBalanceSheetLines
+      : balanceSheetLines
+    const balanceSheetExportHeaders = consolidatedBalanceSheetExport
+      ? ['Particular', 'Note', ...consolidatedBusinessColumns!.map((item) => item.name), 'Total']
+      : ['Particular', 'Note', currentFyLabel, previousFyLabel]
+    const balanceSheetExportRows = balanceSheetExportLines.map((line) => {
+      if (consolidatedBalanceSheetExport) {
+        if (line.isHeader || line.isSubHeader || line.isSpacer) {
+          return [line.label, '', ...consolidatedBusinessColumns!.map(() => ''), '']
+        }
+        return [
+          line.label,
+          line.noteNo || '',
+          ...consolidatedBusinessColumns!.map((item) => line.businessCurrentValues?.[item.id] ?? 0),
+          line.current,
+        ]
+      }
+      return [line.label, line.noteNo || '', line.current, line.previous]
+    })
+
+    sections.push(renderSection('Balance Sheet', balanceSheetExportHeaders, balanceSheetExportRows))
+
+    const consolidatedStatementExport =
+      isConsolidatedView && consolidatedBusinessColumns && consolidatedPerBusinessDerived
+    const profitLossExportLines = consolidatedStatementExport
+      ? displayProfitLossLines
+      : computed.profitAndLoss
+    const profitLossExportHeaders = consolidatedStatementExport
+      ? ['Particular', 'Note', ...consolidatedBusinessColumns!.map((item) => item.name), 'Total']
+      : ['Particular', 'Note', currentFyLabel, previousFyLabel]
+    const profitLossExportRows = profitLossExportLines.map((line) => {
+      if (consolidatedStatementExport) {
+        if (line.isHeader || line.isSubHeader || line.isSpacer) {
+          return [line.label, '', ...consolidatedBusinessColumns!.map(() => ''), '']
+        }
+        return [
+          line.label,
+          line.noteNo || '',
+          ...consolidatedBusinessColumns!.map((item) => line.businessCurrentValues?.[item.id] ?? 0),
+          line.current,
+        ]
+      }
+      return [line.label, line.noteNo || '', line.current, line.previous]
+    })
+
+    sections.push(renderSection('Profit & Loss', profitLossExportHeaders, profitLossExportRows))
 
     if (noteSubRowsMap) {
       const noteRows: Array<Array<string | number>> = []
@@ -4540,20 +4851,38 @@ function FinancialStatement() {
           if (sub.kind === 'header') {
             continue
           }
-          noteRows.push([
-            field.noteNo,
-            sub.label,
-            sub.current,
-            sub.previous,
-            calcValueChange(sub.current, sub.previous),
-            calcPercentChange(sub.current, sub.previous) ?? 0,
-          ])
+          if (consolidatedStatementExport) {
+            const businessValues = getConsolidatedNoteSubBusinessValues(
+              consolidatedPerBusinessDerived!,
+              consolidatedBusinessColumns!,
+              field.key,
+              sub,
+            )
+            const total = Object.values(businessValues).reduce((sum, value) => sum + value, 0)
+            noteRows.push([
+              field.noteNo,
+              sub.label,
+              ...consolidatedBusinessColumns!.map((item) => businessValues[item.id] ?? 0),
+              total,
+            ])
+          } else {
+            noteRows.push([
+              field.noteNo,
+              sub.label,
+              sub.current,
+              sub.previous,
+              calcValueChange(sub.current, sub.previous),
+              calcPercentChange(sub.current, sub.previous) ?? 0,
+            ])
+          }
         }
       }
       sections.push(
         renderSection(
           notesLabel,
-          ['Note', 'Particulars', notesCurrentColumnLabel, notesPreviousColumnLabel, 'Change', '% Change'],
+          consolidatedStatementExport
+            ? ['Note', 'Particulars', ...consolidatedBusinessColumns!.map((item) => item.name), 'Total']
+            : ['Note', 'Particulars', notesCurrentColumnLabel, notesPreviousColumnLabel, 'Change', '% Change'],
           noteRows,
           2,
         ),
@@ -4637,16 +4966,58 @@ function FinancialStatement() {
       rows.push([title], headers, ...sectionRows, [])
     }
 
-    pushSection(
-      'Balance Sheet',
-      ['Particular', 'Note', currentFyLabel, previousFyLabel],
-      balanceSheetLines.map((line) => [line.label, line.noteNo || '', num(line.current), num(line.previous)]),
-    )
-    pushSection(
-      'Profit & Loss',
-      ['Particular', 'Note', currentFyLabel, previousFyLabel],
-      computed.profitAndLoss.map((line) => [line.label, line.noteNo || '', num(line.current), num(line.previous)]),
-    )
+    const consolidatedBalanceSheetExport = isConsolidatedView && consolidatedBusinessColumns
+    const balanceSheetExportLines = consolidatedBalanceSheetExport
+      ? displayBalanceSheetLines
+      : balanceSheetLines
+    const balanceSheetExportHeaders = consolidatedBalanceSheetExport
+      ? ['Particular', 'Note', ...consolidatedBusinessColumns!.map((item) => item.name), 'Total']
+      : ['Particular', 'Note', currentFyLabel, previousFyLabel]
+    const balanceSheetExportRows = balanceSheetExportLines.map((line) => {
+      if (consolidatedBalanceSheetExport) {
+        if (line.isHeader || line.isSubHeader || line.isSpacer) {
+          return [line.label, '', ...consolidatedBusinessColumns!.map(() => ''), '']
+        }
+        return [
+          line.label,
+          line.noteNo || '',
+          ...consolidatedBusinessColumns!.map((item) =>
+            num(line.businessCurrentValues?.[item.id] ?? 0),
+          ),
+          num(line.current),
+        ]
+      }
+      return [line.label, line.noteNo || '', num(line.current), num(line.previous)]
+    })
+
+    pushSection('Balance Sheet', balanceSheetExportHeaders, balanceSheetExportRows)
+
+    const consolidatedStatementExport =
+      isConsolidatedView && consolidatedBusinessColumns && consolidatedPerBusinessDerived
+    const profitLossExportLines = consolidatedStatementExport
+      ? displayProfitLossLines
+      : computed.profitAndLoss
+    const profitLossExportHeaders = consolidatedStatementExport
+      ? ['Particular', 'Note', ...consolidatedBusinessColumns!.map((item) => item.name), 'Total']
+      : ['Particular', 'Note', currentFyLabel, previousFyLabel]
+    const profitLossExportRows = profitLossExportLines.map((line) => {
+      if (consolidatedStatementExport) {
+        if (line.isHeader || line.isSubHeader || line.isSpacer) {
+          return [line.label, '', ...consolidatedBusinessColumns!.map(() => ''), '']
+        }
+        return [
+          line.label,
+          line.noteNo || '',
+          ...consolidatedBusinessColumns!.map((item) =>
+            num(line.businessCurrentValues?.[item.id] ?? 0),
+          ),
+          num(line.current),
+        ]
+      }
+      return [line.label, line.noteNo || '', num(line.current), num(line.previous)]
+    })
+
+    pushSection('Profit & Loss', profitLossExportHeaders, profitLossExportRows)
 
     if (noteSubRowsMap) {
       const noteRows: Array<Array<string | number>> = []
@@ -4656,21 +5027,39 @@ function FinancialStatement() {
           if (sub.kind === 'header') {
             continue
           }
-          const change = calcValueChange(sub.current, sub.previous)
-          const pct = calcPercentChange(sub.current, sub.previous)
-          noteRows.push([
-            field.noteNo,
-            sub.label,
-            num(sub.current),
-            num(sub.previous),
-            num(change),
-            pct === null ? '' : `${pct.toFixed(1)}%`,
-          ])
+          if (consolidatedStatementExport) {
+            const businessValues = getConsolidatedNoteSubBusinessValues(
+              consolidatedPerBusinessDerived!,
+              consolidatedBusinessColumns!,
+              field.key,
+              sub,
+            )
+            const total = Object.values(businessValues).reduce((sum, value) => sum + value, 0)
+            noteRows.push([
+              field.noteNo,
+              sub.label,
+              ...consolidatedBusinessColumns!.map((item) => num(businessValues[item.id] ?? 0)),
+              num(total),
+            ])
+          } else {
+            const change = calcValueChange(sub.current, sub.previous)
+            const pct = calcPercentChange(sub.current, sub.previous)
+            noteRows.push([
+              field.noteNo,
+              sub.label,
+              num(sub.current),
+              num(sub.previous),
+              num(change),
+              pct === null ? '' : `${pct.toFixed(1)}%`,
+            ])
+          }
         }
       }
       pushSection(
         notesLabel,
-        ['Note', 'Particulars', notesCurrentColumnLabel, notesPreviousColumnLabel, 'Change', '% Change'],
+        consolidatedStatementExport
+          ? ['Note', 'Particulars', ...consolidatedBusinessColumns!.map((item) => item.name), 'Total']
+          : ['Note', 'Particulars', notesCurrentColumnLabel, notesPreviousColumnLabel, 'Change', '% Change'],
         noteRows,
       )
     }
@@ -4703,6 +5092,98 @@ function FinancialStatement() {
     setSaveMessage('')
   }
 
+  const persistUdinDetails = async (nextUdinDetails: UdinDetails) => {
+    if (!clientId || !fyId || !businessId || !fsData) {
+      return false
+    }
+
+    const saved = await saveUdinDetails(clientId, fyId, businessId, nextUdinDetails)
+    const normalized = normalizeUdinDetails(saved.udinDetails)
+    const nextState = {
+      ...fsData,
+      udinDetails: normalized,
+    }
+    setFsData(nextState)
+    setSavedFingerprint(fsDataFingerprint(nextState))
+    return true
+  }
+
+  const onUdinSealAttachmentChange = async (file: File | null) => {
+    if (!fsData || isFsReadOnly) {
+      return
+    }
+
+    if (!file) {
+      if (!udinDetails.sealAttachmentDataUrl && !udinDetails.sealAttachmentName) {
+        return
+      }
+
+      const confirmed = await confirmProceed({
+        title: 'Remove CA seal attachment?',
+        message: 'This will remove the attached seal from UDIN details.',
+        confirmButtonText: 'Yes, remove',
+      })
+      if (!confirmed) {
+        return
+      }
+
+      setSaving(true)
+      setSaveMessage('')
+      try {
+        const nextUdinDetails = normalizeUdinDetails({
+          ...fsData.udinDetails,
+          sealAttachmentName: '',
+          sealAttachmentDataUrl: '',
+        })
+        await persistUdinDetails(nextUdinDetails)
+        setSaveMessage('CA seal attachment removed.')
+        await showUpdatedAlert(
+          'CA seal attachment',
+          '<p>The seal attachment has been removed from UDIN details.</p>',
+        )
+      } catch (err) {
+        setSaveMessage(err instanceof Error ? err.message : 'Failed to remove CA seal attachment.')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+
+    const confirmed = await confirmProceed({
+      title: 'Save CA seal attachment?',
+      message: `Attach "${file.name}" and save it to the database for this financial statement?`,
+      confirmButtonText: 'Yes, save',
+    })
+    if (!confirmed) {
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = async () => {
+      setSaving(true)
+      setSaveMessage('')
+      try {
+        const nextUdinDetails = normalizeUdinDetails({
+          ...fsData.udinDetails,
+          sealAttachmentName: file.name,
+          sealAttachmentDataUrl: String(reader.result || ''),
+        })
+        await persistUdinDetails(nextUdinDetails)
+        setSaveMessage('CA seal attachment saved.')
+        await showUpdatedAlert(
+          'CA seal attachment',
+          `<p><strong>${file.name}</strong> has been saved to UDIN details.</p>`,
+        )
+      } catch (err) {
+        setSaveMessage(err instanceof Error ? err.message : 'Failed to save CA seal attachment.')
+      } finally {
+        setSaving(false)
+      }
+    }
+    reader.onerror = () => setSaveMessage('Could not read the CA seal attachment file.')
+    reader.readAsDataURL(file)
+  }
+
   const selectedUdinCa = udinDetails.caProfileId
     ? caProfiles.find((profile) => profile.id === udinDetails.caProfileId) || null
     : null
@@ -4710,9 +5191,148 @@ function FinancialStatement() {
     ? {
         ...selectedUdinCa,
         udin: udinDetails.udinNumber || selectedUdinCa.udin,
+        sealSignatureName:
+          udinDetails.sealAttachmentName || selectedUdinCa.sealSignatureName,
+        sealSignatureDataUrl:
+          udinDetails.sealAttachmentDataUrl || selectedUdinCa.sealSignatureDataUrl,
       }
     : EMPTY_CA_PROFILE
   const printUdinDate = udinDetails.caProfileId ? udinDetails.udinDate : ''
+  const printUdinApplicable = !isConsolidatedView && udinDetails.enabled && Boolean(udinDetails.caProfileId)
+  const printUdinNumber = udinDetails.udinNumber || effectivePrintCaProfile.udin
+  const hasPrintCaSeal = Boolean(normalizeSealDataUrl(effectivePrintCaProfile.sealSignatureDataUrl))
+  const showPrintCaSigning =
+    printUdinApplicable && hasPrintCaSeal && Boolean(effectivePrintCaProfile.id)
+  const printClientSignatoryName =
+    client.name?.trim() || (isConsolidatedView ? client.name : business?.name || client.name)
+  const isUdinDetailsSelectedInPrintAll = Boolean(
+    printAll && printAllSelectedTabs?.has('udin-details'),
+  )
+  const shouldRenderPrintUdinClosing =
+    printAll &&
+    udinDetails.enabled &&
+    Boolean(udinDetails.caProfileId) &&
+    isUdinDetailsSelectedInPrintAll
+  const shouldUsePerPartCaSignoff =
+    showPrintCaSigning && (printAll || resolvedActiveTab !== 'udin-details')
+
+  const shouldRenderPrintPartCaSignoff = (
+    tab: FsTab,
+    options?: { force?: boolean },
+  ) => {
+    if (!showPrintCaSigning) {
+      return false
+    }
+    if (tab === 'udin-details' || tab === 'final-info') {
+      return false
+    }
+
+    if (options?.force) {
+      return true
+    }
+
+    if (printAll) {
+      return !printTabExtraClass(tab).includes('fs-print-tab-skip')
+    }
+
+    if (tab === 'notes') {
+      return resolvedActiveTab === 'notes'
+    }
+
+    return resolvedActiveTab === tab
+  }
+
+  const renderPrintPartSignoff = (tab: FsTab, options?: { force?: boolean }) => {
+    if (!shouldRenderPrintPartCaSignoff(tab, options)) {
+      return null
+    }
+
+    const signoffClass =
+      tab === 'balance-sheet' ? 'fs-print-ca-signoff--balance-sheet' : 'fs-print-ca-signoff--section'
+
+    return (
+      <div className="fs-print-part-signoff fs-print-only">
+        {renderUdinSignBanner({ className: signoffClass })}
+      </div>
+    )
+  }
+
+  const onUdinSealPositionChange = async (offsetX: number, offsetY: number) => {
+    if (!fsData || isFsReadOnly) {
+      return
+    }
+
+    const nextUdinDetails = normalizeUdinDetails({
+      ...fsData.udinDetails,
+      sealOffsetX: offsetX,
+      sealOffsetY: offsetY,
+    })
+
+    try {
+      await persistUdinDetails(nextUdinDetails)
+      setSaveMessage('Seal position saved.')
+    } catch (err) {
+      setSaveMessage(err instanceof Error ? err.message : 'Failed to save seal position.')
+    }
+  }
+
+  const udinBannerClientName = isConsolidatedView
+    ? client?.name?.trim() || ''
+    : client?.name?.trim() || business?.name?.trim() || ''
+
+  const renderUdinSignBanner = (options?: { editable?: boolean; className?: string }) => (
+    <FsUdinSignBanner
+      caProfile={effectivePrintCaProfile}
+      clientName={udinBannerClientName}
+      udinNumber={udinDetails.udinNumber || effectivePrintCaProfile.udin}
+      udinDate={printUdinDate}
+      sealOffsetX={udinDetails.sealOffsetX}
+      sealOffsetY={udinDetails.sealOffsetY}
+      editable={options?.editable}
+      onSealPositionChange={
+        options?.editable && !isFsReadOnly ? onUdinSealPositionChange : undefined
+      }
+      className={options?.className}
+    />
+  )
+
+  const renderPrintUdinBlock = () => (
+    <div className="fs-udin-print-block fs-print-only">
+      <div className="fs-udin-print-summary">
+        <p className="fs-udin-print-line">
+          <span className="fs-udin-print-label">CA Name</span>
+          <span className="fs-udin-print-value">
+            {selectedUdinCa?.partnerName || udinDetails.caPartnerName || '—'}
+          </span>
+        </p>
+        <p className="fs-udin-print-line">
+          <span className="fs-udin-print-label">Firm Name</span>
+          <span className="fs-udin-print-value">
+            {selectedUdinCa?.firmName || udinDetails.caFirmName || '—'}
+          </span>
+        </p>
+        <p className="fs-udin-print-line">
+          <span className="fs-udin-print-label">UDIN Number</span>
+          <span className="fs-udin-print-value">
+            {udinDetails.udinNumber || effectivePrintCaProfile.udin || '—'}
+          </span>
+        </p>
+        <p className="fs-udin-print-line">
+          <span className="fs-udin-print-label">UDIN Date</span>
+          <span className="fs-udin-print-value">
+            {printUdinDate ? formatUdinDatePrint(printUdinDate) : '—'}
+          </span>
+        </p>
+      </div>
+      {renderUdinSignBanner({ className: 'fs-print-ca-signoff--tab' })}
+    </div>
+  )
+
+  const renderNotesPrintSectionBlock = (section: (typeof NOTES_TABLE_SECTIONS)[number]) => (
+    <div key={section.id} className="fs-notes-print-section-block">
+      {renderNotesTableFieldRows(getNoteFieldsForTableSection(section))}
+    </div>
+  )
 
   const sourcesVsApplicationDiff = {
     current:
@@ -4807,7 +5427,7 @@ function FinancialStatement() {
 
   return (
     <div
-      className={`fs-page${isConsolidatedView ? ' fs-page--consolidated-readonly' : ''}${isFsFinalLocked ? ' fs-page--edit-locked' : ''}${printAll ? ' fs-print-all' : ''}${printComparison ? ' fs-print-with-comparison' : ''}${isNotesPrintOutput ? ' fs-print-notes-section' : ''}${isNotesOnlyPrintAll ? ' fs-print-notes-only' : ''}${!printAll && resolvedActiveTab === 'profit-loss' ? ' fs-print-report-profit-loss' : ''} fs-page--cash-adjust-banner`}
+      className={`print-page fs-page ${printComparisonLayout}${isConsolidatedView ? ' fs-page--consolidated-readonly' : ''}${isFsFinalLocked ? ' fs-page--edit-locked' : ''}${printAll ? ' fs-print-all' : ''}${isNotesPrintOutput ? ' fs-print-notes-section' : ''}${isNotesOnlyPrintAll ? ' fs-print-notes-only' : ''}${isGstPrintOutput ? ' fs-print-gst-section' : ''}${isGstOnlyPrintAll ? ' fs-print-gst-only' : ''}${isBalanceSheetPrintOutput ? ' fs-print-balance-sheet' : ''}${isBalanceSheetOnlyPrintOutput ? ' fs-print-balance-sheet-only' : ''}${!printAll && resolvedActiveTab === 'udin-details' ? ' fs-print-udin-section' : ''}${!printAll && resolvedActiveTab === 'profit-loss' ? ' fs-print-report-profit-loss' : ''} fs-page--cash-adjust-banner`}
     >
       <FsPrintLayout
         documentTitle={formatFinancialStatementPageTitle(statementType)}
@@ -4815,10 +5435,6 @@ function FinancialStatement() {
         business={business ?? null}
         isConsolidated={isConsolidatedView}
         fy={fy}
-        caProfile={effectivePrintCaProfile}
-        udinApplicable={!isConsolidatedView && udinDetails.enabled && Boolean(udinDetails.caProfileId)}
-        udinNumber={udinDetails.udinNumber || effectivePrintCaProfile.udin}
-        udinDate={printUdinDate}
         activeTabLabel={printTitleForTab(resolvedActiveTab)}
         reportKind={printReportKind}
         printAll={printAll}
@@ -4874,18 +5490,36 @@ function FinancialStatement() {
               <span>UDIN</span>
             </label>
           )}
-          <label className="fs-print-option" title="Show change amount and % columns when printing">
+          <label className="fs-print-option" title="Show value change column when printing">
             <input
               type="checkbox"
-              checked={printComparison}
-              onChange={(event) => setPrintComparison(event.target.checked)}
+              checked={printValueChange}
+              onChange={(event) => setPrintValueChange(event.target.checked)}
             />
-            <span>Change &amp; % in print</span>
+            <span>Value change in print</span>
           </label>
-          <button type="button" className="secondary-btn" onClick={() => handlePrint('current')}>
+          <label className="fs-print-option" title="Show % change column when printing">
+            <input
+              type="checkbox"
+              checked={printPercentChange}
+              onChange={(event) => setPrintPercentChange(event.target.checked)}
+            />
+            <span>% change in print</span>
+          </label>
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() => void onPrintCurrent()}
+            title="Open the print dialog for the current section"
+          >
             Print
           </button>
-          <button type="button" className="secondary-btn" onClick={() => handlePrint('all')}>
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() => void onPrintAll()}
+            title="Select sections and open the print dialog"
+          >
             Print all
           </button>
           <select
@@ -4981,15 +5615,21 @@ function FinancialStatement() {
       <div className="fs-print-body fs-print-statement-format">
       {isTabMounted('notes') && printableTabSet.has('notes') && (
         <section
-          className={tabPanelClass('notes')}
+          className={`${tabPanelClass('notes')}${shouldPrintMergedNotes && !printAll ? ' fs-print-tab-skip' : ''}`}
           data-fs-tab="notes"
           data-print-title={printTitleForTab('notes')}
         >
           <h2>{notesLabel}</h2>
           <p className="hint">
-            Notes are grouped into four sections. Open a section tab below to enter {currentFyLabel}{' '}
-            figures. {previousFyLabel} amounts are shown for reference. Click a <strong>Note</strong>{' '}
-            number to jump to the {balanceSheetLabel} (1–18) or {profitLossLabel} (19–24).
+            {isConsolidatedView ? (
+              'Consolidated view shows each business in its own column with a Total column summing all businesses.'
+            ) : (
+              <>
+                Notes are grouped into four sections. Open a section tab below to enter {currentFyLabel}{' '}
+                figures. {previousFyLabel} amounts are shown for reference. Click a <strong>Note</strong>{' '}
+                number to jump to the {balanceSheetLabel} (1–18) or {profitLossLabel} (19–24).
+              </>
+            )}
           </p>
 
           <div className="notes-section-nav">
@@ -5046,28 +5686,54 @@ function FinancialStatement() {
         </section>
       )}
 
-      {NOTES_TABLE_SECTIONS.map((section, sectionIndex) =>
-        isTabMounted(section.tabId) && printableTabSet.has(section.tabId) ? (
-          <section
-            key={section.id}
-            className={`${tabPanelClass(section.tabId)} fs-notes-section-tab-panel`}
-            data-fs-tab="notes"
-            data-note-section={section.id}
-            data-print-title={printTitleForTab(section.tabId)}
-          >
-            <h2>
-              {notesLabel} — {section.title}
-            </h2>
-            <p className="hint">
-              {section.rangeLabel}: enter {currentFyLabel} figures below. {previousFyLabel} amounts are
-              for reference.
-            </p>
+      {shouldPrintMergedNotes && mergedNoteSectionsForPrint.length > 0 ? (
+        <section
+          key="notes-merged-print"
+          className={`${tabPanelClass(printAll ? (firstSelectedNoteSectionTab ?? 'notes') : 'notes')} fs-notes-section-tab-panel fs-notes-print-merged${!printAll && resolvedActiveTab === 'notes' ? ' fs-notes-print-merged--overview' : ''}`}
+          data-fs-tab="notes"
+          data-print-title={printTitleForTab('notes')}
+        >
+          {renderPrintSectionStationery('notes')}
+          <div className="fs-print-part-shell">
+            <div className="notes-tables-stack notes-print-notes-stack fs-print-part-body">
+              {mergedNoteSectionsForPrint.map((section) => renderNotesPrintSectionBlock(section))}
+            </div>
+            {renderPrintPartSignoff(firstSelectedNoteSectionTab ?? 'notes', { force: true })}
+          </div>
+        </section>
+      ) : (
+        NOTES_TABLE_SECTIONS.map((section) =>
+          isTabMounted(section.tabId) && printableTabSet.has(section.tabId) ? (
+            <section
+              key={section.id}
+              className={`${tabPanelClass(section.tabId)} fs-notes-section-tab-panel`}
+              data-fs-tab="notes"
+              data-note-section={section.id}
+              data-print-title={printTitleForTab(section.tabId)}
+            >
+              <h2>
+                {notesLabel} — {section.title}
+              </h2>
+              <p className="hint">
+                {isConsolidatedView ? (
+                  'Consolidated view shows each business in its own column with a Total column summing all businesses.'
+                ) : (
+                  <>
+                    {section.rangeLabel}: enter {currentFyLabel} figures below. {previousFyLabel} amounts are
+                    for reference.
+                  </>
+                )}
+              </p>
 
-            {renderPrintSectionStationery(section.tabId)}
+              {renderPrintSectionStationery(section.tabId)}
 
-            {renderNotesSectionTable(section, sectionIndex === 0)}
-          </section>
-        ) : null,
+              <div className="fs-print-part-shell">
+                <div className="fs-print-part-body">{renderNotesSectionTable(section)}</div>
+                {renderPrintPartSignoff(section.tabId)}
+              </div>
+            </section>
+          ) : null,
+        )
       )}
 
       {isTabMounted('balance-sheet') && printableTabSet.has('balance-sheet') && fy && (
@@ -5077,37 +5743,34 @@ function FinancialStatement() {
           data-print-title={printTitleForTab('balance-sheet')}
         >
           <p className="hint">
-            Layout per balance sheet format. Click any <strong>Note</strong> number to open the matching note for
-            entry.
+            {isConsolidatedView ? (
+              'Consolidated view shows each business in its own column with a Total column summing all businesses.'
+            ) : (
+              <>
+                Layout per balance sheet format. Click any <strong>Note</strong> number to open the matching note for
+                entry.
+              </>
+            )}
           </p>
           {renderPrintSectionStationery('balance-sheet')}
-          <div className="fs-balance-sheet-print-body">
-          <StatementTable
-            title={`${balanceSheetLabel} — Sources of Funds — ${balanceSheetCurrentLabel}`}
-            lines={sourcesOfFundsLines}
-            wrapperClassName="statement-table-wrap--balance-sheet statement-table-wrap--balance-sheet-sources"
-            currentLabel={balanceSheetCurrentColumnLabel}
-            previousLabel={balanceSheetPreviousColumnLabel}
-            showNoteColumn
-            useStatementAmountFormat
-            onNoteNavigate={navigateToNote}
-            highlightedRowId={highlightedBsRow}
-            printHeadSpacer={renderPrintHeadSpacer('balance-sheet', 6)}
-            printBanner={renderPrintTableBanner('balance-sheet', 6)}
-          />
-          <StatementTable
-            title={`${balanceSheetLabel} — Application of Funds — ${balanceSheetCurrentLabel}`}
-            lines={applicationOfFundsLines}
-            wrapperClassName="statement-table-wrap--balance-sheet statement-table-wrap--balance-sheet-application"
-            currentLabel={balanceSheetCurrentColumnLabel}
-            previousLabel={balanceSheetPreviousColumnLabel}
-            showNoteColumn
-            useStatementAmountFormat
-            onNoteNavigate={navigateToNote}
-            highlightedRowId={highlightedBsRow}
-            printHeadSpacer={renderPrintHeadSpacer('balance-sheet', 6)}
-            printBanner={renderPrintTableBanner('balance-sheet', 6)}
-          />
+          <div className="fs-print-part-shell">
+            <div className="fs-balance-sheet-print-body fs-print-part-body">
+            <StatementTable
+              title={`${balanceSheetLabel} — ${balanceSheetCurrentLabel}`}
+              lines={displayBalanceSheetLines}
+              wrapperClassName="statement-table-wrap--balance-sheet"
+              currentLabel={balanceSheetCurrentColumnLabel}
+              previousLabel={balanceSheetPreviousColumnLabel}
+              showNoteColumn
+              useStatementAmountFormat
+              onNoteNavigate={navigateToNote}
+              highlightedRowId={highlightedBsRow}
+              printHeadSpacer={renderPrintHeadSpacer('balance-sheet')}
+              printBanner={renderPrintTableBanner('balance-sheet')}
+              consolidatedBusinessColumns={consolidatedBusinessColumns}
+            />
+            </div>
+            {renderPrintPartSignoff('balance-sheet')}
           </div>
         </section>
       )}
@@ -5119,21 +5782,30 @@ function FinancialStatement() {
           data-print-title={printTitleForTab('profit-loss')}
         >
           <p className="hint">
-            Click any <strong>Note</strong> number to open the matching note for entry.
+            {isConsolidatedView ? (
+              'Consolidated view shows each business in its own column with a Total column summing all businesses.'
+            ) : (
+              <>
+                Click any <strong>Note</strong> number to open the matching note for entry.
+              </>
+            )}
           </p>
           {renderPrintSectionStationery('profit-loss')}
-          <div className="fs-profit-loss-print-body">
+          <div className="fs-print-part-shell">
+          <div className="fs-profit-loss-print-body fs-print-part-body">
           <StatementTable
             title={`${profitLossLabel} — ${profitLossCurrentLabel}`}
-            lines={computed.profitAndLoss}
+            lines={displayProfitLossLines}
+            wrapperClassName="statement-table-wrap--profit-loss"
             currentLabel={profitLossCurrentColumnLabel}
             previousLabel={profitLossPreviousColumnLabel}
             showNoteColumn
             useStatementAmountFormat
             onNoteNavigate={navigateToNote}
             highlightedRowId={highlightedPlRow}
-            printHeadSpacer={renderPrintHeadSpacer('profit-loss', 6)}
-            printBanner={renderPrintTableBanner('profit-loss', 6)}
+            printHeadSpacer={renderPrintHeadSpacer('profit-loss')}
+            printBanner={renderPrintTableBanner('profit-loss')}
+            consolidatedBusinessColumns={consolidatedBusinessColumns}
           />
 
           <div
@@ -5182,8 +5854,6 @@ function FinancialStatement() {
                   <col className="pl-col-pct" />
                 </colgroup>
                 <thead>
-                  {renderPrintHeadSpacer('profit-loss', 5)}
-                  {renderPrintTableBanner('profit-loss', 5)}
                   <tr className="pl-appr-head-row">
                     <th className="pl-appr-particular-col">Particular</th>
                     <th className="pl-appr-amount-col pl-appr-curr-col">
@@ -5311,6 +5981,8 @@ function FinancialStatement() {
             </div>
           </div>
           </div>
+          {renderPrintPartSignoff('profit-loss')}
+          </div>
         </section>
       )}
 
@@ -5321,6 +5993,8 @@ function FinancialStatement() {
           data-print-title={printTitleForTab('depreciation')}
         >
           {renderPrintSectionStationery('depreciation')}
+          <div className="fs-print-part-shell">
+          <div className="fs-print-part-body">
           <div className="panel-header-row">
             <h2>Depreciation Schedule (Income Tax Act)</h2>
           </div>
@@ -5341,8 +6015,8 @@ function FinancialStatement() {
             <div className="table-wrap dep-schedule-wrap fs-print-section-block">
               <table className="data-table schedule-table dep-schedule-table">
                 <thead>
-                  {renderPrintHeadSpacer('depreciation', isFsReadOnly ? 8 : 9)}
-                  {renderPrintTableBanner('depreciation', isFsReadOnly ? 8 : 9)}
+                  {renderPrintHeadSpacer('depreciation')}
+                  {renderPrintTableBanner('depreciation')}
                   <tr>
                     <th>Asset</th>
                     <th>Rate %</th>
@@ -5482,7 +6156,7 @@ function FinancialStatement() {
                       <strong>{formatAmount(depTotals.depreciation)}</strong>
                     </td>
                     <td className="calc-cell">{formatAmount(depTotals.closingWdv)}</td>
-                    {!isFsReadOnly && <td />}
+                    {!isFsReadOnly && <td className="dep-actions-col" aria-hidden="true" />}
                   </tr>
                   <tr className="schedule-prev-row">
                     <td colSpan={2}>
@@ -5623,7 +6297,7 @@ function FinancialStatement() {
                         </td>
                       </>
                     )}
-                    {!isFsReadOnly && <td />}
+                    {!isFsReadOnly && <td className="dep-actions-col" aria-hidden="true" />}
                   </tr>
                 </tbody>
               </table>
@@ -5665,6 +6339,9 @@ function FinancialStatement() {
               </div>
             </div>
           )}
+          </div>
+          {renderPrintPartSignoff('depreciation')}
+          </div>
         </section>
       )}
 
@@ -5675,6 +6352,8 @@ function FinancialStatement() {
           data-print-title={printTitleForTab('repayment')}
         >
           {renderPrintSectionStationery('repayment')}
+          <div className="fs-print-part-shell">
+          <div className="fs-print-part-body">
           <div className="panel-header-row">
             <h2>Loan Repayment Schedule</h2>
             <button type="button" className="secondary-btn" onClick={openAddLoan}>
@@ -5772,50 +6451,46 @@ function FinancialStatement() {
                       rows={summarizeCashFlowByYear(loan.monthlySchedule)}
                       compact
                     />
-                    {expanded && (
-                      <>
-                        {loan.monthlySchedule.length > 0 ? (
-                          <div className="table-wrap loan-emi-table-wrap">
-                            <table className="data-table schedule-table loan-emi-table">
-                              <thead>
-                                {renderPrintHeadSpacer('repayment', 7)}
-                                {renderPrintTableBanner('repayment', 7)}
-                                <tr>
-                                  <th>S.No</th>
-                                  <th>Month</th>
-                                  <th>Year</th>
-                                  <th>EMI</th>
-                                  <th>Principal</th>
-                                  <th>Interest</th>
-                                  <th>Balance</th>
+                    {loan.monthlySchedule.length > 0 ? (
+                      <div className={`loan-emi-schedule${expanded ? ' is-expanded' : ''}`}>
+                        <div className="table-wrap loan-emi-table-wrap">
+                          <table className="data-table schedule-table loan-emi-table">
+                            <thead>
+                              <tr>
+                                <th>S.No</th>
+                                <th>Month</th>
+                                <th>Year</th>
+                                <th>EMI</th>
+                                <th>Principal</th>
+                                <th>Interest</th>
+                                <th>Balance</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {loan.monthlySchedule.map((row) => (
+                                <tr
+                                  key={`${loan.id}-${row.serialNo}`}
+                                  className={row.isPrepayment ? 'prepay-row' : undefined}
+                                >
+                                  <td>{row.serialNo}</td>
+                                  <td>
+                                    {row.monthLabel}
+                                    {row.isPreClosure || row.isPrepayment ? ' (Pre-closure)' : ''}
+                                  </td>
+                                  <td>{row.year}</td>
+                                  <td className="calc-cell">{formatAmount(row.emi)}</td>
+                                  <td className="calc-cell">{formatAmount(row.principal)}</td>
+                                  <td className="calc-cell">{formatAmount(row.interest)}</td>
+                                  <td className="calc-cell">{formatAmount(row.balance)}</td>
                                 </tr>
-                              </thead>
-                              <tbody>
-                                {loan.monthlySchedule.map((row) => (
-                                  <tr
-                                    key={`${loan.id}-${row.serialNo}`}
-                                    className={row.isPrepayment ? 'prepay-row' : undefined}
-                                  >
-                                    <td>{row.serialNo}</td>
-                                    <td>
-                                      {row.monthLabel}
-                                      {row.isPreClosure || row.isPrepayment ? ' (Pre-closure)' : ''}
-                                    </td>
-                                    <td>{row.year}</td>
-                                    <td className="calc-cell">{formatAmount(row.emi)}</td>
-                                    <td className="calc-cell">{formatAmount(row.principal)}</td>
-                                    <td className="calc-cell">{formatAmount(row.interest)}</td>
-                                    <td className="calc-cell">{formatAmount(row.balance)}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        ) : (
-                          <p className="loan-emi-empty">No EMI rows generated for this financial year.</p>
-                        )}
-                      </>
-                    )}
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : expanded ? (
+                      <p className="loan-emi-empty">No EMI rows generated for this financial year.</p>
+                    ) : null}
                   </div>
                 )
               })}
@@ -5832,6 +6507,9 @@ function FinancialStatement() {
               <LoanCashFlowTable rows={consolidatedCashFlow} />
             </div>
           )}
+          </div>
+          {renderPrintPartSignoff('repayment')}
+          </div>
         </section>
       )}
 
@@ -5842,6 +6520,8 @@ function FinancialStatement() {
           data-print-title={printTitleForTab('bank-account')}
         >
           {renderPrintSectionStationery('bank-account')}
+          <div className="fs-print-part-shell">
+          <div className="fs-print-part-body">
           <div className="panel-header-row">
             <h2>Bank Accounts</h2>
             <button type="button" className="secondary-btn" onClick={openAddBank}>
@@ -5878,8 +6558,8 @@ function FinancialStatement() {
                   <col className="bank-col-closing" />
                 </colgroup>
                 <thead>
-                  {renderPrintHeadSpacer('bank-account', 12)}
-                  {renderPrintTableBanner('bank-account', 12)}
+                  {renderPrintHeadSpacer('bank-account')}
+                  {renderPrintTableBanner('bank-account')}
                   <tr>
                     <th className="bank-col-name">Bank Name</th>
                     <th className="bank-col-number">A/c No.</th>
@@ -6178,6 +6858,9 @@ function FinancialStatement() {
             </div>
             </>
           )}
+          </div>
+          {renderPrintPartSignoff('bank-account')}
+          </div>
         </section>
       )}
 
@@ -6188,6 +6871,8 @@ function FinancialStatement() {
           data-print-title={printTitleForTab('gst-reco')}
         >
         {renderPrintSectionStationery('gst-reco')}
+        <div className="fs-print-part-shell">
+        <div className="fs-print-part-body">
         <GstRecoTab
           gstReco={fsData.gstReco}
           savedGstReco={lastSavedGstReco ?? undefined}
@@ -6204,24 +6889,26 @@ function FinancialStatement() {
           fsSavedAt={fsData.savedAt ?? undefined}
           onOpenRevenueNote={() => navigateToNote('revenueFromOperations')}
           onChange={updateGstReco}
+          printHeadSpacer={(colSpan) => renderPrintHeadSpacer('gst-reco', colSpan)}
+          printBanner={(colSpan) => renderPrintTableBanner('gst-reco', colSpan)}
         />
+        </div>
+        {renderPrintPartSignoff('gst-reco')}
+        </div>
         </section>
       )}
       {isTabMounted('udin-details') && printableTabSet.has('udin-details') && (
         <section
-          className={tabPanelClass('udin-details')}
+          className={`${tabPanelClass('udin-details')}${shouldRenderPrintUdinClosing ? ' fs-print-tab-skip' : ''}`}
           data-fs-tab="udin-details"
           data-print-title={printTitleForTab('udin-details')}
         >
           {renderPrintSectionStationery('udin-details')}
-          {udinDetails.enabled && udinDetails.caProfileId && (
-            <FsPrintCaSignOff
-              caProfile={effectivePrintCaProfile}
-              udinNumber={udinDetails.udinNumber || effectivePrintCaProfile.udin}
-              udinDate={printUdinDate}
-              className="fs-print-ca-signoff--tab"
-            />
-          )}
+          {!printAll && udinDetails.enabled && udinDetails.caProfileId ? (
+            <div className="fs-print-part-shell">
+              <div className="fs-print-part-body">{renderPrintUdinBlock()}</div>
+            </div>
+          ) : null}
           <h2>UDIN Details</h2>
           <p className="hint">
             Select an active CA profile and enter UDIN details for this financial statement print.
@@ -6233,11 +6920,20 @@ function FinancialStatement() {
                 value={udinDetails.caProfileId}
                 onChange={(event) => {
                   const profile = udinCaOptions.find((item) => item.id === event.target.value)
-                  updateUdinDetails({
+                  const nextPatch: Partial<UdinDetails> = {
                     caProfileId: event.target.value,
                     caPartnerName: profile?.partnerName || '',
                     caFirmName: profile?.firmName || '',
-                  })
+                  }
+                  if (
+                    profile &&
+                    !udinDetails.sealAttachmentDataUrl &&
+                    !udinDetails.sealAttachmentName
+                  ) {
+                    nextPatch.sealAttachmentName = profile.sealSignatureName || ''
+                    nextPatch.sealAttachmentDataUrl = profile.sealSignatureDataUrl || ''
+                  }
+                  updateUdinDetails(nextPatch)
                 }}
                 disabled={isFsReadOnly}
               >
@@ -6295,10 +6991,71 @@ function FinancialStatement() {
                 readOnly={isFsReadOnly}
               />
             </label>
+            <label>
+              CA Seal attachment
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(event) => {
+                  void onUdinSealAttachmentChange(event.target.files?.[0] ?? null)
+                  event.target.value = ''
+                }}
+                disabled={isFsReadOnly || saving}
+              />
+              {udinDetails.sealAttachmentName ? (
+                <span className="fs-udin-file-name">{udinDetails.sealAttachmentName}</span>
+              ) : selectedUdinCa?.sealSignatureName ? (
+                <span className="fs-udin-file-hint">
+                  Using seal from CA profile: {selectedUdinCa.sealSignatureName}
+                </span>
+              ) : (
+                <span className="fs-udin-file-hint">Attach seal image for print (PNG, JPG, etc.)</span>
+              )}
+            </label>
+          </div>
+
+          {udinDetails.enabled && udinDetails.caProfileId && (
+            <div className="fs-udin-banner-editor">
+              <h3>Document sign-off banner</h3>
+              <p className="hint">
+                This banner prints directly below each part&apos;s content table — on the same page
+                when the part fits one page, or on the last page when the part spans multiple pages.
+                Attach a seal image before printing. Drag the seal anywhere inside the banner to
+                adjust its position.
+              </p>
+              {renderUdinSignBanner({ editable: !isFsReadOnly })}
+            </div>
+          )}
+        </section>
+      )}
+      {shouldRenderPrintUdinClosing && (
+        <section
+          className="fs-print-udin-closing fs-print-only"
+          data-fs-tab="udin-details"
+          data-print-title={printTitleForTab('udin-details')}
+        >
+          {renderPrintSectionStationery('udin-details')}
+          <div className="fs-print-part-shell">
+          <div className="fs-print-part-body">
+          {renderPrintUdinBlock()}
+          </div>
           </div>
         </section>
       )}
       </div>
+
+      {!shouldUsePerPartCaSignoff && (
+        <PrintFooter
+          clientName={printClientSignatoryName}
+          showCaSigning={showPrintCaSigning}
+          caProfile={effectivePrintCaProfile}
+          udinNumber={printUdinNumber}
+          udinDate={printUdinDate}
+          sealOffsetX={udinDetails.sealOffsetX}
+          sealOffsetY={udinDetails.sealOffsetY}
+          variant={showPrintCaSigning ? 'ca' : 'client'}
+        />
+      )}
 
       {visibleTabs.some(([tab]) => tab === 'final-info') && (
         <section
@@ -6546,7 +7303,7 @@ function FinancialStatement() {
               <button type="button" className="secondary-btn" onClick={() => setPrintAllModalOpen(false)}>
                 Cancel
               </button>
-              <button type="button" className="primary-btn" onClick={confirmPrintAll}>
+              <button type="button" className="primary-btn" onClick={() => void onConfirmPrintAll()}>
                 Print selected
               </button>
             </div>

@@ -1,0 +1,254 @@
+.fs-udin-sign-banner {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 1rem;
+}
+
+.fs-udin-sign-banner-body {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 110px;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+}
+
+.fs-udin-sign-banner--editable .fs-udin-sign-banner-body {
+  border-style: dashed;
+  background:
+    linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px) 0 0 / 16px 16px,
+    linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px) 0 0 / 16px 16px,
+    linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+}
+
+.fs-udin-sign-banner-text {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 42%;
+  text-align: left;
+  font-family: Arial, Inter, Helvetica, sans-serif;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #0f172a;
+  pointer-events: none;
+}
+
+.fs-udin-sign-banner-firm,
+.fs-udin-sign-banner-frn,
+.fs-udin-sign-banner-name,
+.fs-udin-sign-banner-line {
+  margin: 0;
+  padding: 0;
+}
+
+.fs-udin-sign-banner-firm {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.fs-udin-sign-banner-frn {
+  margin-top: 0.15rem;
+  font-weight: 400;
+}
+
+.fs-udin-sign-banner-ca-block {
+  margin-top: 0.85rem;
+}
+
+.fs-udin-sign-banner-name {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.fs-udin-sign-banner-ca-block .fs-udin-sign-banner-line {
+  margin-top: 0.2rem;
+}
+
+.fs-udin-sign-banner-meta {
+  margin-top: 0.65rem;
+}
+
+.fs-udin-sign-banner-meta .fs-udin-sign-banner-line {
+  margin-top: 0.2rem;
+}
+
+.fs-udin-sign-banner-line {
+  font-weight: 400;
+}
+
+.fs-udin-sign-banner-client {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  min-width: 30%;
+  max-width: 38%;
+  text-align: right;
+  pointer-events: none;
+}
+
+.fs-udin-sign-banner-client-line {
+  width: 38mm;
+  height: 6mm;
+  margin: 0 0 0.35rem auto;
+  border: none;
+}
+
+.fs-udin-sign-banner-client-name {
+  margin: 0;
+  padding: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #0f172a;
+}
+
+.fs-udin-sign-banner-client-label {
+  margin: 0.2rem 0 0;
+  padding: 0;
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: #0f172a;
+}
+
+.fs-udin-sign-banner-seal-placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0.75rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.fs-udin-sign-banner-seal {
+  position: absolute;
+  z-index: 2;
+  max-width: 34mm;
+  max-height: 30mm;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  transform: translate(-50%, -50%);
+  user-select: none;
+  touch-action: none;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.fs-udin-sign-banner--editable .fs-udin-sign-banner-seal {
+  cursor: grab;
+}
+
+.fs-udin-sign-banner-seal--dragging,
+.fs-udin-sign-banner--editable .fs-udin-sign-banner-seal:active {
+  cursor: grabbing;
+}
+
+.fs-udin-sign-banner-hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+@media print {
+  .fs-udin-sign-banner {
+    margin-top: var(--print-space-section, 10px);
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .fs-udin-sign-banner-hint {
+    display: none !important;
+  }
+
+  .fs-udin-sign-banner-body {
+    min-height: 28mm;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: #fff !important;
+    overflow: visible;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(34%, 42%);
+    column-gap: 8mm;
+    align-items: end;
+  }
+
+  .fs-udin-sign-banner-text {
+    grid-column: 1;
+    grid-row: 1;
+    max-width: none !important;
+    font-size: var(--print-small-size, 9pt);
+    line-height: var(--print-line-height, 1.35);
+    color: #000;
+  }
+
+  .fs-udin-sign-banner-client {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative;
+    z-index: 4;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+    justify-self: end;
+    width: 100%;
+    min-width: 0;
+    flex-shrink: 0;
+    background: #fff;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .fs-udin-sign-banner-client-line {
+    display: block !important;
+    visibility: visible !important;
+    width: 38mm;
+    height: 6mm;
+    margin: 0 0 var(--print-space-paragraph, 6px) auto;
+    border: none;
+  }
+
+  .fs-udin-sign-banner-client-name,
+  .fs-udin-sign-banner-client-label {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    font-size: var(--print-small-size, 9pt);
+    line-height: var(--print-line-height, 1.35);
+    color: #000 !important;
+  }
+
+  .fs-udin-sign-banner-client-name {
+    font-weight: 700;
+  }
+
+  .fs-udin-sign-banner-seal {
+    z-index: 2;
+    display: block !important;
+    visibility: visible !important;
+    max-height: 30mm;
+    max-width: 34mm;
+    min-width: 20mm;
+    min-height: 20mm;
+  }
+}

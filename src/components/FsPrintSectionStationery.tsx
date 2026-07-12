@@ -27,7 +27,12 @@ function FsPrintSectionStationery({
   showClientDetails = true,
 }: FsPrintSectionStationeryProps) {
   return (
-    <div className="fs-print-section-stationery fs-print-notes-stationery fs-print-client-header fs-print-only" aria-hidden="true">
+    <div
+      className={`fs-print-section-stationery fs-print-notes-stationery fs-print-only${
+        showClientDetails ? ' fs-print-client-header' : ' fs-print-section-stationery--title-only'
+      }`}
+      aria-hidden="true"
+    >
       <FsPrintBannerContent
         client={client}
         business={business}

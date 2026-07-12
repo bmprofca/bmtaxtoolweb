@@ -85,12 +85,12 @@ function AppContent() {
           element={<ClientToolPicker />}
         />
         <Route
-          path="clients/:clientId/tools/:fyId/business/:businessId"
-          element={<LegacyToolPickerRedirect />}
-        />
-        <Route
           path="clients/:clientId/tools/financial-statement/:fyId/business/:businessId"
           element={<FinancialStatement />}
+        />
+        <Route
+          path="clients/:clientId/tools/:fyId/business/:businessId"
+          element={<LegacyToolPickerRedirect />}
         />
         <Route
           path="clients/:clientId/fs/:fyId/business/:businessId"

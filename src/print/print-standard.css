@@ -1,0 +1,669 @@
+/**
+ * Global print standard — single source of truth for all printable documents.
+ * Import once at application entry (main.tsx).
+ */
+
+/* -------------------------------------------------------------------------- */
+/* Screen helpers                                                             */
+/* -------------------------------------------------------------------------- */
+
+.print-only,
+.fs-print-only {
+  display: none;
+}
+
+.screen-only,
+.fs-screen-only {
+  display: block;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Design tokens (print)                                                      */
+/* -------------------------------------------------------------------------- */
+
+@media print {
+  :root {
+    --print-font-family: Arial, Inter, Helvetica, 'Segoe UI', sans-serif;
+    --print-color-text: #000;
+    --print-color-border: #000;
+    --print-color-header-bg: #f0f0f0;
+    --print-body-size: 11pt;
+    --print-heading-size: 16pt;
+    --print-section-size: 13pt;
+    --print-small-size: 9pt;
+    --print-line-height: 1.35;
+    --print-space-heading: 12px;
+    --print-space-section: 10px;
+    --print-space-paragraph: 6px;
+    --print-space-table: 8px;
+    --print-cell-padding-y: 4px;
+    --print-cell-padding-x: 6px;
+    --print-title-pad-y: 4px;
+    --print-client-header-reserve: 0mm;
+    --print-section-stationery-reserve: 0mm;
+    --print-page-body-min-height: 267mm;
+    --print-balance-sheet-page-body-min-height: 277mm;
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Page setup                                                               */
+  /* ------------------------------------------------------------------------ */
+
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+
+  html,
+  body {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: var(--print-color-text) !important;
+    font-family: var(--print-font-family) !important;
+    font-size: var(--print-body-size) !important;
+    line-height: var(--print-line-height) !important;
+    print-color-adjust: economy;
+    -webkit-print-color-adjust: economy;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box !important;
+    animation: none !important;
+    transition: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Hide non-print chrome                                                    */
+  /* ------------------------------------------------------------------------ */
+
+  .dashboard .sidebar,
+  .fs-no-print,
+  .screen-only,
+  .fs-screen-only,
+  button,
+  input,
+  select,
+  textarea,
+  .notes-add-round-btn,
+  .notes-gst-link-bar,
+  .danger-btn,
+  .secondary-btn,
+  .primary-btn,
+  .notes-gst-open-btn,
+  .loan-card-actions,
+  .bank-row-actions,
+  .bank-icon-btn,
+  .notes-admin-remove-btn,
+  .gst-sales-link-toggle,
+  .gst-note-link-btn,
+  .gst-section-header button,
+  .fs-opening-balance-banner,
+  .fs-consolidated-banner,
+  .hint,
+  .panel-header-row,
+  .back-link,
+  .fs-print-all-modal,
+  .fs-edit-unlock-modal,
+  .alert,
+  .empty-state,
+  .fs-context-bar,
+  .fs-page-actions,
+  .fs-tab-bar,
+  .fs-print-all-toolbar,
+  .fs-print-all-options,
+  .fs-print-option,
+  .page-refresh-btn,
+  .swal2-container {
+    display: none !important;
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Layout shell                                                             */
+  /* ------------------------------------------------------------------------ */
+
+  .dashboard,
+  .dashboard-content,
+  .print-page,
+  .fs-page,
+  .fs-print-body {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: var(--print-color-text) !important;
+    flex: none !important;
+  }
+
+  .dashboard-content {
+    padding: 0 !important;
+  }
+
+  .fs-page {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .print-only,
+  .fs-print-only {
+    display: block !important;
+  }
+
+  tr.fs-print-only,
+  tr.fs-print-notes-banner-row,
+  tr.fs-print-notes-head-spacer {
+    display: table-row !important;
+  }
+
+  .fs-print-body,
+  .print-section {
+    flex: 0 0 auto;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Typography                                                               */
+  /* ------------------------------------------------------------------------ */
+
+  .print-heading,
+  .fs-print-report-title,
+  .fs-print-notes-report-line,
+  .fs-print-header-report-right strong {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: var(--print-font-family) !important;
+    font-size: var(--print-heading-size) !important;
+    font-weight: 700 !important;
+    line-height: var(--print-line-height) !important;
+    color: var(--print-color-text) !important;
+    text-align: center !important;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .fs-print-notes-period-line,
+  .print-document-title__period {
+    margin: var(--print-space-paragraph) 0 0 !important;
+    padding: 0 !important;
+    font-family: var(--print-font-family) !important;
+    font-size: var(--print-small-size) !important;
+    font-weight: 500 !important;
+    line-height: var(--print-line-height) !important;
+    color: var(--print-color-text) !important;
+    text-align: center !important;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .print-section-title,
+  .fs-print-period {
+    margin: var(--print-space-paragraph) 0 0 !important;
+    padding: 0 !important;
+    font-family: var(--print-font-family) !important;
+    font-size: var(--print-section-size) !important;
+    font-weight: 700 !important;
+    line-height: var(--print-line-height) !important;
+    color: var(--print-color-text) !important;
+    text-align: center !important;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .print-small,
+  .fs-print-proprietorship,
+  .fs-print-location,
+  .fs-print-footer-line,
+  .fs-print-footer-strong,
+  .fs-print-ca-signoff-line,
+  .fs-print-ca-signoff-mark {
+    font-family: var(--print-font-family) !important;
+    font-size: var(--print-small-size) !important;
+    line-height: var(--print-line-height) !important;
+    color: var(--print-color-text) !important;
+  }
+
+  .fs-print-business-name {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: var(--print-font-family) !important;
+    font-size: var(--print-section-size) !important;
+    font-weight: 700 !important;
+    line-height: var(--print-line-height) !important;
+    text-align: center !important;
+    text-transform: uppercase;
+    color: var(--print-color-text) !important;
+  }
+
+  .fs-print-body,
+  .fs-print-statement-format,
+  .fs-balance-sheet-print-body,
+  .fs-profit-loss-print-body,
+  .print-table,
+  .statement-table,
+  .notes-table,
+  .schedule-table,
+  .bank-account-table,
+  .pl-appropriation-table,
+  .data-table,
+  .loan-cashflow-table {
+    font-family: var(--print-font-family) !important;
+    font-size: var(--print-body-size) !important;
+    line-height: var(--print-line-height) !important;
+    color: var(--print-color-text) !important;
+  }
+
+  p {
+    margin-top: 0 !important;
+    margin-bottom: var(--print-space-paragraph) !important;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    margin-top: 0 !important;
+    margin-bottom: var(--print-space-heading) !important;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Headers & titles                                                         */
+  /* ------------------------------------------------------------------------ */
+
+  .print-header,
+  .fs-print-header,
+  .fs-print-fixed-client-header,
+  .fs-print-section-stationery,
+  .print-document-title,
+  .fs-print-document-title,
+  .fs-print-notes-banner-surface {
+    text-align: center !important;
+    color: var(--print-color-text) !important;
+    background: #fff !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print-header--fixed,
+  .fs-print-fixed-client-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    width: 100%;
+    padding: 0 0 var(--print-space-paragraph) !important;
+    margin: 0 !important;
+  }
+
+  .print-document-title,
+  .fs-print-document-title,
+  .fs-print-notes-report-block,
+  .fs-print-notes-report-block--title-only {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: var(--print-title-pad-y) auto !important;
+    padding: 0 !important;
+    text-align: center !important;
+  }
+
+  .print-document-title__line,
+  .print-document-title__period,
+  .fs-print-notes-report-line,
+  .fs-print-notes-period-line {
+    display: block !important;
+    width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    text-align: center !important;
+    white-space: normal !important;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+  }
+
+  .fs-print-header-center,
+  .fs-print-header-business,
+  .fs-print-client-header,
+  .fs-print-client-header * {
+    text-align: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Stationery table (repeating title block)                                 */
+  /* ------------------------------------------------------------------------ */
+
+  .fs-print-stationery-table,
+  .fs-print-stationery-inner {
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    margin: 0 auto !important;
+    background: #fff !important;
+  }
+
+  .fs-print-stationery-table thead {
+    display: table-header-group;
+  }
+
+  .fs-print-stationery-table th,
+  .fs-print-stationery-inner th,
+  .fs-print-stationery-inner td,
+  .fs-print-notes-banner-cell,
+  .fs-print-notes-head-spacer-cell {
+    width: 100% !important;
+    max-width: none !important;
+    border: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+    text-align: center !important;
+    vertical-align: top !important;
+    font-weight: 400 !important;
+  }
+
+  .fs-print-notes-head-spacer-cell {
+    height: var(--print-client-header-reserve);
+    min-height: var(--print-client-header-reserve);
+    line-height: 0 !important;
+    font-size: 0 !important;
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Tables                                                                   */
+  /* ------------------------------------------------------------------------ */
+
+  .print-table-wrap,
+  .table-wrap,
+  .statement-table-wrap,
+  .statement-table-container,
+  .notes-table-wrap,
+  .bank-account-table-wrap,
+  .dep-schedule-wrap,
+  .dep-history-wrap,
+  .pl-appropriation-table-wrap,
+  .loan-emi-table-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    margin: var(--print-space-table) 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  .print-table,
+  .fs-print-body table,
+  table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  .statement-head-row th,
+  .notes-head-row th,
+  .pl-appr-head-row th,
+  .print-table thead th,
+  .schedule-table thead th,
+  .bank-account-table thead th {
+    background: var(--print-color-header-bg) !important;
+    color: var(--print-color-text) !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+    padding: var(--print-cell-padding-y) var(--print-cell-padding-x) !important;
+    border: 0.5px solid var(--print-color-border) !important;
+    vertical-align: middle !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  th,
+  td {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    padding: var(--print-cell-padding-y) var(--print-cell-padding-x) !important;
+    border: 0.5px solid var(--print-color-border) !important;
+    vertical-align: top !important;
+    overflow: visible !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    color: var(--print-color-text) !important;
+  }
+
+  .statement-particular-col,
+  .notes-particular-col,
+  .pl-appr-particular-col,
+  td:first-child {
+    text-align: left !important;
+  }
+
+  .statement-amount-col,
+  .statement-curr-col,
+  .statement-prev-col,
+  .statement-change-col,
+  .statement-pct-col,
+  .statement-variance-col,
+  .notes-amount-col,
+  .notes-curr-col,
+  .notes-prev-col,
+  .notes-variance-col,
+  .pl-appr-amount-col,
+  .calc-cell,
+  .bank-col-amount,
+  .bank-col-closing,
+  td[class*='amount'],
+  td[class*='col-amount'] {
+    text-align: right !important;
+  }
+
+  .statement-note-col,
+  .notes-sno-col {
+    text-align: center !important;
+  }
+
+  .statement-grand-total-row,
+  .statement-total-row,
+  .notes-note-total-row,
+  .fs-print-note-block,
+  .fs-print-note-block tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Sections & page breaks                                                   */
+  /* ------------------------------------------------------------------------ */
+
+  .print-section {
+    margin-bottom: var(--print-space-section) !important;
+    padding: 0 !important;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .print-section--break,
+  .fs-print-section-break {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+
+  .fs-print-tab-skip {
+    display: none !important;
+  }
+
+  .fs-tab-panel::before {
+    display: none !important;
+  }
+
+  .fs-print-section-stationery,
+  .fs-print-notes-banner-row,
+  .fs-print-header,
+  .print-header {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Footer & signatures                                                      */
+  /* ------------------------------------------------------------------------ */
+
+  .print-footer,
+  .fs-print-footer {
+    order: 3;
+    flex: 0 0 auto;
+    width: 100% !important;
+    margin-top: var(--print-space-section) !important;
+    padding: var(--print-space-section) 0 0 !important;
+    border: none !important;
+    background: #fff !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print-signature,
+  .fs-print-footer-right,
+  .fs-print-ca-signoff {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print-signature__line,
+  .fs-print-sign-area {
+    width: 38mm;
+    height: 6mm;
+    margin: 0 0 var(--print-space-paragraph) auto !important;
+    border: none !important;
+  }
+
+  .print-signature__name,
+  .print-signature__label,
+  .fs-print-footer-strong,
+  .fs-print-footer-line {
+    margin: 0 !important;
+    text-align: right !important;
+    font-size: var(--print-small-size) !important;
+    line-height: var(--print-line-height) !important;
+  }
+
+  .print-signature__name,
+  .fs-print-footer-strong {
+    font-weight: 700 !important;
+  }
+
+  .fs-print-footer-inner {
+    display: flex !important;
+    justify-content: flex-end !important;
+    width: 100% !important;
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Whitespace audit                                                         */
+  /* ------------------------------------------------------------------------ */
+
+  .statement-spacer-row,
+  .statement-spacer-row td,
+  br + br,
+  p:empty,
+  div:empty:not(.fs-print-sign-area):not(.fs-print-notes-head-spacer-cell):not(.fs-udin-sign-banner-client-line) {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .statement-table-wrap h3,
+  .statement-table-container h3,
+  .fs-tab-panel > h2,
+  .fs-tab-panel > .hint {
+    display: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Overflow                                                                 */
+  /* ------------------------------------------------------------------------ */
+
+  img,
+  svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  img.fs-print-ca-signoff-seal,
+  img.fs-udin-sign-banner-seal {
+    display: block !important;
+    visibility: visible !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .fs-print-body input,
+  .fs-print-body select,
+  .fs-print-body textarea {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    color: var(--print-color-text) !important;
+    font: inherit !important;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .fs-print-body .statement-amount-print,
+  .fs-print-body .statement-note-print-value,
+  .fs-print-body .note-amount-print,
+  .fs-print-body .pl-appr-particular-print {
+    display: inline !important;
+    width: auto !important;
+    color: var(--print-color-text) !important;
+  }
+
+  .fs-print-body .statement-amount-value,
+  .fs-print-body .statement-variance-value {
+    display: none !important;
+  }
+}

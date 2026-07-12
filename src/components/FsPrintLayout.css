@@ -1,3 +1,5 @@
+@import '../print/print-comparison-layout.css';
+
 .fs-print-only {
   display: none;
 }
@@ -6,174 +8,91 @@
   display: block;
 }
 
+/* Screen: merged notes panel only visible when printing from Notes overview */
+.fs-tab-panel.fs-notes-print-merged--overview {
+  display: none !important;
+}
+
+/* Screen: loan EMI schedules hidden until expanded */
+.loan-emi-schedule:not(.is-expanded) {
+  display: none;
+}
+
+/* Document-specific overrides — global print standard lives in print/print-standard.css */
+
 @media print {
-  @page {
+  @page balance-sheet-page {
     size: A4 portrait;
-    margin: 8mm 15mm 10mm 15mm;
+    margin: 10mm;
   }
 
-  html,
-  body {
-    width: 100% !important;
-    height: auto !important;
-    min-height: 0 !important;
-    overflow: visible !important;
-    background: #fff !important;
-    color: #000 !important;
-    print-color-adjust: economy;
-    -webkit-print-color-adjust: economy;
-  }
-
-  html,
-  body,
-  #root {
-    height: auto !important;
-    min-height: 0 !important;
-  }
-
-  .dashboard,
-  .dashboard-content,
-  .fs-page,
-  .fs-print-body {
-    width: 100% !important;
-    max-width: none !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: visible !important;
-    background: #fff !important;
-    color: #000 !important;
-  }
-
-  .dashboard {
-    display: block !important;
-  }
-
-  .dashboard .sidebar,
-  .fs-no-print {
-    display: none !important;
-  }
-
-  .dashboard-content {
-    padding: 0 !important;
-  }
-
-  .fs-page {
-    padding: 0 !important;
-    margin: 0 !important;
-    display: flex;
-    flex-direction: column;
+  /* Apply balance sheet page margins to the whole print run (header + table + footer),
+     not the tab panel — a named page on the panel alone forces a blank first page. */
+  .fs-page.fs-print-balance-sheet-only,
+  .fs-page.fs-print-balance-sheet:not(.fs-print-all) {
+    page: balance-sheet-page;
   }
 
   .fs-page.fs-page--cash-adjust-banner {
     padding-bottom: 0 !important;
   }
 
-  .fs-print-header,
-  .fs-print-body,
-  .fs-print-footer {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-  }
-
-  .fs-print-only {
-    display: block !important;
-  }
-
-  .fs-screen-only {
-    display: none !important;
-  }
-
-  /* Flow layout: header → body → footer (footer after content) */
   .fs-print-header {
     order: 1;
     flex: 0 0 auto;
     position: relative;
-    background: #fff;
-    border: none;
-    padding: 0 0 2mm !important;
+    padding: 0 0 var(--print-space-section, 10px) !important;
     margin: 0;
-    max-height: none;
-    overflow: visible;
     break-after: avoid;
     page-break-after: avoid;
   }
 
-  .fs-print-header-report-right {
-    margin: 0.9mm 0 0;
-    padding: 0;
-    text-align: center;
-    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif;
-    font-size: 12pt;
-    font-weight: 700;
-    line-height: 1.2;
-    color: #000;
-  }
-
-  .fs-print-header-report-right strong {
-    font-weight: 700;
+  /* Document header prints once at the top of page 1 only (in-flow, not repeating) */
+  .fs-page .fs-print-header {
+    display: block !important;
   }
 
   .fs-print-body {
     order: 2;
     flex: 0 0 auto;
-    margin: 0;
-    padding: 0 !important;
   }
 
-  .fs-print-footer {
+  .fs-print-footer,
+  .print-footer {
     order: 3;
     flex: 0 0 auto;
-    position: static;
-    background: #fff;
-    border: none;
-    border-top: none !important;
-    padding: 1.5mm 0 0;
-    margin: 1.5mm 0 0;
-    max-height: none;
-    overflow: visible;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  .fs-print-header-center {
-    text-align: center;
-    color: #000;
-  }
-
-  .fs-print-header-business {
-    margin-bottom: 1mm;
-  }
-
-  .fs-print-header-report {
-    margin: 0;
   }
 
   .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-print-header {
+    display: block !important;
+  }
+
+  .fs-print-notes-banner-row {
     display: none !important;
   }
 
-  /* Print All: fixed client header at top center on every page (same as single Notes print) */
   .fs-print-fixed-client-header {
     display: none !important;
   }
 
-  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-fixed-client-header {
-    display: block !important;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    z-index: 3;
-    box-sizing: border-box;
-    padding: 0 0 3mm;
-    background: #fff;
-    text-align: center !important;
+  .fs-print-notes-head-spacer-row,
+  .fs-print-notes-head-spacer-cell {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
   }
 
-  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-fixed-client-header .fs-print-header-business {
-    margin-bottom: 0;
+  /* Balance sheet tables flow together on one page (not each forced to its own page) */
+  .fs-print-body .statement-table-wrap:not(.statement-table-wrap--balance-sheet),
+  .fs-print-body .notes-print-note-unit,
+  .fs-print-body .bank-account-table-wrap,
+  .fs-print-body .gst-reco-panel .gst-print-table-block,
+  .fs-print-body .pl-appropriation-table-wrap:not(.pl-appropriation-table-wrap--empty) {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   .fs-print-notes-stationery,
@@ -190,51 +109,141 @@
     display: none !important;
   }
 
-  /* Notes print: full-width centered client header outside the table (repeats on every page) */
   .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-tab-panel[data-fs-tab='notes'] > .fs-print-section-stationery,
-  .fs-page.fs-print-notes-only .fs-tab-panel[data-fs-tab='notes'] > .fs-print-section-stationery {
-    display: block !important;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    z-index: 2;
-    box-sizing: border-box;
-    padding: 0 0 4mm;
-    background: #fff;
-    text-align: center !important;
-  }
-
-  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-tab-panel[data-fs-tab='notes'] .fs-print-notes-banner-row,
-  .fs-page.fs-print-notes-only .fs-tab-panel[data-fs-tab='notes'] .fs-print-notes-banner-row {
+  .fs-page.fs-print-notes-only .fs-tab-panel[data-fs-tab='notes'] > .fs-print-section-stationery,
+  .fs-page.fs-print-all.fs-print-notes-only .fs-tab-panel[data-fs-tab='notes'] > .fs-print-section-stationery,
+  .fs-page.fs-print-all.fs-print-notes-only .fs-notes-print-merged > .fs-print-section-stationery,
+  .fs-page.fs-print-gst-section .fs-tab-panel[data-fs-tab='gst-reco'] > .fs-print-section-stationery,
+  .fs-page.fs-print-gst-only .fs-tab-panel[data-fs-tab='gst-reco'] > .fs-print-section-stationery {
     display: none !important;
   }
 
-  /* Print All: section title blocks for non-table sections (GST, UDIN) */
+  /* GST Print Current + GST-only Print All: table thead banner only */
   .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='gst-reco'] > .fs-print-section-stationery,
-  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='udin-details'] > .fs-print-section-stationery {
-    display: block !important;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 0 0 3mm;
-    margin: 0 0 2mm;
-    background: #fff;
-    text-align: center !important;
-    position: static;
-    break-after: avoid;
-    page-break-after: avoid;
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='udin-details'] > .fs-print-section-stationery,
+  .fs-page.fs-print-all .fs-print-udin-closing > .fs-print-section-stationery {
+    margin: 0 0 1.5mm !important;
   }
 
-  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-tab-panel[data-fs-tab='gst-reco'],
-  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-tab-panel[data-fs-tab='udin-details'] {
-    padding-top: 24mm !important;
+  /* Full-width print stationery: spacer + title above data tables (avoids colspan squeeze) */
+  .fs-print-stationery-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    border: none !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .fs-print-stationery-table thead {
+    display: table-header-group;
+  }
+
+  .fs-print-stationery-table th.fs-print-stationery-cell {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    border: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+    text-align: center !important;
+    font-weight: 400 !important;
+    vertical-align: top !important;
+  }
+
+  .fs-print-stationery-inner {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 auto !important;
+    border: none !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    background: #fff !important;
+  }
+
+  .fs-print-stationery-inner th,
+  .fs-print-stationery-inner td {
+    width: 100% !important;
+    max-width: none !important;
+    border: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+    text-align: center !important;
+    vertical-align: top !important;
+  }
+
+  .fs-print-stationery-table th {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    border: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+    text-align: center !important;
+    font-weight: 400 !important;
+    vertical-align: top !important;
+  }
+
+  .fs-print-stationery-table .fs-print-notes-banner-surface {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    display: block !important;
+    margin: 0 auto !important;
+    text-align: center !important;
+  }
+
+  .fs-print-stationery-table .fs-print-notes-report-block,
+  .fs-print-stationery-table .fs-print-notes-report-block--title-only,
+  .fs-print-stationery-table .fs-print-notes-report-line,
+  .fs-print-stationery-table .fs-print-notes-period-line {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    text-align: center !important;
+    box-sizing: border-box !important;
+  }
+
+  .fs-page.fs-print-all .fs-print-stationery-table .fs-print-notes-report-line {
+    font-family: var(--print-font-family);
+    font-size: var(--print-heading-size) !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: var(--print-line-height);
+    color: var(--print-color-text);
+  }
+
+  .fs-page.fs-print-all .fs-print-stationery-table .fs-print-notes-period-line {
+    margin-top: var(--print-space-paragraph) !important;
+    font-family: var(--print-font-family);
+    font-size: var(--print-small-size) !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    line-height: var(--print-line-height);
+    color: var(--print-color-text);
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-stationery-table .fs-print-document-title,
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-stationery-table .fs-print-document-title *,
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-stationery-table .fs-print-client-header,
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-stationery-table .fs-print-client-header * {
+    margin-left: auto !important;
+    margin-right: auto !important;
+    text-align: center !important;
   }
 
   /* Full-width layout table escapes narrow first-column squeeze in repeating thead banners */
   .fs-print-banner-layout {
     width: 100% !important;
-    min-width: 100% !important;
+    min-width: 0 !important;
     max-width: 100% !important;
     margin: 0 auto !important;
     border: none !important;
@@ -252,6 +261,27 @@
     background: #fff !important;
   }
 
+  .fs-print-document-title,
+  .fs-print-document-title .fs-print-notes-report-block,
+  .fs-print-document-title .fs-print-notes-report-line,
+  .fs-print-document-title .fs-print-notes-period-line {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    text-align: center !important;
+  }
+  .fs-print-notes-report-block--title-only .fs-print-notes-report-line,
+  .fs-print-notes-report-block--title-only .fs-print-notes-period-line {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    text-align: center !important;
+  }
+
   .fs-print-client-header,
   .fs-print-client-header .fs-print-header-business,
   .fs-print-client-header .fs-print-header-center,
@@ -267,20 +297,26 @@
     margin-right: auto !important;
   }
 
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-banner-row .fs-print-client-header,
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-banner-row .fs-print-client-header * {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
   /* Print-all / repeating headers: centered section title below fixed client header */
   .fs-print-notes-banner-surface {
     display: block;
-    width: 100vw;
-    max-width: 100vw;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
-    padding: 0 15mm 2mm;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 0 2mm !important;
     box-sizing: border-box;
     text-align: center !important;
   }
 
   .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-banner-surface {
     padding-top: 0;
+    padding-bottom: 0.5mm;
   }
 
   .fs-print-notes-banner-surface .fs-print-header-business {
@@ -293,6 +329,93 @@
   /* Repeating client header for other sections uses table thead banner rows in print */
   .fs-print-section-stationery {
     display: none !important;
+  }
+
+  .fs-page.fs-print-all .fs-print-section-stationery {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    padding: 0 0 2mm !important;
+    margin: 0 0 1.5mm !important;
+    background: #fff;
+    text-align: center !important;
+    position: static;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-tab-panel[data-fs-tab='notes'] > .fs-print-section-stationery,
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-notes-print-merged > .fs-print-section-stationery {
+    display: block !important;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-section-stationery.fs-print-client-header {
+    padding-top: 0 !important;
+    padding-bottom: 0.75mm !important;
+    margin-bottom: 0.75mm !important;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-section-stationery--title-only {
+    padding-top: 0 !important;
+    padding-bottom: 0.75mm !important;
+    margin-bottom: 0.75mm !important;
+  }
+
+  .fs-page.fs-print-all.fs-print-notes-only .fs-print-section-stationery {
+    padding-top: 0 !important;
+  }
+
+  .fs-page.fs-print-all.fs-print-gst-only .fs-print-section-stationery {
+    padding-top: 0 !important;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-tab-panel[data-fs-tab='gst-reco'],
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-tab-panel[data-fs-tab='udin-details'] {
+    padding-top: 0 !important;
+  }
+
+  .fs-page.fs-print-all .fs-print-section-stationery .fs-print-header-center,
+  .fs-page.fs-print-all .fs-print-section-stationery .fs-print-header-business,
+  .fs-page.fs-print-all .fs-print-section-stationery.fs-print-client-header .fs-print-business-name,
+  .fs-page.fs-print-all .fs-print-section-stationery.fs-print-client-header .fs-print-proprietorship,
+  .fs-page.fs-print-all .fs-print-section-stationery.fs-print-client-header .fs-print-location,
+  .fs-page.fs-print-all .fs-print-section-stationery .fs-print-notes-report-block,
+  .fs-page.fs-print-all .fs-print-section-stationery .fs-print-notes-report-line,
+  .fs-page.fs-print-all .fs-print-section-stationery .fs-print-notes-period-line {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    text-align: center !important;
+  }
+
+  .fs-page.fs-print-all .fs-print-section-stationery .fs-print-notes-report-block {
+    margin-top: 0 !important;
+    margin-bottom: 0.8mm !important;
+  }
+
+  .fs-page.fs-print-all .fs-print-section-stationery .fs-print-notes-report-line {
+    margin: 0 !important;
+    font-family: var(--print-font-family);
+    font-size: var(--print-heading-size) !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: var(--print-line-height);
+    color: var(--print-color-text);
+  }
+
+  .fs-page.fs-print-all .fs-print-section-stationery .fs-print-notes-period-line {
+    margin: var(--print-space-paragraph) 0 0 !important;
+    font-family: var(--print-font-family);
+    font-size: var(--print-small-size) !important;
+    font-weight: 500 !important;
+    line-height: var(--print-line-height);
+    color: var(--print-color-text);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
   }
 
   .fs-tab-panel[data-fs-tab='udin-details'] > .fs-print-section-stationery {
@@ -374,22 +497,22 @@
 
   .fs-print-notes-report-line {
     margin: 0;
-    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif;
-    font-size: 8.5pt !important;
+    font-family: var(--print-font-family);
+    font-size: var(--print-heading-size) !important;
     font-weight: 700 !important;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    line-height: 1.2;
-    color: #000;
+    line-height: var(--print-line-height);
+    color: var(--print-color-text);
   }
 
   .fs-print-notes-period-line {
-    margin: 0.4mm 0 0;
-    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif;
-    font-size: 6.5pt !important;
+    margin: var(--print-space-paragraph) 0 0;
+    font-family: var(--print-font-family);
+    font-size: var(--print-small-size) !important;
     font-weight: 500 !important;
-    line-height: 1.15;
-    color: #000;
+    line-height: var(--print-line-height);
+    color: var(--print-color-text);
     text-transform: uppercase;
     letter-spacing: 0.02em;
   }
@@ -424,15 +547,13 @@
     text-align: center !important;
   }
 
-  .fs-page.fs-print-notes-section:not(.fs-print-all)
-    .fs-print-body.fs-print-statement-format
-    .fs-tab-panel[data-fs-tab='notes']
-    .fs-print-notes-head-spacer-cell,
-  .fs-page.fs-print-notes-only
-    .fs-print-body.fs-print-statement-format
-    .fs-tab-panel[data-fs-tab='notes']
-    .fs-print-notes-head-spacer-cell {
-    height: 32mm;
+  .fs-print-notes-banner-surface {
+    padding: 0 0 1.5mm !important;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-head-spacer-cell {
+    height: var(--print-client-header-reserve);
+    min-height: var(--print-client-header-reserve);
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
@@ -441,15 +562,70 @@
     font-size: 0 !important;
   }
 
-  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-head-spacer-cell {
-    height: 26mm;
+  /* Print All: clear fixed client header, then title, then table body */
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-tab-panel[data-fs-tab='balance-sheet'] .fs-print-notes-head-spacer-cell,
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-tab-panel[data-fs-tab='profit-loss'] .statement-table-wrap:first-child .fs-print-notes-head-spacer-cell,
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-tab-panel[data-fs-tab='profit-loss'] .pl-appropriation-table .fs-print-notes-head-spacer-cell,
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-notes-print-merged .fs-print-notes-head-spacer-cell {
+    height: var(--print-client-header-reserve);
+    min-height: var(--print-client-header-reserve);
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-banner-surface {
+    padding: var(--print-title-pad-y) 0 var(--print-space-paragraph) !important;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-report-block--title-only .fs-print-notes-period-line {
+    margin-top: var(--print-space-paragraph) !important;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-tab-panel[data-fs-tab='profit-loss'] .statement-table-wrap:first-child .statement-head-row th,
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-notes-print-merged .notes-head-row th {
+    padding-top: var(--print-cell-padding-y) !important;
+    padding-bottom: var(--print-cell-padding-y) !important;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-banner-surface .fs-print-notes-report-block {
+    margin-top: 0;
+    margin-bottom: var(--print-space-paragraph);
+  }
+
+  /* Print All: center document title with client header on every repeating page */
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-banner-row th.fs-print-notes-banner-cell {
+    text-align: center !important;
     padding: 0 !important;
-    margin: 0 !important;
     border: none !important;
     background: #fff !important;
-    line-height: 0 !important;
-    font-size: 0 !important;
+    vertical-align: top !important;
   }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-banner-surface {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    text-align: center !important;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-banner-surface .fs-print-notes-report-block {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: center !important;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-banner-surface .fs-print-notes-report-line,
+  .fs-page.fs-print-all:not(.fs-print-notes-only) .fs-print-notes-banner-surface .fs-print-notes-period-line {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: center !important;
+    font-family: var(--print-font-family) !important;
+  }
+
+  /* Title sizes delegated to print-standard.css tokens */
 
   .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th {
     padding: 3pt 4pt !important;
@@ -490,19 +666,19 @@
   }
 
   .fs-print-report-title {
-    margin: 1mm 0 0;
-    font-size: 8.5pt;
+    margin: var(--print-space-paragraph) 0 0;
+    font-size: var(--print-heading-size);
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    line-height: 1.1;
+    line-height: var(--print-line-height);
   }
 
   .fs-print-period {
-    margin: 0.3mm 0 0;
-    font-size: 6.5pt;
+    margin: var(--print-space-paragraph) 0 0;
+    font-size: var(--print-small-size);
     font-weight: 500;
-    line-height: 1.1;
+    line-height: var(--print-line-height);
   }
 
   .fs-print-footer-inner {
@@ -517,8 +693,8 @@
   }
 
   .fs-print-footer--ca-signoff {
-    padding-top: 2mm;
-    margin-top: 2mm;
+    padding-top: var(--print-space-section);
+    margin-top: var(--print-space-section);
     overflow: visible !important;
   }
 
@@ -576,14 +752,14 @@
 
   .fs-print-footer-strong {
     margin: 0;
-    font-size: 6.5pt;
+    font-size: var(--print-small-size);
     font-weight: 700;
     color: #000;
   }
 
   .fs-print-footer-line {
-    margin: 0.2mm 0 0;
-    font-size: 6pt;
+    margin: var(--print-space-paragraph) 0 0;
+    font-size: var(--print-small-size);
     font-weight: 400;
     color: #000;
     line-height: 1.15;
@@ -615,8 +791,8 @@
     margin: 2mm 0 1mm;
     padding: 0;
     text-align: center;
-    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif;
-    font-size: 12pt;
+    font-family: Arial, Inter, Helvetica, sans-serif;
+    font-size: var(--print-body-size);
     font-weight: 700;
     line-height: 1.2;
     color: #000;
@@ -651,10 +827,10 @@
 
   .fs-print-body .pl-appropriation-table .statement-fy-label--print {
     display: block !important;
-    font-size: 12pt !important;
+    font-size: var(--print-body-size) !important;
     font-weight: 600 !important;
     white-space: normal !important;
-    line-height: 12pt !important;
+    line-height: var(--print-line-height) !important;
     text-align: right !important;
   }
 
@@ -695,7 +871,7 @@
   }
 
   .fs-page.fs-print-all .fs-print-body {
-    display: flex;
+    display: flex !important;
     flex-direction: column;
     break-before: avoid;
     page-break-before: avoid;
@@ -706,6 +882,14 @@
     page-break-after: avoid;
   }
 
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='notes'],
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='notes-sources'],
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='notes-assets-i'],
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='notes-assets-ii'],
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='notes-pl'] {
+    order: 3;
+  }
+
   .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='balance-sheet'] {
     order: 1;
   }
@@ -714,19 +898,15 @@
     order: 2;
   }
 
-  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='notes'] {
-    order: 3;
-  }
-
   .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='depreciation'] {
     order: 4;
   }
 
-  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='repayment'] {
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='bank-account'] {
     order: 5;
   }
 
-  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='bank-account'] {
+  .fs-page.fs-print-all .fs-tab-panel[data-fs-tab='repayment'] {
     order: 6;
   }
 
@@ -738,9 +918,36 @@
     order: 8;
   }
 
+  .fs-page.fs-print-all .fs-print-udin-closing {
+    order: 9;
+    display: block !important;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    background: #fff !important;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .fs-page.fs-print-all .fs-print-udin-closing > .fs-print-section-stationery {
+    display: block !important;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 0 4mm;
+    background: #fff;
+    text-align: center;
+    position: static;
+    margin: 0 0 3mm;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
   .fs-tab-panel[data-fs-tab='udin-details'] > h2,
   .fs-tab-panel[data-fs-tab='udin-details'] > .hint,
-  .fs-tab-panel[data-fs-tab='udin-details'] .fs-udin-grid {
+  .fs-tab-panel[data-fs-tab='udin-details'] .fs-udin-grid,
+  .fs-tab-panel[data-fs-tab='udin-details'] .fs-udin-banner-editor {
     display: none !important;
   }
 
@@ -776,6 +983,15 @@
     page-break-before: page;
   }
 
+  .fs-page.fs-print-all .fs-tab-panel.fs-notes-print-merged {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .fs-print-body .notes-section-nav {
+    display: none !important;
+  }
+
   .fs-page:not(.fs-print-all) .fs-tab-panel:not(.is-active) {
     display: none !important;
   }
@@ -789,8 +1005,8 @@
   .fs-tab-panel::before {
     content: attr(data-print-title);
     display: block;
-    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif;
-    font-size: 12pt;
+    font-family: Arial, Inter, Helvetica, sans-serif;
+    font-size: var(--print-body-size);
     font-weight: 700;
     line-height: 1.2;
     color: #000;
@@ -833,15 +1049,6 @@
     display: none !important;
   }
 
-  .fs-page:not(.fs-print-with-comparison) .notes-change-col,
-  .fs-page:not(.fs-print-with-comparison) .notes-pct-col,
-  .fs-page:not(.fs-print-with-comparison) .statement-change-col,
-  .fs-page:not(.fs-print-with-comparison) .statement-pct-col,
-  .fs-page:not(.fs-print-with-comparison) .pl-appr-change-col,
-  .fs-page:not(.fs-print-with-comparison) .pl-appr-pct-col {
-    display: none !important;
-  }
-
   .fs-print-body,
   .fs-print-body * {
     color: #000 !important;
@@ -858,9 +1065,9 @@
 
   /* P&L print: highlight table header and first body row */
   .fs-print-body .fs-tab-panel[data-fs-tab='profit-loss'] .statement-table .statement-head-row th {
-    background: #dce4ee !important;
+    background: var(--print-color-header-bg) !important;
     font-weight: 700 !important;
-    color: #0f172a !important;
+    color: var(--print-color-text) !important;
     border: 0.5px solid #000 !important;
     border-top: 1px solid #000 !important;
     border-bottom: 1px solid #000 !important;
@@ -876,9 +1083,9 @@
   }
 
   .fs-print-body .fs-tab-panel[data-fs-tab='profit-loss'] .pl-appropriation-table .pl-appr-head-row th {
-    background: #dce4ee !important;
+    background: var(--print-color-header-bg) !important;
     font-weight: 700 !important;
-    color: #0f172a !important;
+    color: var(--print-color-text) !important;
     border: 0.5px solid #000 !important;
     border-top: 1px solid #000 !important;
     border-bottom: 1px solid #000 !important;
@@ -887,7 +1094,7 @@
   }
 
   .fs-print-body .fs-tab-panel[data-fs-tab='notes'] .notes-table .notes-head-row th {
-    background: #eef2f7 !important;
+    background: var(--print-color-header-bg) !important;
     font-weight: 700 !important;
     border-bottom: 0.5px solid #000 !important;
     print-color-adjust: exact;
@@ -923,8 +1130,8 @@
   }
 
   .fs-page.fs-print-notes-section .fs-print-note-group {
-    break-inside: auto;
-    page-break-inside: auto;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   .fs-print-body .fs-print-note-block tr {
@@ -957,6 +1164,7 @@
   .fs-print-body .loan-card-actions,
   .fs-print-body .bank-row-actions,
   .fs-print-body .bank-icon-btn,
+  .fs-print-body .dep-actions-col,
   .fs-print-body .notes-admin-remove-btn,
   .fs-print-body .gst-sales-link-toggle,
   .fs-print-body .gst-note-link-btn,
@@ -989,6 +1197,7 @@
   .fs-print-body .notes-table-wrap,
   .fs-print-body .bank-account-table-wrap,
   .fs-print-body .dep-schedule-wrap,
+  .fs-print-body .dep-history-wrap,
   .fs-print-body .pl-appropriation-table-wrap,
   .fs-print-body .loan-emi-table-wrap,
   .fs-print-body .gst-reco-panel .table-wrap {
@@ -997,17 +1206,110 @@
     overflow: visible !important;
     width: 100% !important;
     max-width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
     background: #fff !important;
+  }
+
+  /* Loan repayment: allow multi-page EMI tables without row overlap */
+  .fs-print-body .loan-card {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .fs-print-body .loan-emi-schedule,
+  .fs-print-body .loan-emi-table-wrap {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .fs-print-body .loan-emi-table tbody td {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .fs-print-body .loan-emi-table tbody tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Depreciation schedule: allow multi-page tables without row overlap */
+  .fs-print-body .dep-schedule-wrap,
+  .fs-print-body .dep-history-wrap {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .fs-print-body .dep-schedule-table tbody td,
+  .fs-print-body .dep-history-table tbody td {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .fs-print-body .dep-schedule-table tbody tr,
+  .fs-print-body .dep-history-table tbody tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .fs-print-body .dep-schedule-table th:nth-child(1),
+  .fs-print-body .dep-schedule-table td:nth-child(1) {
+    width: 20% !important;
+  }
+
+  .fs-print-body .dep-schedule-table th:nth-child(2),
+  .fs-print-body .dep-schedule-table td:nth-child(2) {
+    width: 7% !important;
+  }
+
+  .fs-print-body .dep-schedule-table th:nth-child(3),
+  .fs-print-body .dep-schedule-table td:nth-child(3),
+  .fs-print-body .dep-schedule-table th:nth-child(4),
+  .fs-print-body .dep-schedule-table td:nth-child(4),
+  .fs-print-body .dep-schedule-table th:nth-child(5),
+  .fs-print-body .dep-schedule-table td:nth-child(5),
+  .fs-print-body .dep-schedule-table th:nth-child(6),
+  .fs-print-body .dep-schedule-table td:nth-child(6),
+  .fs-print-body .dep-schedule-table th:nth-child(7),
+  .fs-print-body .dep-schedule-table td:nth-child(7),
+  .fs-print-body .dep-schedule-table th:nth-child(8),
+  .fs-print-body .dep-schedule-table td:nth-child(8) {
+    width: 11% !important;
   }
 
   .fs-print-body table {
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
     table-layout: fixed;
     font-size: 6pt !important;
     font-weight: 400;
     border-collapse: collapse;
     color: #000 !important;
+  }
+
+  .fs-print-body .notes-table,
+  .fs-print-body .statement-table,
+  .fs-print-body .schedule-table,
+  .fs-print-body .bank-account-table,
+  .fs-print-body .pl-appropriation-table,
+  .fs-print-body .loan-cashflow-table,
+  .fs-print-body .data-table,
+  .fs-print-body .fs-balance-sheet-print-body .statement-table,
+  .fs-print-body .fs-balance-sheet-print-body .statement-table.has-note-col,
+  .fs-print-body .fs-profit-loss-print-body table,
+  .fs-print-body .fs-profit-loss-print-body .statement-table,
+  .fs-print-body .fs-profit-loss-print-body .pl-appropriation-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .fs-print-body th,
+  .fs-print-body td,
+  .fs-print-body col {
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 
   .fs-print-body thead {
@@ -1078,27 +1380,8 @@
     display: none !important;
   }
 
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .notes-sno-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .statement-note-col {
-    width: 7% !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .notes-particular-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .statement-particular-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .pl-appr-particular-col {
-    width: 46% !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .notes-amount-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .statement-amount-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .pl-appr-amount-col {
-    width: 23.5% !important;
-    text-align: right !important;
-    font-weight: 500 !important;
-  }
-
-  .fs-print-body .schedule-table th:last-child,
-  .fs-print-body .schedule-table td:last-child {
+  .fs-print-body .dep-schedule-table th.dep-actions-col,
+  .fs-print-body .dep-schedule-table td.dep-actions-col {
     display: none !important;
   }
 
@@ -1125,53 +1408,9 @@
     padding: 0 !important;
   }
 
-  .fs-print-body .statement-table-wrap--balance-sheet table {
-    font-size: 5.5pt !important;
-  }
-
-  .fs-print-body .statement-table-wrap--balance-sheet-sources {
-    margin-bottom: 0 !important;
-  }
-
-  .fs-print-body .statement-table-wrap--balance-sheet-sources .statement-section-row td {
-    padding-top: 0.8mm !important;
-    padding-bottom: 0 !important;
-    font-weight: 700 !important;
-    font-size: 5.5pt !important;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    border-bottom: 0.25px solid #000 !important;
-    background: #fff !important;
-  }
-
-  .fs-print-body .statement-table-wrap--balance-sheet-application .statement-section-row td {
-    padding-top: 0.8mm !important;
-    padding-bottom: 0 !important;
-    font-weight: 700 !important;
-    font-size: 5.5pt !important;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    border-bottom: 0.25px solid #000 !important;
-  }
-
-  .fs-print-body .statement-spacer-row,
-  .fs-print-body .statement-spacer-row td {
-    display: none !important;
-    height: 0 !important;
-    padding: 0 !important;
+  .fs-print-body .statement-table-wrap--balance-sheet {
     margin: 0 !important;
-    border: none !important;
-  }
-
-  .fs-print-body .statement-table-wrap--balance-sheet-application {
-    page-break-before: auto !important;
-    break-before: auto !important;
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-  }
-
-  .fs-print-body .statement-table-wrap--balance-sheet-application thead {
-    display: none !important;
+    padding: 0 !important;
   }
 
   .fs-print-body .statement-subheader-row td {
@@ -1202,33 +1441,266 @@
   }
 
   .fs-print-body .gst-reco-panel h2 {
-    font-size: 8pt;
+    font-size: var(--print-section-size, 13pt);
     font-weight: 700;
-    margin: 0 0 1mm;
-    color: #000 !important;
+    margin: 0 0 var(--print-space-paragraph);
+    color: var(--print-color-text) !important;
+  }
+
+  .fs-print-body .gst-reco-panel,
+  .fs-print-body .gst-reco-section {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin-bottom: 1mm !important;
+    background: #fff !important;
+  }
+
+  .fs-print-body .gst-reco-panel .hint,
+  .fs-print-body .gst-reco-panel .gst-books-hint,
+  .fs-print-body .gst-reco-panel .gst-note-nav-btn,
+  .fs-print-body .gst-reco-panel .gst-checkbox-label,
+  .fs-print-body .gst-reco-panel .gst-calc-hint,
+  .fs-print-body .gst-reco-panel .gst-section-note,
+  .fs-print-body .gst-reco-panel .gst-sales-db-info,
+  .fs-print-body .gst-reco-section > h3,
+  .fs-print-body .gst-reco-section .gst-section-header,
+  .fs-print-body .gst-reco-subtitle {
+    display: none !important;
+  }
+
+  .fs-print-body .gst-reco-panel .gst-simple-table .fs-print-notes-head-spacer-cell,
+  .fs-print-body .gst-reco-panel .gst-simple-table .fs-print-notes-banner-cell {
+    border: none !important;
+    background: #fff !important;
+    padding: 0 !important;
+    text-align: left !important;
+    font-weight: 700 !important;
+    vertical-align: bottom !important;
+  }
+
+  .fs-print-body .gst-reco-panel .gst-print-section-title {
+    display: block !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+    hyphens: manual !important;
+    font-size: var(--print-body-size) !important;
+    font-weight: 700 !important;
+    color: var(--print-color-text) !important;
+    padding: 1.5mm 0 0.75mm !important;
+    border-bottom: 0.25px solid #000 !important;
+    margin: 0 !important;
+    text-align: left !important;
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .fs-print-body .gst-reco-panel .gst-simple-table tr.fs-print-only,
+  .fs-print-body .gst-reco-panel .gst-simple-table tr.fs-print-notes-banner-row,
+  .fs-print-body .gst-reco-panel .gst-simple-table tr.fs-print-notes-head-spacer {
+    display: table-row !important;
+  }
+
+  .fs-page.fs-print-gst-section .fs-print-body .gst-reco-panel .gst-simple-table .fs-print-notes-head-spacer-cell,
+  .fs-page.fs-print-gst-only .fs-print-body .gst-reco-panel .gst-simple-table .fs-print-notes-head-spacer-cell {
+    height: var(--print-section-stationery-reserve) !important;
+    min-height: var(--print-section-stationery-reserve) !important;
+    line-height: 0 !important;
+    font-size: 0 !important;
+  }
+
+  .fs-print-body .gst-reco-panel .gst-simple-table .fs-print-notes-head-spacer-cell {
+    height: var(--print-client-header-reserve) !important;
+    min-height: var(--print-client-header-reserve) !important;
+    line-height: 0 !important;
+    font-size: 0 !important;
+  }
+
+  .fs-print-body .gst-reco-panel .gst-print-table-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-before: auto;
+    page-break-before: auto;
+  }
+
+  /* ITC sheet (10 rows): allow pagination so all rows print with repeating thead */
+  .fs-print-body .gst-reco-panel .gst-print-table-block--itc {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .fs-print-body .gst-reco-panel .gst-print-table-block--itc .gst-itc-table {
+    display: table !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .fs-print-body .gst-reco-panel .gst-print-table-block--itc .gst-itc-table tbody {
+    display: table-row-group !important;
+  }
+
+  .fs-print-body .gst-reco-panel .gst-print-table-block--itc .gst-itc-table tr {
+    display: table-row !important;
+  }
+
+  .fs-print-body .gst-reco-panel .gst-print-table-block--itc .gst-itc-table th,
+  .fs-print-body .gst-reco-panel .gst-print-table-block--itc .gst-itc-table td {
+    display: table-cell !important;
+  }
+
+  .fs-print-body .gst-reco-section:has(.gst-print-table-block--itc) {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .fs-print-body .gst-reco-panel .gst-simple-table .fs-print-notes-banner-cell {
+    text-align: center !important;
+    padding: 0 !important;
+  }
+
+  .fs-print-body .gst-simple-table.gst-itc-table col.gst-itc-col-sno {
+    width: 5% !important;
+  }
+
+  .fs-print-body .gst-simple-table.gst-itc-table col.gst-itc-col-particular {
+    width: 45% !important;
+  }
+
+  .fs-print-body .gst-simple-table.gst-itc-table col.gst-itc-col-tax {
+    width: 16.67% !important;
+  }
+
+  .fs-print-body .gst-simple-table.gst-itc-table th.gst-itc-sno-col,
+  .fs-print-body .gst-simple-table.gst-itc-table td.gst-sno-cell {
+    width: 5% !important;
+    text-align: center !important;
+  }
+
+  .fs-print-body .gst-simple-table.gst-itc-table th.gst-itc-particular-col,
+  .fs-print-body .gst-simple-table.gst-itc-table td.gst-itc-particular {
+    width: 45% !important;
+    text-align: left !important;
+    vertical-align: top !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+  }
+
+  .fs-print-body .gst-simple-table.gst-itc-table th.gst-itc-amount-col,
+  .fs-print-body .gst-simple-table.gst-itc-table td.gst-itc-amount-col,
+  .fs-print-body .gst-simple-table.gst-itc-table th:nth-child(n + 3),
+  .fs-print-body .gst-simple-table.gst-itc-table td:nth-child(n + 3) {
+    width: 16.67% !important;
+    text-align: right !important;
+    vertical-align: top !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-print-body .gst-simple-table.gst-itc-table thead {
+    display: table-header-group !important;
+  }
+
+  .fs-print-body .gst-simple-table.gst-itc-table thead th {
+    background: var(--print-color-header-bg) !important;
+    color: var(--print-color-text) !important;
+    font-size: var(--print-body-size) !important;
+    font-weight: 700 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .fs-print-body .gst-simple-table.gst-itc-table tbody tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .fs-print-body .gst-simple-table.gst-itc-table .gst-readonly-cell,
+  .fs-print-body .gst-simple-table.gst-itc-table .gst-amount-input {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-print-body .gst-readonly-cell,
+  .fs-print-body .gst-amount-input {
+    display: inline !important;
+    width: auto !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    color: var(--print-color-text) !important;
+    font: inherit !important;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .fs-print-body .schedule-table thead th,
+  .fs-print-body .dep-schedule-table thead th,
+  .fs-print-body .bank-account-table thead th,
+  .fs-print-body .loan-emi-table thead th {
+    background: var(--print-color-header-bg) !important;
+    color: var(--print-color-text) !important;
+    font-size: var(--print-body-size) !important;
+    font-weight: 700 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .fs-tab-panel[data-fs-tab='repayment'] .loan-emi-schedule {
+    display: block !important;
   }
 
   .fs-print-body .gst-reco-section {
-    break-inside: auto;
-    page-break-inside: auto;
+    break-inside: avoid;
+    page-break-inside: avoid;
     margin-bottom: 1mm;
   }
 
-  /* Balance sheet: aligned cell grid — outer frame from table cell borders */
+  .fs-print-body .gst-reco-section:has(.gst-print-table-block--itc) {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  /* Balance sheet: unified compact print (sources + application continuous) */
   .fs-print-body .fs-balance-sheet-print-body {
+    --print-bs-size: 6pt;
+    --print-bs-row: 7pt;
+    --print-bs-head: 8pt;
+    --print-bs-pad-y: 0.3pt;
+    --print-bs-pad-x: 1.2pt;
     border: none !important;
     box-sizing: border-box !important;
     overflow: visible !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
-    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif !important;
-    font-size: 12pt !important;
+    font-family: Arial, Inter, Helvetica, sans-serif !important;
+    font-size: var(--print-bs-size) !important;
     width: 100% !important;
     max-width: 100% !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .fs-page.fs-print-balance-sheet .fs-print-section-stationery {
+    margin-bottom: 0.5mm !important;
+    padding-bottom: 0 !important;
+  }
+
+  .fs-page.fs-print-balance-sheet:not(.fs-print-all) .fs-print-header {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .fs-page.fs-print-balance-sheet:not(.fs-print-all) .fs-print-notes-report-block--title-only {
+    margin-bottom: 0.5mm !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-table-wrap--balance-sheet {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
     margin: 0 !important;
     padding: 0 !important;
   }
@@ -1250,57 +1722,44 @@
     max-width: 100% !important;
     min-width: 0 !important;
     box-sizing: border-box !important;
-    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif !important;
-    font-size: 12pt !important;
+    font-family: Arial, Inter, Helvetica, sans-serif !important;
+    font-size: var(--print-bs-size) !important;
+    line-height: 1.08 !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-table.has-note-col {
     min-width: 0 !important;
   }
 
-  .fs-print-body .fs-balance-sheet-print-body .statement-table-wrap--balance-sheet-sources .statement-head-row th {
-    border: 0.5px solid #000 !important;
-    border-top: 1px solid #000 !important;
-  }
-
   .fs-print-body .fs-balance-sheet-print-body .statement-head-row th {
     font-weight: 700 !important;
     text-align: center !important;
-    background: #dce4ee !important;
-    color: #0f172a !important;
+    background: var(--print-color-header-bg) !important;
+    color: var(--print-color-text) !important;
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
     border: 0.5px solid #000 !important;
     border-top: 1px solid #000 !important;
     border-bottom: 1px solid #000 !important;
-    padding: 2pt 4pt !important;
+    padding: var(--print-bs-pad-y) var(--print-bs-pad-x) !important;
     vertical-align: middle !important;
-    height: auto !important;
-    min-height: 15pt !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-change-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-pct-col {
-    border: none !important;
-    padding: 0 !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-curr-col {
-    border-right: 0.5px solid #000 !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body .statement-pct-col {
-    border-right: 0.5px solid #000 !important;
+    height: var(--print-bs-head) !important;
+    min-height: var(--print-bs-head) !important;
+    font-size: var(--print-bs-size) !important;
+    line-height: 1.08 !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-particular-col {
     border-left: 0.5px solid #000 !important;
+    text-align: left !important;
+    width: 60% !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-section-row td,
   .fs-print-body .fs-balance-sheet-print-body .statement-subheader-row td {
     border-right: 0.5px solid #000 !important;
     border-left: 0.5px solid #000 !important;
+    border-top: 0.5px solid #000 !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body col.bs-col-particular {
@@ -1316,68 +1775,10 @@
     width: 16% !important;
   }
 
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body col.bs-col-change,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body col.bs-col-pct {
-    width: 0 !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body col.bs-col-particular {
-    width: 42% !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body col.bs-col-note {
-    width: 6% !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body col.bs-col-prev,
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body col.bs-col-curr {
-    width: 15% !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body col.bs-col-change {
-    width: 10% !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body col.bs-col-pct {
-    width: 12% !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-particular-col {
-    width: 60% !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-note-col {
-    width: 8% !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-prev-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-balance-sheet-print-body .statement-curr-col {
-    width: 16% !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body .statement-particular-col {
-    width: 40% !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body .statement-note-col {
-    width: 8% !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body .statement-prev-col,
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body .statement-curr-col {
-    width: 15% !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body .statement-change-col {
-    width: 10% !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-balance-sheet-print-body .statement-pct-col {
-    width: 12% !important;
-  }
-
   .fs-print-body .fs-balance-sheet-print-body .statement-amount-print,
-  .fs-print-body .fs-balance-sheet-print-body .statement-note-print-value {
+  .fs-print-body .fs-balance-sheet-print-body .statement-note-print-value,
+  .fs-print-body .fs-balance-sheet-print-body .statement-fy-label--print,
+  .fs-print-body .fs-balance-sheet-print-body .statement-fy-label--unified {
     display: block !important;
     width: 100% !important;
     padding: 0 !important;
@@ -1385,9 +1786,9 @@
     border: none !important;
     background: transparent !important;
     font-family: inherit !important;
-    font-size: 12pt !important;
+    font-size: var(--print-bs-size) !important;
     font-weight: 400 !important;
-    line-height: 12pt !important;
+    line-height: 1.08 !important;
     color: #000 !important;
     box-shadow: none !important;
     font-variant-numeric: tabular-nums !important;
@@ -1407,20 +1808,28 @@
     display: none !important;
   }
 
-  .fs-print-body .fs-balance-sheet-print-body th,
+  .fs-print-body .fs-balance-sheet-print-body th:not(.fs-print-notes-banner-cell):not(.fs-print-notes-head-spacer-cell),
   .fs-print-body .fs-balance-sheet-print-body td {
     border: 0.5px solid #000 !important;
     vertical-align: middle !important;
-    padding: 1.5pt 4pt !important;
-    line-height: 12pt !important;
+    padding: var(--print-bs-pad-y) var(--print-bs-pad-x) !important;
+    line-height: 1.08 !important;
     font-family: inherit !important;
-    font-size: 12pt !important;
+    font-size: var(--print-bs-size) !important;
     box-sizing: border-box !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
   }
 
-  .fs-print-body .fs-balance-sheet-print-body tbody td {
-    height: 15pt !important;
-    min-height: 15pt !important;
+  .fs-print-body .fs-balance-sheet-print-body tbody td,
+  .fs-print-body .fs-balance-sheet-print-body .statement-section-row td,
+  .fs-print-body .fs-balance-sheet-print-body .statement-subheader-row td,
+  .fs-print-body .fs-balance-sheet-print-body .statement-total-row td,
+  .fs-print-body .fs-balance-sheet-print-body .statement-grand-total-row td {
+    height: var(--print-bs-row) !important;
+    min-height: var(--print-bs-row) !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-head-row th.statement-particular-col {
@@ -1439,17 +1848,12 @@
   .fs-print-body .fs-balance-sheet-print-body .statement-head-row th.statement-amount-col .statement-fy-label--unified {
     display: block;
     font-family: inherit !important;
-    font-size: 12pt !important;
+    font-size: var(--print-bs-size) !important;
     font-weight: 700 !important;
     white-space: normal !important;
-    line-height: 12pt !important;
+    line-height: 1.08 !important;
     text-align: right !important;
-    color: #0f172a !important;
-  }
-
-  .fs-print-body .fs-balance-sheet-print-body .statement-particular-col {
-    text-align: left !important;
-    width: 60% !important;
+    color: var(--print-color-text) !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-note-col {
@@ -1476,36 +1880,33 @@
     text-align: right !important;
   }
 
-  .fs-print-body .fs-balance-sheet-print-body .statement-table-wrap--balance-sheet-sources tbody tr:last-child td {
+  .fs-print-body .fs-balance-sheet-print-body .statement-table-wrap--balance-sheet tbody tr:last-child td {
     border-bottom: 0.5px solid #000 !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-section-row td {
     font-weight: 700 !important;
-    font-size: 12pt !important;
+    font-size: 5.5pt !important;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    height: 15pt !important;
-    min-height: 15pt !important;
-    padding: 1.5pt 4pt !important;
+    letter-spacing: 0.02em;
+    padding-top: 0.4pt !important;
+    padding-bottom: 0.1pt !important;
     background: #fff !important;
     border-bottom: 0.5px solid #000 !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-subheader-row td {
     font-weight: 600 !important;
-    font-size: 12pt !important;
+    font-size: 5.5pt !important;
     border-bottom: none !important;
-    height: 15pt !important;
-    min-height: 15pt !important;
-    padding: 1.5pt 4pt !important;
+    padding-top: 0.3pt !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-blank-label-row td {
-    height: 10pt !important;
-    min-height: 10pt !important;
-    padding: 0.5pt 4pt !important;
-    line-height: 9pt !important;
+    height: 5pt !important;
+    min-height: 5pt !important;
+    padding: 0.1pt var(--print-bs-pad-x) !important;
+    line-height: 5pt !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-blank-label-row .statement-particular-col {
@@ -1515,26 +1916,18 @@
 
   .fs-print-body .fs-balance-sheet-print-body .statement-total-row td {
     font-weight: 700 !important;
-    font-size: 12pt !important;
     background: #f1f5f9 !important;
     border-top: 1px solid #000 !important;
     border-bottom: 0.5px solid #000 !important;
-    height: 15pt !important;
-    min-height: 15pt !important;
-    padding: 1.5pt 4pt !important;
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-grand-total-row td {
     font-weight: 800 !important;
-    font-size: 12pt !important;
     background: #c9d4e3 !important;
     border-top: 1px solid #000 !important;
     border-bottom: 1px solid #000 !important;
-    height: 15pt !important;
-    min-height: 15pt !important;
-    padding: 1.5pt 4pt !important;
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
   }
@@ -1542,13 +1935,13 @@
   .fs-print-body .fs-balance-sheet-print-body .statement-total-row .statement-particular-col,
   .fs-print-body .fs-balance-sheet-print-body .statement-grand-total-row .statement-particular-col {
     font-weight: inherit !important;
-    color: #0f172a !important;
+    color: var(--print-color-text) !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-total-row .statement-amount-print,
   .fs-print-body .fs-balance-sheet-print-body .statement-grand-total-row .statement-amount-print {
     font-weight: 700 !important;
-    color: #0f172a !important;
+    color: var(--print-color-text) !important;
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-grand-total-row .statement-amount-print {
@@ -1556,7 +1949,33 @@
   }
 
   .fs-print-body .fs-balance-sheet-print-body .statement-sub-row .statement-particular-col {
-    padding-left: 2mm !important;
+    padding-left: 1.2mm !important;
+  }
+
+  .fs-print-part-signoff .fs-udin-sign-banner.fs-print-ca-signoff--balance-sheet,
+  .fs-print-part-signoff .fs-udin-sign-banner.fs-print-ca-signoff--section {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-before: avoid;
+    page-break-before: avoid;
+  }
+
+  .fs-print-part-signoff .fs-udin-sign-banner.fs-print-ca-signoff--balance-sheet .fs-udin-sign-banner-body,
+  .fs-print-part-signoff .fs-udin-sign-banner.fs-print-ca-signoff--section .fs-udin-sign-banner-body {
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: 24mm !important;
+  }
+
+  .fs-print-part-signoff .fs-udin-sign-banner.fs-print-ca-signoff--balance-sheet .fs-udin-sign-banner-text,
+  .fs-print-part-signoff .fs-udin-sign-banner.fs-print-ca-signoff--section .fs-udin-sign-banner-text {
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: left !important;
   }
 
   /* P&L print: aligned tables with bordered header and appropriation grid */
@@ -1567,8 +1986,8 @@
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
-    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif !important;
-    font-size: 12pt !important;
+    font-family: Arial, Inter, Helvetica, sans-serif !important;
+    font-size: var(--print-body-size) !important;
     width: 100% !important;
     max-width: 100% !important;
   }
@@ -1600,7 +2019,7 @@
     min-width: 0 !important;
     box-sizing: border-box !important;
     font-family: inherit !important;
-    font-size: 12pt !important;
+    font-size: var(--print-body-size) !important;
   }
 
   .fs-print-body .fs-profit-loss-print-body .statement-table.has-note-col,
@@ -1612,12 +2031,16 @@
   .fs-print-body .fs-profit-loss-print-body td {
     border: 0.5px solid #000 !important;
     vertical-align: middle !important;
-    padding: 1.5pt 4pt !important;
-    line-height: 12pt !important;
+    padding: var(--print-cell-padding-y) var(--print-cell-padding-x) !important;
+    line-height: var(--print-line-height) !important;
     font-family: inherit !important;
-    font-size: 12pt !important;
+    font-size: var(--print-body-size) !important;
     box-sizing: border-box !important;
     color: #000 !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
   }
 
   .fs-print-body .fs-profit-loss-print-body tbody td {
@@ -1628,14 +2051,14 @@
   .fs-print-body .fs-profit-loss-print-body .statement-head-row th,
   .fs-print-body .fs-profit-loss-print-body .pl-appr-head-row th {
     font-weight: 700 !important;
-    background: #dce4ee !important;
-    color: #0f172a !important;
+    background: var(--print-color-header-bg) !important;
+    color: var(--print-color-text) !important;
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
     border: 0.5px solid #000 !important;
     border-top: 1px solid #000 !important;
     border-bottom: 1px solid #000 !important;
-    padding: 2pt 4pt !important;
+    padding: var(--print-cell-padding-y) var(--print-cell-padding-x) !important;
     vertical-align: middle !important;
     height: auto !important;
     min-height: 15pt !important;
@@ -1660,71 +2083,11 @@
   .fs-print-body .fs-profit-loss-print-body .pl-appr-head-row th .statement-fy-label--print {
     display: block !important;
     font-family: inherit !important;
-    font-size: 12pt !important;
+    font-size: var(--print-body-size) !important;
     font-weight: 700 !important;
-    line-height: 12pt !important;
+    line-height: var(--print-line-height) !important;
     text-align: right !important;
-    color: #0f172a !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body col.pl-col-particular {
-    width: 60% !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body col.pl-col-prev,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body col.pl-col-curr {
-    width: 20% !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .statement-particular-col {
-    width: 52% !important;
-    text-align: left !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .statement-note-col {
-    width: 8% !important;
-    text-align: center !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .pl-appr-particular-col {
-    width: 60% !important;
-    text-align: left !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .statement-prev-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .statement-curr-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .pl-appr-prev-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .pl-appr-curr-col {
-    width: 20% !important;
-    text-align: right !important;
-    font-variant-numeric: tabular-nums !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .statement-curr-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body .fs-profit-loss-print-body .pl-appr-curr-col {
-    border-right: 0.5px solid #000 !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body col.pl-col-particular {
-    width: 45% !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body col.pl-col-prev,
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body col.pl-col-curr {
-    width: 15% !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body col.pl-col-change,
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body col.pl-col-pct {
-    width: 12.5% !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body .pl-appr-curr-col {
-    border-right: none !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body .fs-profit-loss-print-body .pl-appr-pct-col {
-    border-right: 0.5px solid #000 !important;
+    color: var(--print-color-text) !important;
   }
 
   .fs-print-body .fs-profit-loss-print-body .statement-note-print-value {
@@ -1737,9 +2100,9 @@
     padding: 0 !important;
     margin: 0 !important;
     font-family: inherit !important;
-    font-size: 12pt !important;
+    font-size: var(--print-body-size) !important;
     font-weight: 400 !important;
-    line-height: 12pt !important;
+    line-height: var(--print-line-height) !important;
     color: #000 !important;
   }
 
@@ -1753,8 +2116,8 @@
     padding: 0 !important;
     margin: 0 !important;
     font-family: inherit !important;
-    font-size: 12pt !important;
-    line-height: 12pt !important;
+    font-size: var(--print-body-size) !important;
+    line-height: var(--print-line-height) !important;
     color: #000 !important;
     font-variant-numeric: tabular-nums !important;
   }
@@ -1808,7 +2171,7 @@
   .fs-print-body .fs-profit-loss-print-body .pl-appropriation-total-row .pl-appr-total-value,
   .fs-print-body .fs-profit-loss-print-body .pl-appropriation-total-row .pl-appr-particular-col {
     font-weight: 700 !important;
-    color: #0f172a !important;
+    color: var(--print-color-text) !important;
   }
 
   .fs-print-body .fs-profit-loss-print-body .statement-table tbody > tr:first-child td {
@@ -1829,8 +2192,8 @@
   .fs-print-body.fs-print-statement-format .note-amount-input,
   .fs-print-body.fs-print-statement-format .note-prev-ref,
   .fs-print-body.fs-print-statement-format .note-variance-value {
-    font-family: 'Book Antiqua', 'Palatino Linotype', Palatino, serif !important;
-    font-size: 12pt !important;
+    font-family: Arial, Inter, Helvetica, sans-serif !important;
+    font-size: var(--print-body-size) !important;
   }
 
   .fs-print-body.fs-print-statement-format table {
@@ -1842,100 +2205,20 @@
   .fs-print-body.fs-print-statement-format th,
   .fs-print-body.fs-print-statement-format td {
     border: 0.5px solid #000 !important;
-    padding: 1.5pt 4pt !important;
-    line-height: 12pt !important;
+    padding: var(--print-cell-padding-y) var(--print-cell-padding-x) !important;
+    line-height: var(--print-line-height) !important;
     vertical-align: middle !important;
     color: #000 !important;
     background: #fff !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
   }
 
   .fs-print-body.fs-print-statement-format tbody td {
     height: 15pt !important;
     min-height: 15pt !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body.fs-print-statement-format .notes-sno-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body.fs-print-statement-format .statement-note-col {
-    width: 8% !important;
-    text-align: center !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body.fs-print-statement-format .notes-particular-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body.fs-print-statement-format .statement-particular-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body.fs-print-statement-format .pl-appr-particular-col {
-    width: 52% !important;
-    min-width: 0 !important;
-    text-align: left !important;
-  }
-
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body.fs-print-statement-format .notes-amount-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body.fs-print-statement-format .statement-amount-col,
-  .fs-page:not(.fs-print-with-comparison) .fs-print-body.fs-print-statement-format .pl-appr-amount-col {
-    width: 20% !important;
-    min-width: 0 !important;
-    text-align: right !important;
-    font-variant-numeric: tabular-nums !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .notes-sno-col,
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .statement-note-col {
-    width: 7% !important;
-    text-align: center !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .notes-particular-col,
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .statement-particular-col {
-    width: 38% !important;
-    min-width: 0 !important;
-    text-align: left !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .notes-amount-col,
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .statement-amount-col {
-    width: 15% !important;
-    min-width: 0 !important;
-    text-align: right !important;
-    font-variant-numeric: tabular-nums !important;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .notes-variance-col,
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .statement-change-col,
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .statement-pct-col {
-    width: 12.5% !important;
-    min-width: 0 !important;
-    text-align: right !important;
-    font-variant-numeric: tabular-nums !important;
-  }
-
-  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-sno-col {
-    width: 8%;
-  }
-
-  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-particular-col {
-    width: 52%;
-  }
-
-  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-prev-col,
-  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-curr-col {
-    width: 20%;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-sno-col {
-    width: 7%;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-particular-col {
-    width: 38%;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-prev-col,
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-curr-col {
-    width: 15%;
-  }
-
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-change-col,
-  .fs-page.fs-print-with-comparison .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table col.notes-pct-col {
-    width: 12.5%;
   }
 
   .fs-print-body.fs-print-statement-format .statement-amount-print,
@@ -1949,7 +2232,7 @@
     background: transparent !important;
     padding: 0 !important;
     margin: 0 !important;
-    line-height: 12pt !important;
+    line-height: var(--print-line-height) !important;
     font-variant-numeric: tabular-nums !important;
   }
 
@@ -1966,24 +2249,10 @@
     font-weight: 700 !important;
     height: auto !important;
     min-height: 15pt !important;
-    padding: 2pt 4pt !important;
-  }
-
-  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-head-row th {
-    background: #dce4ee !important;
-    color: #0f172a !important;
-    border: 0.5px solid #000 !important;
-    border-top: 1px solid #000 !important;
-    print-color-adjust: exact !important;
-    -webkit-print-color-adjust: exact !important;
-  }
-
-  .fs-print-body.fs-print-statement-format .fs-profit-loss-print-body .statement-head-row th,
-  .fs-print-body.fs-print-statement-format .fs-profit-loss-print-body .pl-appr-head-row th {
-    background: #dce4ee !important;
-    color: #0f172a !important;
-    border: 0.5px solid #000 !important;
-    border-top: 1px solid #000 !important;
+    padding: var(--print-cell-padding-y) var(--print-cell-padding-x) !important;
+    background: var(--print-color-header-bg) !important;
+    color: var(--print-color-text) !important;
+    border: 0.5px solid var(--print-color-border) !important;
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
   }
@@ -2023,6 +2292,81 @@
     border-bottom: 1px solid #000 !important;
   }
 
+  /* Balance sheet: restore compact sizing (unified statement-format above uses 11pt/15pt) */
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body,
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body table,
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body th,
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body td,
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-amount-print,
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-note-print-value,
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-fy-label--print,
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-fy-label--unified {
+    font-size: var(--print-bs-size) !important;
+    line-height: 1.08 !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body th:not(.fs-print-notes-banner-cell):not(.fs-print-notes-head-spacer-cell),
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body td {
+    padding: var(--print-bs-pad-y) var(--print-bs-pad-x) !important;
+    line-height: 1.08 !important;
+    vertical-align: middle !important;
+    border: 0.5px solid #000 !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body tbody td,
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-section-row td,
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-subheader-row td,
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-total-row td,
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-grand-total-row td {
+    height: var(--print-bs-row) !important;
+    min-height: var(--print-bs-row) !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-head-row th {
+    height: var(--print-bs-head) !important;
+    min-height: var(--print-bs-head) !important;
+    padding: var(--print-bs-pad-y) var(--print-bs-pad-x) !important;
+    font-size: var(--print-bs-size) !important;
+    line-height: 1.08 !important;
+    border: 0.5px solid #000 !important;
+    border-top: 1px solid #000 !important;
+    border-bottom: 1px solid #000 !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-section-row td {
+    font-size: 5.5pt !important;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    padding-top: 0.4pt !important;
+    padding-bottom: 0.1pt !important;
+    background: #fff !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-subheader-row td {
+    font-size: 5.5pt !important;
+    border-bottom: none !important;
+    padding-top: 0.3pt !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-blank-label-row td {
+    height: 5pt !important;
+    min-height: 5pt !important;
+    padding: 0.1pt var(--print-bs-pad-x) !important;
+    line-height: 5pt !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-amount-print,
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-note-print-value {
+    line-height: 1.08 !important;
+    font-size: var(--print-bs-size) !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-balance-sheet-print-body .statement-total-row td {
+    background: #f1f5f9 !important;
+    border-top: 1px solid #000 !important;
+    border-bottom: 0.5px solid #000 !important;
+  }
+
   /* Notes print: match P&L statement table formatting */
   .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table-wrap {
     margin: 0 !important;
@@ -2042,10 +2386,10 @@
 
   .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th .statement-fy-label--print {
     display: block !important;
-    font-size: 12pt !important;
+    font-size: var(--print-body-size) !important;
     font-weight: 600 !important;
     white-space: normal !important;
-    line-height: 12pt !important;
+    line-height: var(--print-line-height) !important;
     text-align: right !important;
   }
 
@@ -2131,7 +2475,7 @@
     background: transparent !important;
     padding: 0 !important;
     margin: 0 !important;
-    line-height: 12pt !important;
+    line-height: var(--print-line-height) !important;
     font-variant-numeric: tabular-nums !important;
   }
 
@@ -2168,7 +2512,7 @@
     border-top: none !important;
     height: 15pt !important;
     min-height: 15pt !important;
-    line-height: 12pt !important;
+    line-height: var(--print-line-height) !important;
   }
 
   .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-finance-header-row td,
@@ -2179,15 +2523,15 @@
     background: #fff !important;
     height: 15pt !important;
     min-height: 15pt !important;
-    line-height: 12pt !important;
+    line-height: var(--print-line-height) !important;
   }
 
   .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-finance-section-title,
   .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-finance-subsection-title {
     margin: 0 !important;
     padding: 0 !important;
-    line-height: 12pt !important;
-    font-size: 12pt !important;
+    line-height: var(--print-line-height) !important;
+    font-size: var(--print-body-size) !important;
     color: #000 !important;
     text-transform: none !important;
     letter-spacing: 0 !important;
@@ -2202,15 +2546,15 @@
     padding: 1.5pt 4pt !important;
     height: 15pt !important;
     min-height: 15pt !important;
-    line-height: 12pt !important;
+    line-height: var(--print-line-height) !important;
     background: #f1f5f9 !important;
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
   }
 
   .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .fs-print-note-group {
-    break-inside: auto !important;
-    page-break-inside: auto !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .fs-print-note-block {
@@ -2249,12 +2593,25 @@
     border: none !important;
   }
 
-  .fs-print-body .loan-card,
-  .fs-print-body .dep-schedule-wrap,
-  .fs-print-body .gst-reco-section,
-  .fs-print-section-block {
+  .fs-print-body .fs-print-section-block {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .fs-print-body .dep-schedule-wrap,
+  .fs-print-body .dep-history-wrap {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .fs-print-body .gst-reco-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .fs-print-body .gst-reco-section:has(.gst-print-table-block--itc) {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
   }
 
   .fs-print-note-block {
@@ -2265,8 +2622,63 @@
   }
 
   .fs-print-note-group {
-    break-inside: auto;
-    page-break-inside: auto;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-before: auto;
+    page-break-before: auto;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-print-notes-stack {
+    gap: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-print-note-unit {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-before: auto;
+    page-break-before: auto;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-print-note-unit .notes-table {
+    display: table !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-print-note-unit .notes-table thead {
+    display: table-header-group !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-print-note-unit .notes-table tbody {
+    display: table-row-group !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-print-note-unit .notes-table tr {
+    display: table-row !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-print-note-unit .notes-table th,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-print-note-unit .notes-table td {
+    display: table-cell !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-print-note-unit .fs-print-note-block tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table-wrap {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-table tbody.fs-print-note-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
     break-before: auto;
     page-break-before: auto;
   }
@@ -2276,14 +2688,117 @@
     page-break-inside: avoid !important;
   }
 
+  /* Notes print: show full thead on every note unit (client banner + column headers) */
+  .notes-print-note-unit + .notes-print-note-unit .notes-table thead {
+    display: table-header-group !important;
+  }
+
+  .notes-print-note-unit + .notes-print-note-unit .notes-table tbody tr:first-child td {
+    border-top-width: 0.5px !important;
+  }
+
   /* Notes print: visible repeating column headers with top border on header row only */
   .fs-page.fs-print-notes-section .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-head-row th {
-    padding: 3pt 4pt !important;
-    background: #eef2f7 !important;
-    border: 0.5px solid #000 !important;
-    border-top: 0.5px solid #000 !important;
-    color: #000 !important;
+    padding: var(--print-cell-padding-y) var(--print-cell-padding-x) !important;
+    background: var(--print-color-header-bg) !important;
+    border: 0.5px solid var(--print-color-border) !important;
+    border-top: 0.5px solid var(--print-color-border) !important;
+    color: var(--print-color-text) !important;
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
+  }
+
+  /* Print Current from Notes overview: show merged table, hide hub panel */
+  .fs-page:not(.fs-print-all) .fs-tab-panel.fs-notes-print-merged--overview {
+    display: block !important;
+  }
+
+  .fs-page:not(.fs-print-all)
+    .fs-tab-panel[data-fs-tab='notes']:not([data-note-section]):not(.fs-notes-print-merged) {
+    display: none !important;
+  }
+
+  /* Notes-only / Print Current: fixed section stationery — no extra table spacer gap */
+  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-tab-panel[data-fs-tab='notes'] > .fs-print-section-stationery + .table-wrap,
+  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-tab-panel[data-fs-tab='notes'] > .fs-print-section-stationery + .notes-print-notes-stack,
+  .fs-page.fs-print-all.fs-print-notes-only .fs-print-section-stationery + .table-wrap,
+  .fs-page.fs-print-all.fs-print-notes-only .fs-print-section-stationery + .notes-print-notes-stack,
+  .fs-page.fs-print-all.fs-print-notes-only .fs-notes-print-merged .table-wrap,
+  .fs-page.fs-print-all.fs-print-notes-only .fs-notes-print-merged .notes-print-notes-stack {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  .fs-page.fs-print-notes-section:not(.fs-print-all) .fs-tab-panel[data-fs-tab='notes'] .fs-print-stationery-table,
+  .fs-page.fs-print-all.fs-print-notes-only .fs-notes-print-merged .fs-print-stationery-table {
+    display: none !important;
+  }
+
+  .fs-print-body .fs-tab-panel,
+  .fs-print-body .fs-balance-sheet-print-body,
+  .fs-print-body .fs-profit-loss-print-body,
+  .fs-print-body .notes-table-wrap,
+  .fs-print-body .statement-table-wrap,
+  .fs-print-body .statement-table-container,
+  .fs-print-body .table-wrap,
+  .fs-print-body .dep-schedule-wrap,
+  .fs-print-body .dep-history-wrap,
+  .fs-print-body .bank-account-table-wrap,
+  .fs-print-body .pl-appropriation-table-wrap,
+  .fs-print-body .loan-emi-table-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+
+  .fs-print-body .fs-balance-sheet-print-body th.fs-print-notes-banner-cell,
+  .fs-print-body .fs-balance-sheet-print-body th.fs-print-notes-head-spacer-cell,
+  .fs-print-body .fs-balance-sheet-print-body .fs-print-stationery-table th,
+  .fs-print-body .fs-profit-loss-print-body th.fs-print-notes-banner-cell,
+  .fs-print-body .fs-profit-loss-print-body th.fs-print-notes-head-spacer-cell,
+  .fs-print-body .fs-profit-loss-print-body .fs-print-stationery-table th {
+    border: none !important;
+    padding: 0 !important;
+    text-align: center !important;
+    background: #fff !important;
+    font-weight: 400 !important;
+    vertical-align: top !important;
+    line-height: normal !important;
+    font-size: inherit !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .fs-print-body .statement-head-row th,
+  .fs-print-body .notes-head-row th,
+  .fs-print-body .pl-appr-head-row th {
+    padding-left: 2pt !important;
+    padding-right: 2pt !important;
+  }
+
+  .fs-page.fs-print-all:not(.fs-print-notes-only):not(.fs-print-gst-only) .fs-print-fixed-client-header {
+    width: 100% !important;
+    max-width: 100% !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+
+  .fs-page.fs-print-all .fs-print-stationery-table,
+  .fs-page.fs-print-all .fs-print-stationery-table th,
+  .fs-page.fs-print-all .fs-print-stationery-table .fs-print-notes-banner-surface,
+  .fs-page.fs-print-all .fs-print-stationery-table .fs-print-notes-report-block,
+  .fs-page.fs-print-all .fs-print-stationery-table .fs-print-notes-report-line,
+  .fs-page.fs-print-all .fs-print-stationery-table .fs-print-notes-period-line,
+  .fs-page.fs-print-all .fs-print-notes-banner-row th.fs-print-notes-banner-cell,
+  .fs-page.fs-print-all .fs-print-notes-banner-row th.fs-print-notes-banner-cell .fs-print-notes-banner-surface,
+  .fs-page.fs-print-all .fs-print-notes-banner-row th.fs-print-notes-banner-cell .fs-print-notes-report-block,
+  .fs-page.fs-print-all .fs-print-notes-banner-row th.fs-print-notes-banner-cell .fs-print-notes-report-line,
+  .fs-page.fs-print-all .fs-print-notes-banner-row th.fs-print-notes-banner-cell .fs-print-notes-period-line {
+    text-align: center !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
   }
 }

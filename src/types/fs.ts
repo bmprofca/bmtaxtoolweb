@@ -136,6 +136,10 @@ export interface UdinDetails {
   udinDate: string
   caPartnerName?: string
   caFirmName?: string
+  sealAttachmentName?: string
+  sealAttachmentDataUrl?: string
+  sealOffsetX?: number
+  sealOffsetY?: number
 }
 
 export interface FinalizationInfo {
@@ -261,6 +265,8 @@ export interface StatementLine {
   blankAmounts?: boolean
   isSpacer?: boolean
   rowId?: string
+  /** Consolidated balance sheet: current-year amount per business id. */
+  businessCurrentValues?: Record<string, number>
 }
 
 export interface ComputedStatements {

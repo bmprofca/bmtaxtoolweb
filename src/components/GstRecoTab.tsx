@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { fetchGstReco } from '../api/fs'
 import type { GstInputTaxRow, GstRecoStatement, GstTaxTriple } from '../types/gst'
 import { computeGstReco, getGstTaxableSalesTotal, isInputRowEditable } from '../utils/gstCalculator'
@@ -19,6 +20,8 @@ interface GstRecoTabProps {
   fsSavedAt?: string
   onOpenRevenueNote?: () => void
   onChange: (data: GstRecoStatement) => void
+  printHeadSpacer?: (colSpan: number) => ReactNode
+  printBanner?: (colSpan: number) => ReactNode
 }
 
 function AmountInput({
@@ -70,6 +73,36 @@ function TaxCells({
   )
 }
 
+function GstPrintSectionTitle({ title }: { title: string }) {
+  return (
+    <div className="gst-print-section-title fs-print-only" aria-hidden="true">
+      {title}
+    </div>
+  )
+}
+
+function GstPrintTableHead({
+  colSpan,
+  printHeadSpacer,
+  printBanner,
+  children,
+}: {
+  colSpan: number
+  printHeadSpacer?: (colSpan: number) => ReactNode
+  printBanner?: (colSpan: number) => ReactNode
+  children: ReactNode
+}) {
+  const spacer = printHeadSpacer?.(colSpan)
+  const banner = printBanner?.(colSpan)
+  return (
+    <thead>
+      {spacer}
+      {banner}
+      {children}
+    </thead>
+  )
+}
+
 function GstRecoTab({
   gstReco,
   savedGstReco,
@@ -83,6 +116,8 @@ function GstRecoTab({
   fsSavedAt,
   onOpenRevenueNote,
   onChange,
+  printHeadSpacer,
+  printBanner,
 }: GstRecoTabProps) {
   const computed = computeGstReco(gstReco)
   const [dbGstReco, setDbGstReco] = useState<GstRecoStatement | null>(null)
@@ -410,9 +445,14 @@ function GstRecoTab({
             </p>
           )}
         </div>
-        <div className="table-wrap">
+        <div className="table-wrap gst-print-table-block">
+          <GstPrintSectionTitle title="1. Sales & GST on Sales (Output Tax)" />
           <table className="data-table gst-simple-table">
-            <thead>
+            <GstPrintTableHead
+              colSpan={5}
+              printHeadSpacer={printHeadSpacer}
+              printBanner={printBanner}
+            >
               <tr>
                 <th>Particulars</th>
                 <th>Taxable Value</th>
@@ -420,7 +460,7 @@ function GstRecoTab({
                 <th>CGST</th>
                 <th>SGST</th>
               </tr>
-            </thead>
+            </GstPrintTableHead>
             <tbody>
               <tr>
                 <td>Sales / Turnover</td>
@@ -486,16 +526,17 @@ function GstRecoTab({
           CGST and IGST; SGST credit can pay SGST and IGST. CGST and SGST credits cannot be used
           against each other.
         </p>
-        <div className="table-wrap">
+        <div className="table-wrap gst-print-table-block">
+          <GstPrintSectionTitle title="2. Payment of Outward Tax Liability" />
           <table className="data-table gst-simple-table gst-payment-matrix">
-            <thead>
+            <GstPrintTableHead colSpan={4}>
               <tr>
                 <th>ITC Credit / Payment</th>
                 <th>Toward IGST liability</th>
                 <th>Toward CGST liability</th>
                 <th>Toward SGST liability</th>
               </tr>
-            </thead>
+            </GstPrintTableHead>
             <tbody>
               <tr>
                 <td>Output tax liability (from sales)</td>
@@ -624,7 +665,8 @@ function GstRecoTab({
             Link closing ITC to Notes (manual entry)
           </label>
         </div>
-        <div className="table-wrap">
+        <div className="table-wrap gst-print-table-block gst-print-table-block--itc">
+          <GstPrintSectionTitle title="3. Input Tax (ITC) Sheet" />
           <table className="data-table gst-simple-table gst-itc-table">
             <colgroup>
               <col className="gst-itc-col-sno" />
@@ -633,15 +675,15 @@ function GstRecoTab({
               <col className="gst-itc-col-tax" />
               <col className="gst-itc-col-tax" />
             </colgroup>
-            <thead>
+            <GstPrintTableHead colSpan={5} printHeadSpacer={printHeadSpacer} printBanner={printBanner}>
               <tr>
-                <th>S.No</th>
-                <th className="particulars-col">Particulars</th>
-                <th>IGST</th>
-                <th>CGST</th>
-                <th>SGST</th>
+                <th className="gst-itc-sno-col">S.No</th>
+                <th className="gst-itc-particular-col particulars-col">Particulars</th>
+                <th className="gst-itc-amount-col">IGST</th>
+                <th className="gst-itc-amount-col">CGST</th>
+                <th className="gst-itc-amount-col">SGST</th>
               </tr>
-            </thead>
+            </GstPrintTableHead>
             <tbody>
               {gstReco.inputTax.rows.map((row, index) => renderInputRow(row, index))}
             </tbody>
@@ -660,16 +702,19 @@ function GstRecoTab({
         <h3>4. Simple Reconciliation</h3>
 
         <h4 className="gst-reco-subtitle">ITC claimed in GSTR-3B — FY {fyLabel}</h4>
-        <div className="table-wrap">
+        <div className="table-wrap gst-print-table-block">
+          <GstPrintSectionTitle
+            title={`4. Simple Reconciliation — ITC claimed in GSTR-3B (FY ${fyLabel})`}
+          />
           <table className="data-table gst-simple-table gst-reco-simple-table">
-            <thead>
+            <GstPrintTableHead colSpan={4}>
               <tr>
                 <th>Particulars</th>
                 <th>IGST</th>
                 <th>CGST</th>
                 <th>SGST</th>
               </tr>
-            </thead>
+            </GstPrintTableHead>
             <tbody>
               <tr>
                 <td className="gst-reco-particular">
@@ -721,16 +766,17 @@ function GstRecoTab({
         </div>
 
         <h4 className="gst-reco-subtitle">Comparison — GSTR-2B vs GSTR-3B (current year ITC)</h4>
-        <div className="table-wrap">
+        <div className="table-wrap gst-print-table-block">
+          <GstPrintSectionTitle title="4. Simple Reconciliation — Comparison (GSTR-2B vs GSTR-3B)" />
           <table className="data-table gst-simple-table gst-reco-simple-table">
-            <thead>
+            <GstPrintTableHead colSpan={4}>
               <tr>
                 <th>Particulars</th>
                 <th>IGST</th>
                 <th>CGST</th>
                 <th>SGST</th>
               </tr>
-            </thead>
+            </GstPrintTableHead>
             <tbody>
               <tr>
                 <td className="gst-reco-particular">ITC as per GSTR-2B (current year)</td>
