@@ -9,11 +9,13 @@ import type { BusinessStatus, Client } from '../types'
 import {
   BUSINESS_TYPES,
   formatBusinessDate,
+  getBusinessFieldsFromClient,
   getBusinessStatusLabel,
   getFyCellStatusLabel,
   getNormalizedFinancialYears,
-  isProprietorshipType,
+  isSelfBusinessType,
   normalizeClientBusinesses,
+  usesClientPanFallback,
 } from '../utils/businessUtils'
 import { formatPanInput, getPanValidationMessage } from '../utils/clientValidation'
 import {
@@ -155,7 +157,7 @@ function BusinessProfile() {
     }
 
     const panToValidate =
-      isProprietorshipType(businessType) && !businessPan.trim()
+      usesClientPanFallback(businessType) && !businessPan.trim()
         ? client?.pan || ''
         : businessPan
     const panError = getPanValidationMessage(panToValidate)
@@ -577,7 +579,14 @@ function BusinessProfile() {
                     onChange={(event) => {
                       const value = event.target.value
                       setBusinessType(value)
-                      if (isProprietorshipType(value) && client?.pan) {
+                      if (isSelfBusinessType(value) && client) {
+                        const fromClient = getBusinessFieldsFromClient(client)
+                        setBusinessName(fromClient.name)
+                        setBusinessPan(formatPanInput(fromClient.pan))
+                        setBusinessAddress(fromClient.address)
+                        return
+                      }
+                      if (usesClientPanFallback(value) && client?.pan) {
                         setBusinessPan(formatPanInput(client.pan))
                       }
                     }}

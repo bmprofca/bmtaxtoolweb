@@ -31,6 +31,11 @@ import {
   normalizeAdminCategoryId,
 } from './adminExpenseCategories'
 import {
+  applyIntegerCashNotes,
+  floorCashNoteValue,
+  hasActiveCashRoundOff,
+} from './cashRoundOff'
+import {
   manualShortTermInterestSubId,
   manualShortTermSubId,
   normalizeOtherShortTermBorrowingTypeId,
@@ -802,13 +807,22 @@ export function reconcileAdministrativeExpenseLines(
   ledgers: LedgerRecord[] = [],
   priorLines: AdministrativeExpenseLine[] = [],
 ): AdministrativeExpenseLine[] {
-  const byId = new Map<string, AdministrativeExpenseLine>()
+  const byKey = new Map<string, AdministrativeExpenseLine>()
 
-  for (const line of [...priorLines, ...(raw ?? [])]) {
-    byId.set(line.id, {
-      id: line.id,
-      categoryId: normalizeAdminCategoryId(line.categoryId),
-    })
+  const addLine = (line: AdministrativeExpenseLine, prefer = false) => {
+    const categoryId = normalizeAdminCategoryId(line.categoryId)
+    const key = adminExpenseDedupKey(ledgers, categoryId)
+    const existing = byKey.get(key)
+    if (!existing || prefer) {
+      byKey.set(key, { id: line.id, categoryId })
+    }
+  }
+
+  for (const line of priorLines) {
+    addLine(line, false)
+  }
+  for (const line of raw ?? []) {
+    addLine(line, true)
   }
 
   const subs = noteSubAmounts?.otherAdministrativeExpenses ?? {}
@@ -817,16 +831,16 @@ export function reconcileAdministrativeExpenseLines(
       continue
     }
     const lineId = subId.slice('admin-line-'.length)
-    if (byId.has(lineId)) {
+    if (Array.from(byKey.values()).some((line) => line.id === lineId)) {
       continue
     }
     if ((amount?.current ?? 0) === 0 && (amount?.previous ?? 0) === 0) {
       continue
     }
-    byId.set(lineId, { id: lineId, categoryId: 'others' })
+    addLine({ id: lineId, categoryId: 'others' }, true)
   }
 
-  const normalized = normalizeAdministrativeExpenseLines(Array.from(byId.values()), noteSubAmounts)
+  const normalized = normalizeAdministrativeExpenseLines(Array.from(byKey.values()), noteSubAmounts)
   return normalized.map((line) => ({
     id: line.id,
     categoryId: resolveAdminExpenseCategoryId(ledgers, line.categoryId),
@@ -905,6 +919,118 @@ export function deduplicateAdministrativeExpenseLines(
       ...noteSubAmounts,
       otherAdministrativeExpenses: adminSubs,
     },
+  }
+}
+
+/** Match admin expense comparative rows by ledger label, not line id. */
+export function mergeAdminExpenseSubRowsForComparative(
+  currentRows: ResolvedSubRow[],
+  priorRows: ResolvedSubRow[],
+): ResolvedSubRow[] {
+  const normalizeLabel = (label: string) => label.trim().toLowerCase()
+
+  const priorAmountByLabel = new Map<string, number>()
+  const priorRowByLabel = new Map<string, ResolvedSubRow>()
+  for (const row of priorRows) {
+    if (row.kind !== 'entry' && row.kind !== 'less') {
+      continue
+    }
+    const key = normalizeLabel(row.label)
+    priorAmountByLabel.set(key, (priorAmountByLabel.get(key) ?? 0) + row.current)
+    if (!priorRowByLabel.has(key)) {
+      priorRowByLabel.set(key, row)
+    }
+  }
+
+  const merged: ResolvedSubRow[] = []
+  const seenLabels = new Set<string>()
+
+  for (const row of currentRows) {
+    if (row.id === 'admin-total') {
+      continue
+    }
+    if (row.kind === 'header') {
+      merged.push(row)
+      continue
+    }
+    const key = normalizeLabel(row.label)
+    seenLabels.add(key)
+    merged.push({
+      ...row,
+      previous: priorAmountByLabel.get(key) ?? row.previous,
+    })
+  }
+
+  for (const [key, priorAmount] of priorAmountByLabel) {
+    if (seenLabels.has(key)) {
+      continue
+    }
+    const priorRow = priorRowByLabel.get(key)
+    if (!priorRow) {
+      continue
+    }
+    merged.push({
+      ...priorRow,
+      current: 0,
+      previous: priorAmount,
+    })
+  }
+
+  const currentTotal = currentRows.find((row) => row.id === 'admin-total')
+  const priorTotal = priorRows.find((row) => row.id === 'admin-total')
+  if (currentTotal) {
+    merged.push({
+      ...currentTotal,
+      previous: priorTotal?.current ?? currentTotal.previous,
+    })
+  }
+
+  return merged
+}
+
+/** Roll prior-year admin expense amounts onto current lines matched by ledger label. */
+export function rollUpAdminExpensePriorAmounts(
+  lines: AdministrativeExpenseLine[],
+  noteSubAmounts: NoteSubAmounts,
+  priorLines: AdministrativeExpenseLine[],
+  priorNoteSubAmounts: NoteSubAmounts | null,
+  ledgers: LedgerRecord[] = [],
+): NoteSubAmounts {
+  if (!priorNoteSubAmounts || priorLines.length === 0) {
+    return noteSubAmounts
+  }
+
+  const priorAdminSubs = priorNoteSubAmounts.otherAdministrativeExpenses ?? {}
+  const priorAmountByKey = new Map<string, { current: number; previous: number }>()
+
+  for (const line of priorLines) {
+    const key = adminExpenseDedupKey(ledgers, line.categoryId)
+    const sub = priorAdminSubs[adminExpenseSubId(line.id)]
+    const existing = priorAmountByKey.get(key) ?? { current: 0, previous: 0 }
+    priorAmountByKey.set(key, {
+      current: existing.current + (sub?.current ?? 0),
+      previous: existing.previous + (sub?.previous ?? 0),
+    })
+  }
+
+  const adminSubs = { ...(noteSubAmounts.otherAdministrativeExpenses ?? {}) }
+  for (const line of lines) {
+    const key = adminExpenseDedupKey(ledgers, line.categoryId)
+    const rolled = priorAmountByKey.get(key)
+    if (!rolled || (rolled.current === 0 && rolled.previous === 0)) {
+      continue
+    }
+    const subId = adminExpenseSubId(line.id)
+    const existing = adminSubs[subId] ?? emptyCell()
+    adminSubs[subId] = {
+      current: existing.current ?? 0,
+      previous: rolled.current + rolled.previous,
+    }
+  }
+
+  return {
+    ...noteSubAmounts,
+    otherAdministrativeExpenses: adminSubs,
   }
 }
 
@@ -1416,12 +1542,30 @@ export function resolveNoteSubRows(
             bankTotal.current > 0 || bankTotal.previous > 0
               ? bankTotal
               : sumEntrySubs(defs.filter((item) => item.id !== def.id), resolved, ['entry'])
+          if (
+            hasActiveCashRoundOff(
+              ctx.administrativeExpenseLines,
+              ctx.noteSubAmounts,
+              ctx.ledgers,
+            )
+          ) {
+            value = floorCashNoteValue(value)
+          }
         } else if (noteKey === 'cashInHand') {
           const cashEntry = resolved.get('cash-in-hand') ?? emptyCell()
           const cashAdj = resolved.get('cash-flow-adjustment') ?? emptyCell()
           value = {
             current: cashEntry.current + cashAdj.current,
             previous: cashEntry.previous + cashAdj.previous,
+          }
+          if (
+            hasActiveCashRoundOff(
+              ctx.administrativeExpenseLines,
+              ctx.noteSubAmounts,
+              ctx.ledgers,
+            )
+          ) {
+            value = floorCashNoteValue(value)
           }
         } else {
           value = entryTotal
@@ -1763,5 +1907,10 @@ export function buildNotesFromSubAmounts(
     base[field.key] = getNoteTotalFromSubs(field.key, rows)
   }
 
-  return base
+  return applyIntegerCashNotes(
+    base,
+    administrativeExpenseLines,
+    noteSubAmounts,
+    ledgers,
+  )
 }

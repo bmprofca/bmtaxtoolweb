@@ -112,6 +112,24 @@
   background: #1d4ed8;
 }
 
+.fs-auto-generate-btn {
+  height: 1.85rem;
+  border: 1px solid #0f766e;
+  border-radius: 6px;
+  background: #0f766e;
+  color: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0 0.65rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fs-auto-generate-btn:hover {
+  background: #0d9488;
+}
+
 @media (max-width: 768px) {
   .fs-context-bar {
     gap: 0.5rem;

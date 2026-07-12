@@ -5,10 +5,12 @@ import type { Business as BusinessRecord, BusinessStatus, Client } from '../type
 import {
   BUSINESS_TYPES,
   formatBusinessDate,
+  getBusinessFieldsFromClient,
   getBusinessStatusLabel,
   getNormalizedFinancialYears,
-  isProprietorshipType,
+  isSelfBusinessType,
   normalizeClientBusinesses,
+  usesClientPanFallback,
 } from '../utils/businessUtils'
 import { formatPanInput, getPanValidationMessage } from '../utils/clientValidation'
 import { getDefaultFyForBusiness, buildShortFyLabel, sortFinancialYears } from '../utils/financialYear'
@@ -190,7 +192,18 @@ function Business() {
   const handleBusinessTypeChange = (value: string) => {
     setBusinessType(value)
 
-    if (isProprietorshipType(value) && client?.pan) {
+    if (isSelfBusinessType(value) && client) {
+      const fromClient = getBusinessFieldsFromClient(client)
+      setBusinessName(fromClient.name)
+      setBusinessPan(formatPanInput(fromClient.pan))
+      setBusinessAddress(fromClient.address)
+      setBusinessPanError(
+        fromClient.pan ? getPanValidationMessage(formatPanInput(fromClient.pan)) || '' : '',
+      )
+      return
+    }
+
+    if (usesClientPanFallback(value) && client?.pan) {
       setBusinessPan(formatPanInput(client.pan))
       setBusinessPanError('')
     }
@@ -267,7 +280,7 @@ function Business() {
     }
 
     const panToValidate =
-      isProprietorshipType(businessType) && !businessPan.trim()
+      usesClientPanFallback(businessType) && !businessPan.trim()
         ? client?.pan || ''
         : businessPan
 
@@ -441,7 +454,9 @@ function Business() {
             type="text"
             value={businessPan}
             onChange={(event) => handleBusinessPanChange(event.target.value)}
-            placeholder={isProprietorshipType(businessType) ? 'Uses proprietor PAN if empty' : 'ABCDE1234F'}
+            placeholder={
+              usesClientPanFallback(businessType) ? 'Uses client PAN if empty' : 'ABCDE1234F'
+            }
             maxLength={10}
             inputMode="text"
             autoCapitalize="characters"

@@ -669,6 +669,142 @@ input.fs-readonly-input {
   border-color: #b91c1c;
 }
 
+.fs-live-summary-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.fs-live-summary-reset-btn {
+  border: 1px solid #94a3b8;
+  border-radius: 5px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.28rem 0.55rem;
+  cursor: pointer;
+}
+
+.fs-live-summary-reset-btn:hover {
+  background: #f8fafc;
+  border-color: #64748b;
+  color: #0f172a;
+}
+
+.fs-cash-adjust-reset-btn {
+  margin-right: auto;
+}
+
+.fs-cash-adjust-modal {
+  max-width: 520px;
+}
+
+.fs-cash-adjust-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.85rem 0 0.65rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.fs-cash-adjust-summary-head,
+.fs-cash-adjust-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(5.5rem, 1fr) minmax(5.5rem, 1fr);
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.fs-cash-adjust-summary-head {
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.fs-cash-adjust-summary-head span:not(:first-child) {
+  text-align: right;
+}
+
+.fs-cash-adjust-label {
+  font-size: 0.84rem;
+  color: #334155;
+}
+
+.fs-cash-adjust-row strong {
+  text-align: right;
+  font-size: 0.86rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+}
+
+.fs-cash-adjust-value--warn {
+  color: #b91c1c;
+}
+
+.fs-cash-adjust-row--result {
+  margin-top: 0.2rem;
+  padding-top: 0.55rem;
+  border-top: 1px dashed #cbd5e1;
+}
+
+.fs-cash-adjust-row--result .fs-cash-adjust-label {
+  font-weight: 700;
+  color: #166534;
+}
+
+.fs-cash-adjust-row--result strong {
+  color: #065f46;
+}
+
+.fs-cash-adjust-footnote {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.fs-cash-adjust-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.fs-cash-adjust-actions-primary {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.fs-cash-adjust-reset-link {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #b45309;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.fs-cash-adjust-reset-link:hover {
+  color: #92400e;
+}
+
 .fs-live-summary-banner {
   position: fixed;
   bottom: 0;

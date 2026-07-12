@@ -15,6 +15,7 @@ interface FsContextBarProps {
   activeTab: string
   readOnly?: boolean
   onQuickEntry?: () => void
+  onAutoGenerate?: () => void
   onStatementTypeChange: (nextType: string) => Promise<void>
 }
 
@@ -26,6 +27,7 @@ function FsContextBar({
   activeTab,
   readOnly = false,
   onQuickEntry,
+  onAutoGenerate,
   onStatementTypeChange,
 }: FsContextBarProps) {
   const [savingStatementType, setSavingStatementType] = useState(false)
@@ -73,6 +75,12 @@ function FsContextBar({
           {!readOnly && onQuickEntry && (
             <button type="button" className="fs-quick-entry-btn" onClick={onQuickEntry}>
               Quick Entry
+            </button>
+          )}
+
+          {!readOnly && onAutoGenerate && (
+            <button type="button" className="fs-auto-generate-btn" onClick={onAutoGenerate}>
+              Auto Generate
             </button>
           )}
         </>

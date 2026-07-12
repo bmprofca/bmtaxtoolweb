@@ -20,6 +20,7 @@ import { computeStatements } from './fsCalculator'
 import { buildEffectiveNotes, type NoteCalcContext } from './noteCalculator'
 import {
   buildSubResolveContext,
+  mergeAdminExpenseSubRowsForComparative,
   resolveNoteSubRows,
   type ResolvedSubRow,
 } from './noteSubFields'
@@ -188,10 +189,16 @@ export function mergeComparativeDerivedState(
   const noteSubRowsMap = {} as Record<keyof FsNotes, ResolvedSubRow[]>
   for (const field of NOTE_FIELDS) {
     const noteKey = field.key
-    noteSubRowsMap[noteKey] = mergeSubRowsForComparative(
-      current.noteSubRowsMap[noteKey] ?? [],
-      priorSnapshot.noteSubRowsMap[noteKey] ?? [],
-    )
+    noteSubRowsMap[noteKey] =
+      noteKey === 'otherAdministrativeExpenses'
+        ? mergeAdminExpenseSubRowsForComparative(
+            current.noteSubRowsMap[noteKey] ?? [],
+            priorSnapshot.noteSubRowsMap[noteKey] ?? [],
+          )
+        : mergeSubRowsForComparative(
+            current.noteSubRowsMap[noteKey] ?? [],
+            priorSnapshot.noteSubRowsMap[noteKey] ?? [],
+          )
   }
 
   const computed: ComputedStatements = {

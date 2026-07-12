@@ -1,6 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import FsAutoGenerateModal from '../components/FsAutoGenerateModal'
 import FsContextBar from '../components/FsContextBar'
 import FsPrintLayout from '../components/FsPrintLayout'
 import '../components/FsPrintLayout.css'
@@ -37,6 +38,7 @@ import type {
   FinalizationInfo,
   FinancialStatementData,
   FsNotes,
+  ManualNoteLine,
   NoteSubAmounts,
   NoteSubCell,
   PreviousYearDepreciationSummary,
@@ -61,6 +63,14 @@ import {
   mergeComparativeDerivedState,
   type FsDerivedState,
 } from '../utils/fsEngine'
+import {
+  fsDataHasGeneratedContent,
+  generateFsAutoPreview,
+  resolvePriorYearProfitAnchors,
+  resolvePriorYearSales,
+  type FsAutoGenerateInputs,
+  type FsAutoGeneratePreview,
+} from '../utils/fsAutoGenerator'
 import { resolveYearDisplaySnapshot, type YearDisplaySnapshotChain } from '../utils/yearDisplaySnapshot'
 import { buildExportBusinessHeaderHtml, buildExportBusinessHeaderLines } from '../utils/printExportHeader'
 import {
@@ -83,6 +93,7 @@ import {
   NOTE_SECTION_TAB_IDS,
   type NoteSectionTabId,
   createEmptyUdinDetails,
+  createEmptyCashAdjustment,
   buildComparativeCashAdjustment,
   migrateNoteBreakdowns,
   migrateNotes,
@@ -125,6 +136,14 @@ import {
   isLegacyAdminCategoryId,
 } from '../utils/adminExpenseCategories'
 import {
+  applyCashRoundOffToFsData,
+  ensureRoundOffAdjustmentLedger,
+  findRoundOffLedger,
+  getUnroundedCashTotalsFromSubRows,
+  isCashRoundOffSynced,
+  needsCashRoundOff,
+} from '../utils/cashRoundOff'
+import {
   manualShortTermInterestSubId,
   manualShortTermSubId,
   normalizeOtherShortTermBorrowingTypeId,
@@ -159,6 +178,7 @@ import {
   migrateOtherShortTermSubAmounts,
   deduplicateAdministrativeExpenseLines,
   reconcileAdministrativeExpenseLines,
+  rollUpAdminExpensePriorAmounts,
   normalizeManualNoteLines,
   normalizeNoteSubAmounts,
   normalizeOtherShortTermBorrowingLines,
@@ -747,6 +767,10 @@ function FinancialStatement() {
   const fsDataRef = useRef<FinancialStatementData | null>(null)
   const [previousYearNotes, setPreviousYearNotes] = useState<FsNotes | null>(null)
   const [previousYearSubAmounts, setPreviousYearSubAmounts] = useState<NoteSubAmounts | null>(null)
+  const [previousYearManualNoteLines, setPreviousYearManualNoteLines] = useState<ManualNoteLine[]>([])
+  const [previousYearAdministrativeExpenseLines, setPreviousYearAdministrativeExpenseLines] = useState<
+    AdministrativeExpenseLine[]
+  >([])
   const [previousYearPlAppropriationAmounts, setPreviousYearPlAppropriationAmounts] = useState<Record<
     string,
     NoteSubCell
@@ -772,6 +796,7 @@ function FinancialStatement() {
   const [cashAdjustConfirmOpen, setCashAdjustConfirmOpen] = useState(false)
   const [unlockConfirmationCode, setUnlockConfirmationCode] = useState('')
   const [quickEntryOpen, setQuickEntryOpen] = useState(false)
+  const [autoGenerateOpen, setAutoGenerateOpen] = useState(false)
   const [quickEntryNoteKey, setQuickEntryNoteKey] = useState<keyof FsNotes>('capitalAccount')
   const [quickEntryNoteSearch, setQuickEntryNoteSearch] = useState('')
   const [quickEntryNoteMenuOpen, setQuickEntryNoteMenuOpen] = useState(false)
@@ -1180,6 +1205,7 @@ function FinancialStatement() {
       }
 
       let priorNotes: FsNotes | null = null
+      let priorEffectiveNotes: FsNotes | null = null
       let priorSubAmounts: NoteSubAmounts | null = null
       let priorLoans: LoanRecord[] | null = null
       let priorBankAccounts: BankAccountRecord[] = []
@@ -1251,7 +1277,7 @@ function FinancialStatement() {
             interestForYear: loan.interestForYear,
             lender: loan.lender,
           }))
-          const priorEffectiveNotes = buildEffectiveNotes({
+          const priorEffectiveNotesResult = buildEffectiveNotes({
             notes: priorNotes,
             noteBreakdowns: migrateNoteBreakdowns(priorFs.noteBreakdowns),
             noteSubAmounts: priorSub,
@@ -1282,8 +1308,9 @@ function FinancialStatement() {
               previous: Number(priorFs.cashAdjustment?.previous) || 0,
             },
           })
+          priorEffectiveNotes = priorEffectiveNotesResult
           const priorComputed = computeStatements(
-            priorEffectiveNotes,
+            priorEffectiveNotesResult,
             normalizeDepreciationSchedule(priorFs.depreciationSchedule || []),
             priorLoans,
             priorFyStart,
@@ -1345,6 +1372,7 @@ function FinancialStatement() {
           setPreviousYearPlAppropriationAmounts(priorPlAppropriationAmounts)
         } catch {
           priorNotes = null
+          priorEffectiveNotes = null
           priorSubAmounts = null
           priorLoans = null
           priorFsPrepared = priorFsPrepared ?? {
@@ -1360,8 +1388,16 @@ function FinancialStatement() {
         setPreviousYearDerived(null)
       }
       setPreviousYearDerived(previousYearDerivedSnapshot)
-      setPreviousYearNotes(priorNotes)
+      setPreviousYearNotes(priorEffectiveNotes ?? priorNotes)
       setPreviousYearSubAmounts(priorSubAmounts)
+      setPreviousYearManualNoteLines(
+        priorFsFetched && (priorEffectiveNotes || priorNotes)
+          ? normalizeManualNoteLines(priorFsFetched.manualNoteLines, priorSubAmounts ?? undefined)
+          : [],
+      )
+      setPreviousYearAdministrativeExpenseLines(
+        priorFsFetched && (priorEffectiveNotes || priorNotes) ? priorAdminLines : [],
+      )
       setPreviousYearLoans(priorLoans)
       setPreviousYearBankAccounts(priorBankAccounts)
       setPreviousYearCashAdjustment(
@@ -1412,6 +1448,15 @@ function FinancialStatement() {
         loadedLedgers,
       )
       noteSubAmounts = migrateAdminExpenseSubAmounts(administrativeExpenseLines, noteSubAmounts)
+      if (priorSubAmounts) {
+        noteSubAmounts = rollUpAdminExpensePriorAmounts(
+          administrativeExpenseLines,
+          noteSubAmounts,
+          priorAdminLines,
+          priorSubAmounts,
+          loadedLedgers,
+        )
+      }
       noteSubAmounts = migrateOtherShortTermSubAmounts(otherShortTermBorrowingLines, noteSubAmounts)
       noteSubAmounts = migrateManualNoteLineSubAmounts(manualNoteLines, noteSubAmounts)
       noteSubAmounts = migrateCapitalAccountSubAmounts(capitalAccountLines, noteSubAmounts)
@@ -2163,6 +2208,55 @@ function FinancialStatement() {
     }
     return getNoteCalcMap(noteCalcContext, effectiveNotes)
   }, [noteCalcContext, effectiveNotes])
+
+  useEffect(() => {
+    if (
+      !fsData ||
+      !noteSubRowsMap ||
+      !ledgers.length ||
+      isConsolidatedView ||
+      isFsFinalLocked
+    ) {
+      return
+    }
+
+    const rawCash = getUnroundedCashTotalsFromSubRows(noteSubRowsMap)
+    if (!needsCashRoundOff(rawCash.bank, rawCash.hand)) {
+      return
+    }
+    if (isCashRoundOffSynced(fsData, ledgers, rawCash)) {
+      return
+    }
+
+    let cancelled = false
+
+    void (async () => {
+      let nextLedgers = ledgers
+      if (!findRoundOffLedger(ledgers)) {
+        try {
+          const ledger = await ensureRoundOffAdjustmentLedger()
+          if (cancelled) {
+            return
+          }
+          nextLedgers = [...ledgers.filter((item) => item.id !== ledger.id), ledger]
+          setLedgers(nextLedgers)
+        } catch {
+          return
+        }
+      }
+
+      setFsData((current) => {
+        if (!current) {
+          return current
+        }
+        return applyCashRoundOffToFsData(current, nextLedgers, rawCash)
+      })
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [fsData, noteSubRowsMap, ledgers, isConsolidatedView, isFsFinalLocked])
 
   const balanceSheetLines = useMemo(() => {
     if (!effectiveNotes || !noteSubRowsMap) {
@@ -3263,8 +3357,12 @@ function FinancialStatement() {
       openingBalanceLocks,
     )
 
+    const categoryLabel = sub.label || resolveAdminExpenseLabel(ledgers, categoryId)
+
     return (
-      <div className="notes-admin-field">
+      <>
+        <span className="notes-sub-particular-print fs-print-only">{categoryLabel}</span>
+        <div className="notes-admin-field fs-screen-only">
         <span className="notes-admin-field-marker" aria-hidden="true" />
         <div className="notes-admin-select-wrap">
           <select
@@ -3272,14 +3370,14 @@ function FinancialStatement() {
             value={categoryId}
             title={
               categoryLocked
-                ? `${resolveAdminExpenseLabel(ledgers, categoryId)} — carried from previous year`
-                : resolveAdminExpenseLabel(ledgers, categoryId)
+                ? `${categoryLabel} — carried from previous year`
+                : categoryLabel
             }
             disabled={categoryLocked}
             onChange={(event) => updateAdministrativeExpenseCategory(lineId, event.target.value)}
           >
             {!hasLedgerOption && isLegacyAdminCategoryId(categoryId) ? (
-              <option value={categoryId}>{resolveAdminExpenseLabel(ledgers, categoryId)}</option>
+              <option value={categoryId}>{categoryLabel}</option>
             ) : null}
             {renderLedgerSelectOptions('otherAdministrativeExpenses', undefined, {
               excludeUsedIds: usedCategoryIds,
@@ -3298,7 +3396,8 @@ function FinancialStatement() {
             ×
           </button>
         ) : null}
-      </div>
+        </div>
+      </>
     )
   }
 
@@ -3307,14 +3406,18 @@ function FinancialStatement() {
     const line = fsData?.otherShortTermBorrowingLines?.find((item) => item.id === lineId)
     const typeId = line?.typeId ?? defaultLedgerIdForGroup(ledgers, 'shortTermBorrowings')
 
+    const lineLabel = sub.label || resolveShortTermBorrowingLabel(ledgers, typeId)
+
     return (
-      <div className="notes-admin-field">
+      <>
+        <span className="notes-sub-particular-print fs-print-only">{lineLabel}</span>
+        <div className="notes-admin-field fs-screen-only">
         <span className="notes-admin-field-marker" aria-hidden="true" />
         <div className="notes-admin-select-wrap">
           <select
             className="notes-admin-category-select"
             value={typeId}
-            title={resolveShortTermBorrowingLabel(ledgers, typeId)}
+            title={lineLabel}
             onChange={(event) => updateOtherShortTermBorrowingType(lineId, event.target.value)}
           >
             {renderLedgerSelectOptions('shortTermBorrowings')}
@@ -3329,7 +3432,8 @@ function FinancialStatement() {
         >
           ×
         </button>
-      </div>
+        </div>
+      </>
     )
   }
 
@@ -3339,8 +3443,12 @@ function FinancialStatement() {
     const typeId = line?.typeId ?? defaultLedgerIdForGroup(ledgers, noteKey)
     const categoryLocked = isManualNoteLineCategoryLocked(openingBalanceLocks, noteKey, lineId)
 
+    const lineLabel = sub.label || resolveManualNoteLineLabel(ledgers, noteKey, typeId)
+
     return (
-      <div className="notes-admin-field">
+      <>
+        <span className="notes-sub-particular-print fs-print-only">{lineLabel}</span>
+        <div className="notes-admin-field fs-screen-only">
         <span className="notes-admin-field-marker notes-manual-marker" aria-hidden="true" />
         <div className="notes-admin-select-wrap">
           <select
@@ -3348,8 +3456,8 @@ function FinancialStatement() {
             value={typeId}
             title={
               categoryLocked
-                ? `${resolveManualNoteLineLabel(ledgers, noteKey, typeId)} — carried from previous year`
-                : resolveManualNoteLineLabel(ledgers, noteKey, typeId)
+                ? `${lineLabel} — carried from previous year`
+                : lineLabel
             }
             disabled={categoryLocked}
             onChange={(event) => updateManualNoteLineType(noteKey, lineId, event.target.value)}
@@ -3367,7 +3475,8 @@ function FinancialStatement() {
         >
           ×
         </button>
-      </div>
+        </div>
+      </>
     )
   }
 
@@ -3377,8 +3486,12 @@ function FinancialStatement() {
     const sign = normalizeCapitalAccountLineSign(line?.sign)
     const typeId = line?.typeId ?? defaultCapitalLedgerId(sign)
 
+    const lineLabel = sub.label || resolveCapitalAccountLineLabel(ledgers, sign, typeId)
+
     return (
-      <div className="notes-admin-field notes-capital-field">
+      <>
+        <span className="notes-sub-particular-print fs-print-only">{lineLabel}</span>
+        <div className="notes-admin-field notes-capital-field fs-screen-only">
         <span className="notes-admin-field-marker notes-capital-marker" aria-hidden="true" />
         <div className="notes-admin-select-wrap notes-capital-sign-wrap">
           <select
@@ -3395,7 +3508,7 @@ function FinancialStatement() {
           <select
             className="notes-admin-category-select"
             value={typeId}
-            title={resolveCapitalAccountLineLabel(ledgers, sign, typeId)}
+            title={lineLabel}
             onChange={(event) => updateCapitalAccountLineType(lineId, event.target.value)}
           >
             {renderLedgerSelectOptions('capitalAccount', sign)}
@@ -3410,7 +3523,8 @@ function FinancialStatement() {
         >
           ×
         </button>
-      </div>
+        </div>
+      </>
     )
   }
 
@@ -3423,8 +3537,12 @@ function FinancialStatement() {
       (ledger) => normalizeLedgerSign(ledger.sign) === sign,
     )
 
+    const lineLabel = sub.label
+
     return (
-      <div className="notes-admin-field notes-cogs-field">
+      <>
+        <span className="notes-sub-particular-print fs-print-only">{lineLabel}</span>
+        <div className="notes-admin-field notes-cogs-field fs-screen-only">
         <span className="notes-admin-field-marker notes-cogs-marker" aria-hidden="true" />
         <div className="notes-admin-select-wrap notes-cogs-sign-wrap">
           <select
@@ -3461,7 +3579,8 @@ function FinancialStatement() {
         >
           ×
         </button>
-      </div>
+        </div>
+      </>
     )
   }
 
@@ -4169,7 +4288,11 @@ function FinancialStatement() {
     // Allow save while a local lock token is set so Finalize/Relock can be persisted.
     // Block only when the year is already locked and there is nothing new to save.
     const hasLockAction = Boolean(options?.finalizationOverride || options?.unlockCode)
-    if (isConsolidatedView || (isFsFinalLocked && !isDirty && !hasLockAction)) {
+    const hasDataOverride = Boolean(options?.dataOverride)
+    if (
+      isConsolidatedView ||
+      (isFsFinalLocked && !isDirty && !hasLockAction && !hasDataOverride)
+    ) {
       return false
     }
 
@@ -4193,8 +4316,26 @@ function FinancialStatement() {
     setSaveMessage('')
 
     try {
+      let workingLedgers = ledgers
+      if (!findRoundOffLedger(ledgers)) {
+        const ledger = await ensureRoundOffAdjustmentLedger()
+        workingLedgers = [...ledgers.filter((item) => item.id !== ledger.id), ledger]
+        setLedgers(workingLedgers)
+      }
+
+      let dataForSave = workingData
+      if (noteSubRowsMap && dataForSave) {
+        const rawCash = getUnroundedCashTotalsFromSubRows(noteSubRowsMap)
+        if (
+          needsCashRoundOff(rawCash.bank, rawCash.hand) ||
+          !isCashRoundOffSynced(dataForSave, workingLedgers, rawCash)
+        ) {
+          dataForSave = applyCashRoundOffToFsData(dataForSave, workingLedgers, rawCash)
+        }
+      }
+
       const plLine = (label: string) => computed.profitAndLoss.find((line) => line.label === label)
-      const cashAdj = normalizeCashAdjustment(workingData.cashAdjustment)
+      const cashAdj = normalizeCashAdjustment(dataForSave.cashAdjustment)
       const statementSnapshot = {
         balanceSheetLines,
         profitAndLossLines: computed.profitAndLoss,
@@ -4222,48 +4363,48 @@ function FinancialStatement() {
 
       const nextFinalization = options?.finalizationOverride
         ? normalizeFinalizationInfo(options.finalizationOverride)
-        : normalizeFinalizationInfo(workingData.finalizationInfo)
+        : normalizeFinalizationInfo(dataForSave.finalizationInfo)
       const unlockCode = options?.unlockCode || unlockConfirmationCode
       const notesForSave = options?.dataOverride
         ? notesWithPreviousFromPriorFy(options.dataOverride.notes, previousYearNotes)
         : notesWithPreviousFromPriorFy(effectiveNotes, previousYearNotes)
 
       const businessAssetLedgerIds = collectBusinessAssetLedgerIds(
-        workingData.depreciationSchedule,
+        dataForSave.depreciationSchedule,
         depreciationHistory,
         priorDepClosingsByLedgerId,
       )
       const prunedDepreciationSchedule = isConsolidatedView
-        ? filterActiveDepreciationSchedule(workingData.depreciationSchedule)
-        : filterScheduleToBusinessAssets(workingData.depreciationSchedule, businessAssetLedgerIds)
+        ? filterActiveDepreciationSchedule(dataForSave.depreciationSchedule)
+        : filterScheduleToBusinessAssets(dataForSave.depreciationSchedule, businessAssetLedgerIds)
 
       const reconciledAdminLines = reconcileAdministrativeExpenseLines(
-        workingData.administrativeExpenseLines,
-        workingData.noteSubAmounts,
-        ledgers,
+        dataForSave.administrativeExpenseLines,
+        dataForSave.noteSubAmounts,
+        workingLedgers,
       )
       const dedupedAdminForSave = deduplicateAdministrativeExpenseLines(
         reconciledAdminLines,
-        workingData.noteSubAmounts,
-        ledgers,
+        dataForSave.noteSubAmounts,
+        workingLedgers,
       )
       const adminLinesForSave = dedupedAdminForSave.lines
       const otherStLinesForSave = normalizeOtherShortTermBorrowingLines(
-        workingData.otherShortTermBorrowingLines,
-        workingData.noteSubAmounts,
+        dataForSave.otherShortTermBorrowingLines,
+        dataForSave.noteSubAmounts,
       )
       const manualLinesForSave = normalizeManualNoteLines(
-        workingData.manualNoteLines,
-        workingData.noteSubAmounts,
+        dataForSave.manualNoteLines,
+        dataForSave.noteSubAmounts,
       )
       const capitalLinesForSave = normalizeCapitalAccountLines(
-        workingData.capitalAccountLines,
-        workingData.noteSubAmounts,
+        dataForSave.capitalAccountLines,
+        dataForSave.noteSubAmounts,
       )
-      const cogsExtraLinesForSave = normalizeCogsExtraLines(workingData.cogsExtraLines)
-      const bankAccountsForSave = normalizeBankAccounts(workingData.bankAccounts)
+      const cogsExtraLinesForSave = normalizeCogsExtraLines(dataForSave.cogsExtraLines)
+      const bankAccountsForSave = normalizeBankAccounts(dataForSave.bankAccounts)
       const gstRecoForSave = (() => {
-        let next = normalizeGstReco(workingData.gstReco)
+        let next = normalizeGstReco(dataForSave.gstReco)
         if (getGstTaxableSalesTotal(next) === 0 && lastSavedGstReco) {
           const prior = normalizeGstReco(lastSavedGstReco)
           if (getGstTaxableSalesTotal(prior) > 0) {
@@ -4274,7 +4415,7 @@ function FinancialStatement() {
       })()
       let noteSubAmountsForSave = buildCompleteNoteSubAmounts(
         dedupedAdminForSave.noteSubAmounts,
-        migrateNoteBreakdowns(workingData.noteBreakdowns),
+        migrateNoteBreakdowns(dataForSave.noteBreakdowns),
         workingData.loans,
         adminLinesForSave,
         otherStLinesForSave,
@@ -4282,13 +4423,13 @@ function FinancialStatement() {
         bankAccountsForSave,
         capitalLinesForSave,
         cogsExtraLinesForSave,
-        ledgers,
+        workingLedgers,
       )
       noteSubAmountsForSave = applyGstSalesFromRecoToRevenue(noteSubAmountsForSave, gstRecoForSave)
       noteSubAmountsForSave = applyClosingStockLink(noteSubAmountsForSave)
 
       const payload: FinancialStatementData = {
-        ...workingData,
+        ...dataForSave,
         notes: notesForSave,
         noteSubAmounts: noteSubAmountsForSave,
         administrativeExpenseLines: adminLinesForSave,
@@ -4434,6 +4575,41 @@ function FinancialStatement() {
     }
   }
 
+  const priorYearSales = resolvePriorYearSales(previousYearNotes, previousYearSubAmounts)
+  const priorYearProfitAnchors = useMemo(
+    () =>
+      resolvePriorYearProfitAnchors(
+        previousYearNotes,
+        previousYearSubAmounts,
+        previousYearDerived?.computed.profitAndLoss,
+      ),
+    [previousYearNotes, previousYearSubAmounts, previousYearDerived],
+  )
+
+  const buildAutoGenerateContext = () => {
+    if (!clientId || !fyId || !businessId || !fy) {
+      return null
+    }
+    return {
+      clientId,
+      fyId,
+      businessId,
+      ledgers,
+      fyStartYear: fy.startYear,
+      fyEndYear: fy.endYear,
+      previousYearNotes,
+      previousYearSubAmounts,
+      previousYearManualNoteLines,
+      previousYearAdministrativeExpenseLines,
+      previousYearCashAdjustment,
+      previousYearPlAppropriationAmounts,
+      computedLoans: loanCalcPayload,
+      previousYearComputedLoans,
+      previousYearBankAccounts: visiblePreviousYearBankAccounts,
+      openingBalanceLocks,
+    }
+  }
+
   const openQuickEntry = () => {
     if (!fsData || isFsReadOnly) {
       return
@@ -4443,6 +4619,59 @@ function FinancialStatement() {
     setQuickEntryNoteSearch('')
     setQuickEntryNoteMenuOpen(false)
     setQuickEntryOpen(true)
+  }
+
+  const openAutoGenerate = () => {
+    if (!fsData || isFsReadOnly) {
+      return
+    }
+    setAutoGenerateOpen(true)
+  }
+
+  const handleAutoGeneratePreview = (inputs: FsAutoGenerateInputs): FsAutoGeneratePreview | null => {
+    if (!fsData) {
+      return null
+    }
+    const context = buildAutoGenerateContext()
+    if (!context) {
+      return null
+    }
+    return generateFsAutoPreview(inputs, context, fsData)
+  }
+
+  const handleAutoGenerateApply = async (preview: FsAutoGeneratePreview) => {
+    if (!fsData || isFsReadOnly) {
+      return
+    }
+
+    if (fsDataHasGeneratedContent(fsData)) {
+      const confirmed = await confirmProceed({
+        title: 'Replace current figures?',
+        message:
+          'Applying the generated draft will replace current-year note amounts, schedules, and related lines. Review the notes tabs and click Save when ready.',
+        confirmButtonText: 'Yes, apply',
+      })
+      if (!confirmed) {
+        return
+      }
+    }
+
+    const nextData: FinancialStatementData = {
+      ...preview.draftFsData,
+      savedAt: fsData.savedAt,
+    }
+    setFsData(nextData)
+    fsDataRef.current = nextData
+    setAutoGenerateOpen(false)
+
+    const saved = await handleSave({
+      skipConfirm: true,
+      dataOverride: nextData,
+      successMessage: 'Generated figures applied and saved.',
+    })
+    if (!saved) {
+      setSaveMessage('Generated figures applied. Click Save to persist your changes.')
+    }
   }
 
   const saveQuickEntry = async () => {
@@ -5341,6 +5570,13 @@ function FinancialStatement() {
       (sourcesFundsTotal?.previous ?? 0) - (applicationFundsTotal?.previous ?? 0),
   }
   const cashAdjustmentApplied = normalizeCashAdjustment(fsData?.cashAdjustment)
+  const projectedCashAdjustment = {
+    current: cashAdjustmentApplied.current + sourcesVsApplicationDiff.current,
+    previous: cashAdjustmentApplied.previous + sourcesVsApplicationDiff.previous,
+  }
+  const hasCashAdjustment =
+    Math.round(cashAdjustmentApplied.current) !== 0 ||
+    Math.round(cashAdjustmentApplied.previous) !== 0
   const hasSourcesApplicationDiff =
     Math.round(sourcesVsApplicationDiff.current) !== 0 ||
     Math.round(sourcesVsApplicationDiff.previous) !== 0
@@ -5406,7 +5642,7 @@ function FinancialStatement() {
   })()
 
   const adjustDifferenceInCashBalance = () => {
-    if (!fsData || isFsReadOnly || !hasSourcesApplicationDiff) {
+    if (!fsData || isFsReadOnly || !hasSourcesApplicationDiff || !noteSubRowsMap) {
       return
     }
 
@@ -5415,14 +5651,71 @@ function FinancialStatement() {
       previous: cashAdjustmentApplied.previous + sourcesVsApplicationDiff.previous,
     }
 
+    const handEntry = noteSubRowsMap.cashInHand.find((row) => row.id === 'cash-in-hand')
+    const rawBank = getUnroundedCashTotalsFromSubRows(noteSubRowsMap).bank
+    const rawHand = {
+      current: (handEntry?.current ?? 0) + nextCashAdjustment.current,
+      previous: (handEntry?.previous ?? 0) + nextCashAdjustment.previous,
+    }
+
+    void (async () => {
+      let nextLedgers = ledgers
+      if (!findRoundOffLedger(ledgers)) {
+        try {
+          const ledger = await ensureRoundOffAdjustmentLedger()
+          nextLedgers = [...ledgers.filter((item) => item.id !== ledger.id), ledger]
+          setLedgers(nextLedgers)
+        } catch {
+          setFsData({
+            ...fsData,
+            cashAdjustment: nextCashAdjustment,
+          })
+          setSaveMessage(
+            'Difference applied to Cash in Hand (Note 18) on the Balance Sheet. Click Save to store in the database.',
+          )
+          setCashAdjustConfirmOpen(false)
+          return
+        }
+      }
+
+      const nextData = applyCashRoundOffToFsData(
+        {
+          ...fsData,
+          cashAdjustment: nextCashAdjustment,
+        },
+        nextLedgers,
+        { bank: rawBank, hand: rawHand },
+      )
+
+      setFsData(nextData)
+      setSaveMessage(
+        'Difference applied to Cash in Hand (Note 18) on the Balance Sheet. Click Save to store in the database.',
+      )
+      setCashAdjustConfirmOpen(false)
+    })()
+  }
+
+  const resetCashAdjustment = async () => {
+    if (!fsData || isFsReadOnly || !hasCashAdjustment) {
+      return
+    }
+
+    const confirmed = await confirmProceed({
+      title: 'Reset cash adjustment?',
+      message:
+        'This clears the cash flow adjustment applied to Cash in Hand (Note 18). The Sources vs Application difference will appear again until you adjust or change figures.',
+      confirmButtonText: 'Yes, reset',
+    })
+    if (!confirmed) {
+      return
+    }
+
     setFsData({
       ...fsData,
-      cashAdjustment: nextCashAdjustment,
+      cashAdjustment: createEmptyCashAdjustment(),
     })
-    setSaveMessage(
-      'Difference applied to Cash in Hand (Note 18) on the Balance Sheet. Click Save to store in the database.',
-    )
     setCashAdjustConfirmOpen(false)
+    setSaveMessage('Cash adjustment cleared. Click Save to store in the database.')
   }
 
   return (
@@ -5572,6 +5865,7 @@ function FinancialStatement() {
           activeTab={resolvedActiveTab}
           readOnly={isFsReadOnly}
           onQuickEntry={openQuickEntry}
+          onAutoGenerate={openAutoGenerate}
           onStatementTypeChange={handleStatementTypeChange}
         />
       </div>
@@ -7314,41 +7608,97 @@ function FinancialStatement() {
       {cashAdjustConfirmOpen && (
         <div className="modal-overlay fs-no-print" onClick={() => setCashAdjustConfirmOpen(false)}>
           <div
-            className="fs-edit-unlock-modal"
+            className="fs-edit-unlock-modal fs-cash-adjust-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="fs-cash-adjust-title"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 id="fs-cash-adjust-title">Confirm Cash Adjustment</h2>
+            <h2 id="fs-cash-adjust-title">
+              {hasCashAdjustment ? 'Update Cash Adjustment' : 'Confirm Cash Adjustment'}
+            </h2>
             <p className="fs-edit-unlock-hint">
-              This will add the Sources vs Application difference to{' '}
-              <strong>Cash in Hand (Note 18)</strong> on the Balance Sheet.
-              <br />
-              Current difference: {formatAmount(sourcesVsApplicationDiff.current)} | Previous:{' '}
-              {formatAmount(sourcesVsApplicationDiff.previous)}
-              {(cashAdjustmentApplied.current !== 0 || cashAdjustmentApplied.previous !== 0) && (
-                <>
-                  <br />
-                  Existing adjustment — Current: {formatAmount(cashAdjustmentApplied.current)} |
-                  Previous: {formatAmount(cashAdjustmentApplied.previous)}
-                </>
-              )}
+              Post the remaining Sources vs Application difference to{' '}
+              <strong>Cash in Hand (Note 18)</strong> so the balance sheet totals match.
             </p>
-            <div className="fs-edit-unlock-actions">
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => setCashAdjustConfirmOpen(false)}
-              >
-                Cancel
-              </button>
-              <button type="button" className="primary-btn" onClick={adjustDifferenceInCashBalance}>
-                Confirm Adjustment
-              </button>
+
+            <div className="fs-cash-adjust-summary" aria-label="Cash adjustment summary">
+              <div className="fs-cash-adjust-summary-head">
+                <span />
+                <span>Current</span>
+                <span>Previous</span>
+              </div>
+              <div className="fs-cash-adjust-row">
+                <span className="fs-cash-adjust-label">Remaining difference</span>
+                <strong className={sourcesVsApplicationDiff.current !== 0 ? 'fs-cash-adjust-value--warn' : ''}>
+                  {signedAmountText(sourcesVsApplicationDiff.current)}
+                </strong>
+                <strong className={sourcesVsApplicationDiff.previous !== 0 ? 'fs-cash-adjust-value--warn' : ''}>
+                  {signedAmountText(sourcesVsApplicationDiff.previous)}
+                </strong>
+              </div>
+              {hasCashAdjustment && (
+                <div className="fs-cash-adjust-row">
+                  <span className="fs-cash-adjust-label">Existing adjustment</span>
+                  <strong>{signedAmountText(cashAdjustmentApplied.current)}</strong>
+                  <strong>{signedAmountText(cashAdjustmentApplied.previous)}</strong>
+                </div>
+              )}
+              <div className="fs-cash-adjust-row fs-cash-adjust-row--result">
+                <span className="fs-cash-adjust-label">
+                  {hasCashAdjustment ? 'New adjustment' : 'Cash adjustment'}
+                </span>
+                <strong>{signedAmountText(projectedCashAdjustment.current)}</strong>
+                <strong>{signedAmountText(projectedCashAdjustment.previous)}</strong>
+              </div>
+            </div>
+
+            <p className="fs-cash-adjust-footnote">
+              {hasCashAdjustment
+                ? 'The existing Note 18 adjustment will be updated by the remaining difference shown above.'
+                : 'This amount will be added to Cash in Hand on the balance sheet.'}{' '}
+              Click Save after confirming to store in the database.
+            </p>
+
+            <div className="fs-cash-adjust-actions">
+              {hasCashAdjustment && (
+                <button
+                  type="button"
+                  className="fs-cash-adjust-reset-link"
+                  onClick={() => void resetCashAdjustment()}
+                >
+                  Clear existing adjustment instead
+                </button>
+              )}
+              <div className="fs-cash-adjust-actions-primary">
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => setCashAdjustConfirmOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button type="button" className="primary-btn" onClick={adjustDifferenceInCashBalance}>
+                  {hasCashAdjustment ? 'Update Adjustment' : 'Confirm Adjustment'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
+      )}
+
+      {autoGenerateOpen && (
+        <FsAutoGenerateModal
+          hasPriorYear={priorYearSales > 0}
+          priorYearSales={priorYearSales}
+          priorYearProfitAnchors={priorYearProfitAnchors}
+          ledgers={ledgers}
+          priorYearAdministrativeExpenseLines={previousYearAdministrativeExpenseLines}
+          onLedgersUpdated={setLedgers}
+          onClose={() => setAutoGenerateOpen(false)}
+          onGeneratePreview={handleAutoGeneratePreview}
+          onApply={handleAutoGenerateApply}
+        />
       )}
 
       {quickEntryOpen && (() => {
@@ -7562,15 +7912,27 @@ function FinancialStatement() {
               </span>
             )}
           </div>
-          {!isFsReadOnly && hasSourcesApplicationDiff && (
-            <button
-              type="button"
-              className="fs-balance-diff-banner-btn"
-              onClick={() => setCashAdjustConfirmOpen(true)}
-            >
-              Adjust
-            </button>
-          )}
+          <div className="fs-live-summary-actions">
+            {!isFsReadOnly && hasCashAdjustment && (
+              <button
+                type="button"
+                className="fs-live-summary-reset-btn"
+                onClick={() => void resetCashAdjustment()}
+                title="Clear cash flow adjustment on Note 18"
+              >
+                Reset Adj
+              </button>
+            )}
+            {!isFsReadOnly && hasSourcesApplicationDiff && (
+              <button
+                type="button"
+                className="fs-balance-diff-banner-btn"
+                onClick={() => setCashAdjustConfirmOpen(true)}
+              >
+                Adjust
+              </button>
+            )}
+          </div>
         </div>,
         document.body,
       )}

@@ -2,6 +2,7 @@ import type { BusinessStatus, Client, FinancialYear } from '../types'
 import { buildShortFyLabel, getBusinessFyCellState, getEligibleBusinesses } from './financialYear'
 
 export const BUSINESS_TYPES = [
+  'Self',
   'Proprietorship',
   'Partnership',
   'LLP',
@@ -13,6 +14,32 @@ export const BUSINESS_TYPES = [
 
 export function isProprietorshipType(type: string) {
   return type.trim().toLowerCase() === 'proprietorship'
+}
+
+export function isSelfBusinessType(type: string) {
+  return type.trim().toLowerCase() === 'self'
+}
+
+export function usesClientPanFallback(type: string) {
+  return isProprietorshipType(type) || isSelfBusinessType(type)
+}
+
+export function formatClientAddressForBusiness(client: Pick<Client, 'address' | 'pin'>) {
+  const address = client.address?.trim() || ''
+  const pin = client.pin?.trim() || ''
+  if (address && pin) {
+    return `${address}, PIN ${pin}`
+  }
+  return address || (pin ? `PIN ${pin}` : '')
+}
+
+/** Copy client profile fields into a new self-owned business. */
+export function getBusinessFieldsFromClient(client: Client) {
+  return {
+    name: client.name?.trim() || '',
+    pan: client.pan?.trim() || '',
+    address: formatClientAddressForBusiness(client),
+  }
 }
 
 export function getBusinessStatusLabel(status?: BusinessStatus) {

@@ -656,7 +656,8 @@
   .fs-print-body .statement-amount-print,
   .fs-print-body .statement-note-print-value,
   .fs-print-body .note-amount-print,
-  .fs-print-body .pl-appr-particular-print {
+  .fs-print-body .pl-appr-particular-print,
+  .fs-print-body .notes-sub-particular-print {
     display: inline !important;
     width: auto !important;
     color: var(--print-color-text) !important;

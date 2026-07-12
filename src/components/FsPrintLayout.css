@@ -2452,6 +2452,7 @@
   }
 
   .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-admin-field-marker,
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-admin-field,
   .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-gst-link-bar,
   .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-schedule-link-bar,
   .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-lt-empty-row,
@@ -2477,6 +2478,16 @@
     margin: 0 !important;
     line-height: var(--print-line-height) !important;
     font-variant-numeric: tabular-nums !important;
+  }
+
+  .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-sub-particular-print {
+    display: block !important;
+    width: 100% !important;
+    text-align: left !important;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: var(--print-line-height) !important;
+    color: #000;
   }
 
   .fs-print-body.fs-print-statement-format .fs-tab-panel[data-fs-tab='notes'] .notes-main-label-row,
